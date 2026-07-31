@@ -78,6 +78,9 @@ export default function Eleves() {
           <button type="submit" style={{ padding: "10px 20px", borderRadius: "8px", border: "none", backgroundColor: COULEURS.navy, color: "#FFFFFF", fontWeight: "700", fontSize: "13px", cursor: "pointer" }}>
             Rechercher
           </button>
+          <button type="button" onClick={() => navigate("/eleves-ajouter")} style={{ padding: "10px 20px", borderRadius: "8px", border: `2px solid ${COULEURS.navy}`, backgroundColor: "#FFFFFF", color: COULEURS.navy, fontWeight: "700", fontSize: "13px", cursor: "pointer" }}>
+            + Ajouter un élève
+          </button>
         </form>
 
         {erreur && <p style={{ color: COULEURS.rouge, fontSize: "13px" }}>{erreur}</p>}
@@ -130,3 +133,5 @@ export default function Eleves() {
     </div>
   );
 }
+
+

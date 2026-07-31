@@ -9,6 +9,8 @@ import ReinitialiserMotDePasse from "./pages/ReinitialiserMotDePasse";
 import Layout from "./components/Layout";
 import TableauDeBord from "./pages/modules/TableauDeBord";
 import Eleves from "./pages/modules/Eleves";
+import EleveFiche from "./pages/modules/EleveFiche";
+import AjouterEleve from "./pages/modules/AjouterEleve";
 import Enseignants from "./pages/modules/Enseignants";
 import Matieres from "./pages/modules/Matieres";
 import EmploiDuTemps from "./pages/modules/EmploiDuTemps";
@@ -41,6 +43,8 @@ function AppContent() {
       <Routes>
         <Route path="/tableau-de-bord" element={<TableauDeBord role={role} />} />
         <Route path="/eleves" element={<Eleves />} />
+        <Route path="/eleves/:id" element={<EleveFiche />} />
+        <Route path="/eleves-ajouter" element={<AjouterEleve />} />
         <Route path="/enseignants" element={<Enseignants />} />
         <Route path="/matieres" element={<Matieres />} />
         <Route path="/emploi-du-temps" element={<EmploiDuTemps />} />
@@ -61,3 +65,5 @@ export default function App() {
     </BrowserRouter>
   );
 }
+
+
