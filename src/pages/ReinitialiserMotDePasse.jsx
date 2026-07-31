@@ -24,7 +24,7 @@ export default function ReinitialiserMotDePasse() {
         nouveau_mot_de_passe: nouveauMotDePasse,
         nouveau_mot_de_passe_confirmation: confirmation,
       });
-      navigate("/");
+      navigate("/connexion");
     } catch (err) {
       setErreur(err.response?.data?.message || "Erreur de reinitialisation.");
     } finally {
@@ -82,3 +82,4 @@ const styles = {
   bouton: { width: "100%", padding: "14px", backgroundColor: "#0C447C", color: "#FFFFFF", border: "none", borderRadius: "8px", fontWeight: "bold", cursor: "pointer" },
   erreur: { color: "#DC2626", fontSize: "14px", marginBottom: "12px" },
 };
+

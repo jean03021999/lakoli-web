@@ -47,7 +47,7 @@ export default function MotDePasseOublie() {
           </button>
         </form>
 
-        <p style={styles.lien} onClick={() => navigate("/")}>
+        <p style={styles.lien} onClick={() => navigate("/connexion")}>
           Retour a la connexion
         </p>
       </div>
@@ -65,3 +65,4 @@ const styles = {
   erreur: { color: "#DC2626", fontSize: "14px", marginBottom: "12px" },
   lien: { color: "#0C447C", textAlign: "center", marginTop: "16px", cursor: "pointer", fontSize: "14px" },
 };
+
