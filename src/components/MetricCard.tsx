@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import * as Icons from 'lucide-react';
 
 interface MetricCardProps {
@@ -42,10 +42,11 @@ export default function MetricCard({
                 {trend}
               </span>
             )}
-            {subtitle && <span className="text-slate-400 font-medium truncate">• {subtitle}</span>}
+            {subtitle && <span className="text-slate-400 font-medium truncate">â€¢ {subtitle}</span>}
           </div>
         )}
       </div>
     </div>
   );
 }
+

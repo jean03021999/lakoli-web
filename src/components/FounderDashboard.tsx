@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { School } from '../types';
 import MetricCard from './MetricCard';
 import { FORMAT_GNF } from '../data';
@@ -94,16 +94,16 @@ export default function FounderDashboard({
       recentActivities: [
         {
           id: `act-${Date.now()}`,
-          text: `Création de l'établissement par le Fondateur`,
+          text: `CrÃ©ation de l'Ã©tablissement par le Fondateur`,
           type: 'admin',
-          timeAgo: 'à l\'instant',
+          timeAgo: 'Ã  l\'instant',
           user: 'Fondateur'
         }
       ]
     };
 
     onAddSchool(newSchoolObj);
-    onShowNotification(`L'établissement ${newSchoolName} a été créé dans le réseau consolidé.`, 'success');
+    onShowNotification(`L'Ã©tablissement ${newSchoolName} a Ã©tÃ© crÃ©Ã© dans le rÃ©seau consolidÃ©.`, 'success');
 
     setNewSchoolName('');
     setNewSchoolPupils('');
@@ -116,18 +116,18 @@ export default function FounderDashboard({
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <MetricCard
           iconName="Building"
-          title="Établissements gérés"
+          title="Ã‰tablissements gÃ©rÃ©s"
           value={totalSchools}
-          subtitle="Écoles dans le groupe"
+          subtitle="Ã‰coles dans le groupe"
           trend="Vue d'ensemble"
           trendType="neutral"
           color="text-slate-600 bg-slate-100"
         />
         <MetricCard
           iconName="Users"
-          title="Élèves (Consolidés)"
+          title="Ã‰lÃ¨ves (ConsolidÃ©s)"
           value={totalPupils}
-          subtitle="Élèves scolarisés"
+          subtitle="Ã‰lÃ¨ves scolarisÃ©s"
           trend="+18% de croissance"
           trendType="up"
           color="text-blue-600 bg-blue-50"
@@ -137,7 +137,7 @@ export default function FounderDashboard({
           title="Total Enseignants"
           value={totalTeachers}
           subtitle="Enseignants actifs"
-          trend="Moyenne 15 élèves / prof"
+          trend="Moyenne 15 Ã©lÃ¨ves / prof"
           trendType="neutral"
           color="text-indigo-600 bg-indigo-50"
         />
@@ -145,8 +145,8 @@ export default function FounderDashboard({
           iconName="Coins"
           title="Revenus du Groupe (Mois)"
           value={FORMAT_GNF(totalRevenue)}
-          subtitle="Encaissé sur le réseau"
-          trend="+9.2% de rentabilité"
+          subtitle="EncaissÃ© sur le rÃ©seau"
+          trend="+9.2% de rentabilitÃ©"
           trendType="up"
           color="text-emerald-600 bg-emerald-50"
         />
@@ -158,11 +158,11 @@ export default function FounderDashboard({
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 lg:col-span-2">
           <div className="flex flex-wrap items-center justify-between gap-2 mb-6 border-b border-slate-100 pb-4">
             <div>
-              <h3 className="text-base font-bold text-slate-900">Statut par établissement</h3>
-              <p className="text-xs text-slate-500">Suivi consolidé des abonnements et de la scolarité</p>
+              <h3 className="text-base font-bold text-slate-900">Statut par Ã©tablissement</h3>
+              <p className="text-xs text-slate-500">Suivi consolidÃ© des abonnements et de la scolaritÃ©</p>
             </div>
             <span className="text-[10px] font-black tracking-widest bg-slate-100 text-slate-700 uppercase px-3 py-1 rounded-full border border-slate-200">
-              {totalSchools} Écoles actives
+              {totalSchools} Ã‰coles actives
             </span>
           </div>
 
@@ -170,8 +170,8 @@ export default function FounderDashboard({
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="border-b border-slate-200 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                  <th className="py-3 px-4">Établissement / Ville</th>
-                  <th className="py-3 px-4">Élèves</th>
+                  <th className="py-3 px-4">Ã‰tablissement / Ville</th>
+                  <th className="py-3 px-4">Ã‰lÃ¨ves</th>
                   <th className="py-3 px-4">Statut LAKOLI</th>
                   <th className="py-3 px-4">Retards</th>
                   <th className="py-3 px-4 text-right">Action</th>
@@ -182,7 +182,7 @@ export default function FounderDashboard({
                   <tr key={school.id} className="hover:bg-slate-50/70 transition-colors text-xs">
                     <td className="py-4 px-4">
                       <div className="font-bold text-slate-900 text-sm">{school.name}</div>
-                      <div className="text-slate-400 mt-0.5">{school.city}, Guinée</div>
+                      <div className="text-slate-400 mt-0.5">{school.city}, GuinÃ©e</div>
                     </td>
                     <td className="py-4 px-4">
                       <span className="font-bold text-slate-700 font-mono text-sm">
@@ -196,11 +196,11 @@ export default function FounderDashboard({
                       {school.latePayments.length > 0 ? (
                         <span className="inline-flex items-center gap-1 text-rose-800 font-bold bg-rose-100 px-2.5 py-0.5 rounded-full border border-rose-200">
                           <AlertTriangle className="w-3.5 h-3.5" />
-                          {school.latePayments.length} élèves en retard
+                          {school.latePayments.length} Ã©lÃ¨ves en retard
                         </span>
                       ) : (
                         <span className="inline-flex items-center gap-1 text-emerald-800 font-bold bg-emerald-100 px-2.5 py-0.5 rounded-full border border-emerald-200">
-                          À jour
+                          Ã€ jour
                         </span>
                       )}
                     </td>
@@ -228,19 +228,19 @@ export default function FounderDashboard({
                 Console Fondateur
               </span>
               <h3 className="text-sm font-bold text-slate-800 mt-2">
-                Simuler l'ouverture d'un nouvel établissement
+                Simuler l'ouverture d'un nouvel Ã©tablissement
               </h3>
               <p className="text-xs text-slate-500 mt-1">
-                Créez une nouvelle école dans le réseau LAKOLI pour simuler la croissance consolidée des revenus du groupe.
+                CrÃ©ez une nouvelle Ã©cole dans le rÃ©seau LAKOLI pour simuler la croissance consolidÃ©e des revenus du groupe.
               </p>
             </div>
 
             <form onSubmit={handleCreateSchoolSim} className="space-y-3">
               <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-500 uppercase block">Nom de l'établissement :</label>
+                <label className="text-[10px] font-bold text-slate-500 uppercase block">Nom de l'Ã©tablissement :</label>
                 <input
                   type="text"
-                  placeholder="ex: Lycée LAKOLI - Mamou"
+                  placeholder="ex: LycÃ©e LAKOLI - Mamou"
                   value={newSchoolName}
                   onChange={(e) => setNewSchoolName(e.target.value)}
                   className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs focus:outline-hidden focus:ring-1 focus:ring-slate-900 text-slate-800 placeholder-slate-400"
@@ -256,14 +256,14 @@ export default function FounderDashboard({
                 >
                   <option value="Mamou">Mamou</option>
                   <option value="Siguiri">Siguiri</option>
-                  <option value="Boké">Boké</option>
+                  <option value="BokÃ©">BokÃ©</option>
                   <option value="Conakry">Conakry</option>
                 </select>
               </div>
 
               <div className="grid grid-cols-2 gap-2">
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase block">Effectif élèves :</label>
+                  <label className="text-[10px] font-bold text-slate-500 uppercase block">Effectif Ã©lÃ¨ves :</label>
                   <input
                     type="number"
                     placeholder="ex: 300"
@@ -289,16 +289,17 @@ export default function FounderDashboard({
                 className="w-full bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold py-2.5 rounded-lg flex items-center justify-center gap-1.5 transition-colors shadow-sm mt-2 cursor-pointer"
               >
                 <PlusCircle className="w-4 h-4" />
-                Intégrer au Groupe LAKOLI
+                IntÃ©grer au Groupe LAKOLI
               </button>
             </form>
           </div>
 
           <div className="mt-6 pt-4 border-t border-slate-200 text-center text-xs text-slate-400 font-medium">
-            LAKOLI Group Cloud Center • Guinée
+            LAKOLI Group Cloud Center â€¢ GuinÃ©e
           </div>
         </div>
       </div>
     </div>
   );
 }
+

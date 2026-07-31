@@ -101,7 +101,7 @@ const styles = {
     marginBottom: "16px",
     borderRadius: "8px",
     border: "1px solid #D1D5DB",
-    boxSizing: "border-box",
+    boxSizing: "border-box", color: "#1F2937", backgroundColor: "#FFFFFF",
   },
   bouton: {
     width: "100%",
@@ -119,3 +119,4 @@ const styles = {
     marginBottom: "12px",
   },
 };
+

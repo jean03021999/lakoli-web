@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { MonthlyPaymentHistory } from '../types';
 import { FORMAT_GNF } from '../data';
 
@@ -43,8 +43,8 @@ export default function PaymentHistoryChart({ history }: PaymentHistoryChartProp
       <div>
         <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
           <div>
-            <h3 className="text-base font-bold text-slate-900">Évolution des encaissements</h3>
-            <p className="text-xs text-slate-500">Flux d'évolution mensuel des paiements (GNF)</p>
+            <h3 className="text-base font-bold text-slate-900">Ã‰volution des encaissements</h3>
+            <p className="text-xs text-slate-500">Flux d'Ã©volution mensuel des paiements (GNF)</p>
           </div>
           <div className="flex items-center gap-2">
             <span className="w-3 h-3 rounded-full bg-slate-900"></span>
@@ -171,9 +171,10 @@ export default function PaymentHistoryChart({ history }: PaymentHistoryChartProp
       <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
         <span>Tendance active</span>
         <span className="text-emerald-600 font-bold flex items-center gap-0.5">
-          ▲ +7.3% vs mois précédent
+          â–² +7.3% vs mois prÃ©cÃ©dent
         </span>
       </div>
     </div>
   );
 }
+

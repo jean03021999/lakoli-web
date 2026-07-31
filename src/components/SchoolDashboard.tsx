@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { School, UserSession, Activity } from '../types';
 import MetricCard from './MetricCard';
 import AlertCard from './AlertCard';
@@ -26,7 +26,7 @@ export default function SchoolDashboard({
   // Simulation form states
   const [simName, setSimName] = useState('');
   const [simAmount, setSimAmount] = useState('');
-  const [simClass, setSimClass] = useState('10ème Année A');
+  const [simClass, setSimClass] = useState('10Ã¨me AnnÃ©e A');
 
   // Interactive: approve a pedagogical evaluation
   const handleApproveEvaluation = (evalId: string) => {
@@ -37,9 +37,9 @@ export default function SchoolDashboard({
     const updatedEvaluations = school.pendingEvaluations.filter(e => e.id !== evalId);
     const newActivity: Activity = {
       id: `act-sim-${Date.now()}`,
-      text: `Évaluation de ${evaluation.course} par ${evaluation.teacherName} approuvée et publiée par ${session.name}`,
+      text: `Ã‰valuation de ${evaluation.course} par ${evaluation.teacherName} approuvÃ©e et publiÃ©e par ${session.name}`,
       type: 'admin',
-      timeAgo: 'à l\'instant',
+      timeAgo: 'Ã  l\'instant',
       user: session.name
     };
 
@@ -49,7 +49,7 @@ export default function SchoolDashboard({
       recentActivities: [newActivity, ...school.recentActivities.slice(0, 4)]
     });
 
-    onShowNotification(`L'évaluation de ${evaluation.course} (${evaluation.className}) a été approuvée !`, 'success');
+    onShowNotification(`L'Ã©valuation de ${evaluation.course} (${evaluation.className}) a Ã©tÃ© approuvÃ©e !`, 'success');
   };
 
   // Interactive: reject evaluation
@@ -60,9 +60,9 @@ export default function SchoolDashboard({
     const updatedEvaluations = school.pendingEvaluations.filter(e => e.id !== evalId);
     const newActivity: Activity = {
       id: `act-sim-${Date.now()}`,
-      text: `Évaluation de ${evaluation.course} renvoyée pour modification à ${evaluation.teacherName}`,
+      text: `Ã‰valuation de ${evaluation.course} renvoyÃ©e pour modification Ã  ${evaluation.teacherName}`,
       type: 'admin',
-      timeAgo: 'à l\'instant',
+      timeAgo: 'Ã  l\'instant',
       user: session.name
     };
 
@@ -72,7 +72,7 @@ export default function SchoolDashboard({
       recentActivities: [newActivity, ...school.recentActivities.slice(0, 4)]
     });
 
-    onShowNotification(`Évaluation renvoyée pour modification.`, 'info');
+    onShowNotification(`Ã‰valuation renvoyÃ©e pour modification.`, 'info');
   };
 
   // Interactive: send SMS reminder to parent
@@ -81,7 +81,7 @@ export default function SchoolDashboard({
     if (!payment) return;
 
     setSentReminders([...sentReminders, paymentId]);
-    onShowNotification(`Rappel SMS envoyé avec succès au parent d'élève : ${payment.studentName} (${payment.parentContact})`, 'success');
+    onShowNotification(`Rappel SMS envoyÃ© avec succÃ¨s au parent d'Ã©lÃ¨ve : ${payment.studentName} (${payment.parentContact})`, 'success');
   };
 
   // Interactive simulation: add new client-side payment
@@ -107,9 +107,9 @@ export default function SchoolDashboard({
 
     const newActivity: Activity = {
       id: `act-sim-${Date.now()}`,
-      text: `Paiement reçu de ${simName} (${simClass}) : +${FORMAT_GNF(amt)}`,
+      text: `Paiement reÃ§u de ${simName} (${simClass}) : +${FORMAT_GNF(amt)}`,
       type: 'payment',
-      timeAgo: 'à l\'instant',
+      timeAgo: 'Ã  l\'instant',
       user: session.name
     };
 
@@ -126,7 +126,7 @@ export default function SchoolDashboard({
       recentActivities: [newActivity, ...school.recentActivities.slice(0, 4)]
     });
 
-    onShowNotification(`Paiement de ${FORMAT_GNF(amt)} de ${simName} enregistré avec succès !`, 'success');
+    onShowNotification(`Paiement de ${FORMAT_GNF(amt)} de ${simName} enregistrÃ© avec succÃ¨s !`, 'success');
     setSimName('');
     setSimAmount('');
   };
@@ -136,9 +136,9 @@ export default function SchoolDashboard({
     const updatedPupils = school.pupilsCount + 1;
     const newActivity: Activity = {
       id: `act-sim-${Date.now()}`,
-      text: `Nouvel élève enregistré par le Directeur dans la base LAKOLI`,
+      text: `Nouvel Ã©lÃ¨ve enregistrÃ© par le Directeur dans la base LAKOLI`,
       type: 'student',
-      timeAgo: 'à l\'instant',
+      timeAgo: 'Ã  l\'instant',
       user: session.name
     };
 
@@ -148,7 +148,7 @@ export default function SchoolDashboard({
       recentActivities: [newActivity, ...school.recentActivities.slice(0, 4)]
     });
 
-    onShowNotification(`Nouvel élève inscrit ! Total de l'établissement : ${updatedPupils}`, 'success');
+    onShowNotification(`Nouvel Ã©lÃ¨ve inscrit ! Total de l'Ã©tablissement : ${updatedPupils}`, 'success');
   };
 
   return (
@@ -157,9 +157,9 @@ export default function SchoolDashboard({
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <MetricCard
           iconName="Users"
-          title="Élèves inscrits"
+          title="Ã‰lÃ¨ves inscrits"
           value={school.pupilsCount}
-          subtitle="Élèves actifs"
+          subtitle="Ã‰lÃ¨ves actifs"
           trend="+12 ce trimestre"
           trendType="up"
           color="text-blue-600 bg-blue-50"
@@ -168,8 +168,8 @@ export default function SchoolDashboard({
           iconName="GraduationCap"
           title="Enseignants actifs"
           value={school.teachersCount}
-          subtitle="Enseignants agréés"
-          trend="100% qualifiés"
+          subtitle="Enseignants agrÃ©Ã©s"
+          trend="100% qualifiÃ©s"
           trendType="neutral"
           color="text-indigo-600 bg-indigo-50"
         />
@@ -184,7 +184,7 @@ export default function SchoolDashboard({
         />
         <MetricCard
           iconName="Wallet"
-          title="Paiements encaissés"
+          title="Paiements encaissÃ©s"
           value={FORMAT_GNF(school.monthlyRevenue)}
           subtitle="Revenus du mois en cours"
           trend="+15.3% vs juin"
@@ -199,18 +199,18 @@ export default function SchoolDashboard({
           iconName="AlertCircle"
           title="Paiements en retard"
           value={school.latePayments.length}
-          badgeLabel={school.latePayments.length > 0 ? "URGENT" : "À jour"}
+          badgeLabel={school.latePayments.length > 0 ? "URGENT" : "Ã€ jour"}
           badgeType={school.latePayments.length > 0 ? "error" : "success"}
-          actionLabel="Voir le détail"
+          actionLabel="Voir le dÃ©tail"
           onActionClick={() => setDrawerType('payments')}
-          statusText={`${FORMAT_GNF(school.latePayments.reduce((acc, p) => acc + p.amount, 0))} restant dû`}
+          statusText={`${FORMAT_GNF(school.latePayments.reduce((acc, p) => acc + p.amount, 0))} restant dÃ»`}
         />
 
         <AlertCard
           iconName="FileSpreadsheet"
-          title="Évaluations à valider"
+          title="Ã‰valuations Ã  valider"
           value={school.pendingEvaluations.length}
-          badgeLabel={school.pendingEvaluations.length > 0 ? "ATTENTION" : "Traité"}
+          badgeLabel={school.pendingEvaluations.length > 0 ? "ATTENTION" : "TraitÃ©"}
           badgeType={school.pendingEvaluations.length > 0 ? "warning" : "success"}
           actionLabel="Ouvrir le module"
           onActionClick={() => setDrawerType('evaluations')}
@@ -219,13 +219,13 @@ export default function SchoolDashboard({
 
         <AlertCard
           iconName="CheckCircle"
-          title="Bulletins publiés"
+          title="Bulletins publiÃ©s"
           value={`${school.bulletinsPublished} / ${school.bulletinsExpected}`}
-          badgeLabel={school.bulletinsPublished === school.bulletinsExpected ? "TERMINÉ" : "EN COURS"}
+          badgeLabel={school.bulletinsPublished === school.bulletinsExpected ? "TERMINÃ‰" : "EN COURS"}
           badgeType="success"
-          actionLabel="Gérer les publications"
+          actionLabel="GÃ©rer les publications"
           onActionClick={() => setDrawerType('bulletins')}
-          statusText={`Reste ${school.bulletinsExpected - school.bulletinsPublished} bulletins à saisir`}
+          statusText={`Reste ${school.bulletinsExpected - school.bulletinsPublished} bulletins Ã  saisir`}
         />
       </div>
 
@@ -242,8 +242,8 @@ export default function SchoolDashboard({
           <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm flex flex-col h-full">
             <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-3">
               <div>
-                <h3 className="text-base font-bold text-slate-900">Activité récente</h3>
-                <p className="text-xs text-slate-500">Dernières actions de l'école</p>
+                <h3 className="text-base font-bold text-slate-900">ActivitÃ© rÃ©cente</h3>
+                <p className="text-xs text-slate-500">DerniÃ¨res actions de l'Ã©cole</p>
               </div>
               <Clock className="w-4 h-4 text-slate-400" />
             </div>
@@ -298,7 +298,7 @@ export default function SchoolDashboard({
               <div className="grid grid-cols-2 gap-2">
                 <input
                   type="text"
-                  placeholder="Nom de l'élève"
+                  placeholder="Nom de l'Ã©lÃ¨ve"
                   value={simName}
                   onChange={(e) => setSimName(e.target.value)}
                   className="bg-white border border-slate-200 rounded-lg p-1.5 text-xs focus:outline-hidden focus:ring-1 focus:ring-slate-900 text-slate-800 placeholder-slate-400"
@@ -327,7 +327,7 @@ export default function SchoolDashboard({
                 className="flex-1 bg-white hover:bg-slate-50 border border-slate-200 text-slate-900 text-xs font-bold py-2 px-3 rounded-lg flex items-center justify-center gap-1.5 transition-colors shadow-xs cursor-pointer"
               >
                 <Users className="w-3.5 h-3.5" />
-                Simuler inscription élève
+                Simuler inscription Ã©lÃ¨ve
               </button>
             </div>
           </div>
@@ -339,9 +339,9 @@ export default function SchoolDashboard({
         isOpen={drawerType !== null}
         onClose={() => setDrawerType(null)}
         title={
-          drawerType === 'payments' ? 'Frais de scolarité en retard' :
-          drawerType === 'evaluations' ? 'Évaluations en attente de validation' :
-          'Bulletins scolaires publiés'
+          drawerType === 'payments' ? 'Frais de scolaritÃ© en retard' :
+          drawerType === 'evaluations' ? 'Ã‰valuations en attente de validation' :
+          'Bulletins scolaires publiÃ©s'
         }
         type={drawerType || 'payments'}
         school={school}
@@ -353,3 +353,4 @@ export default function SchoolDashboard({
     </div>
   );
 }
+

@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { X, Send, Check, AlertTriangle, FileText, Bell, GraduationCap, DollarSign } from 'lucide-react';
 import { School, Evaluation, LatePayment } from '../types';
 import { FORMAT_GNF } from '../data';
@@ -61,16 +61,16 @@ export default function InteractiveDrawer({
               <div className="bg-rose-50 border border-rose-200 rounded-xl p-4 flex gap-3 items-start">
                 <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
                 <div>
-                  <h4 className="text-xs font-black uppercase tracking-widest text-rose-900">Retards à régulariser</h4>
+                  <h4 className="text-xs font-black uppercase tracking-widest text-rose-900">Retards Ã  rÃ©gulariser</h4>
                   <p className="text-xs text-rose-700 mt-1 font-medium leading-relaxed">
-                    Le non-paiement des frais scolaires perturbe la trésorerie de l'établissement. Relancez les parents directement via SMS/LAKOLI.
+                    Le non-paiement des frais scolaires perturbe la trÃ©sorerie de l'Ã©tablissement. Relancez les parents directement via SMS/LAKOLI.
                   </p>
                 </div>
               </div>
 
               <div className="space-y-3">
                 <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
-                  Liste des élèves ({school.latePayments.length})
+                  Liste des Ã©lÃ¨ves ({school.latePayments.length})
                 </h3>
 
                 {school.latePayments.length === 0 ? (
@@ -94,11 +94,11 @@ export default function InteractiveDrawer({
                             </span>
                           </div>
                           <p className="text-xs text-rose-600 font-bold mt-1.5">
-                            Scolarité en retard : {FORMAT_GNF(p.amount)}
+                            ScolaritÃ© en retard : {FORMAT_GNF(p.amount)}
                           </p>
                           <div className="flex items-center gap-2 mt-2 text-slate-500 text-[11px] font-medium">
                             <span className="font-mono">{p.parentContact}</span>
-                            <span>•</span>
+                            <span>â€¢</span>
                             <span className="text-rose-500 font-bold">{p.daysOverdue}j de retard</span>
                           </div>
                         </div>
@@ -115,7 +115,7 @@ export default function InteractiveDrawer({
                           {isSent ? (
                             <>
                               <Check className="w-3.5 h-3.5" />
-                              Relancé !
+                              RelancÃ© !
                             </>
                           ) : (
                             <>
@@ -137,23 +137,23 @@ export default function InteractiveDrawer({
               <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex gap-3 items-start">
                 <GraduationCap className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
                 <div>
-                  <h4 className="text-xs font-black uppercase tracking-widest text-amber-900">Validation Pédagogique</h4>
+                  <h4 className="text-xs font-black uppercase tracking-widest text-amber-900">Validation PÃ©dagogique</h4>
                   <p className="text-xs text-amber-700 mt-1 font-medium leading-relaxed">
-                    Vérifiez la cohérence du sujet et du barème saisis par l'enseignant avant de valider. La validation publie l'évaluation sur l'espace élève/parent.
+                    VÃ©rifiez la cohÃ©rence du sujet et du barÃ¨me saisis par l'enseignant avant de valider. La validation publie l'Ã©valuation sur l'espace Ã©lÃ¨ve/parent.
                   </p>
                 </div>
               </div>
 
               <div className="space-y-3">
                 <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
-                  Évaluations en attente ({school.pendingEvaluations.length})
+                  Ã‰valuations en attente ({school.pendingEvaluations.length})
                 </h3>
 
                 {school.pendingEvaluations.length === 0 ? (
                   <div className="text-center py-12 text-slate-400">
                     <Check className="w-10 h-10 text-emerald-500 mx-auto mb-2" />
-                    <p className="text-sm font-bold text-slate-800">Toutes les évaluations sont validées !</p>
-                    <p className="text-xs mt-1">Excellent suivi pédagogique.</p>
+                    <p className="text-sm font-bold text-slate-800">Toutes les Ã©valuations sont validÃ©es !</p>
+                    <p className="text-xs mt-1">Excellent suivi pÃ©dagogique.</p>
                   </div>
                 ) : (
                   school.pendingEvaluations.map((ev) => (
@@ -203,7 +203,7 @@ export default function InteractiveDrawer({
                 <div>
                   <h4 className="text-xs font-black uppercase tracking-widest text-emerald-900">Suivi des Bulletins</h4>
                   <p className="text-xs text-emerald-700 mt-1 font-medium leading-relaxed">
-                    Ratio actuel : {school.bulletinsPublished} bulletins générés sur un total attendu de {school.bulletinsExpected}.
+                    Ratio actuel : {school.bulletinsPublished} bulletins gÃ©nÃ©rÃ©s sur un total attendu de {school.bulletinsExpected}.
                   </p>
                 </div>
               </div>
@@ -211,7 +211,7 @@ export default function InteractiveDrawer({
               {/* Progress visualizer */}
               <div className="space-y-2">
                 <div className="flex justify-between text-xs font-bold text-slate-600">
-                  <span>Progression générale</span>
+                  <span>Progression gÃ©nÃ©rale</span>
                   <span>{Math.round((school.bulletinsPublished / school.bulletinsExpected) * 100)}%</span>
                 </div>
                 <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden border border-slate-200">
@@ -224,20 +224,20 @@ export default function InteractiveDrawer({
 
               <div className="space-y-3">
                 <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
-                  Détail par cycle scolaire
+                  DÃ©tail par cycle scolaire
                 </h3>
 
                 <div className="space-y-2">
                   <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-between text-xs">
                     <span className="font-bold text-slate-700">Cycle Primaire</span>
-                    <span className="font-mono text-slate-400 font-medium">60 / 60 bulletins (Terminé)</span>
+                    <span className="font-mono text-slate-400 font-medium">60 / 60 bulletins (TerminÃ©)</span>
                   </div>
                   <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-between text-xs">
-                    <span className="font-bold text-slate-700">Premier Cycle (Collège)</span>
+                    <span className="font-bold text-slate-700">Premier Cycle (CollÃ¨ge)</span>
                     <span className="font-mono text-slate-400 font-medium">52 / 60 bulletins (En cours)</span>
                   </div>
                   <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-between text-xs">
-                    <span className="font-bold text-slate-700">Second Cycle (Lycée)</span>
+                    <span className="font-bold text-slate-700">Second Cycle (LycÃ©e)</span>
                     <span className="font-mono text-slate-400 font-medium">30 / 60 bulletins (En saisie)</span>
                   </div>
                 </div>
@@ -245,12 +245,12 @@ export default function InteractiveDrawer({
                 <div className="pt-4">
                   <button
                     onClick={() => {
-                      alert('Génération automatique des bulletins restants lancée avec succès.');
+                      alert('GÃ©nÃ©ration automatique des bulletins restants lancÃ©e avec succÃ¨s.');
                     }}
                     className="w-full bg-slate-900 hover:bg-slate-800 text-white py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer"
                   >
                     <FileText className="w-4 h-4" />
-                    Générer les bulletins manquants ({school.bulletinsExpected - school.bulletinsPublished})
+                    GÃ©nÃ©rer les bulletins manquants ({school.bulletinsExpected - school.bulletinsPublished})
                   </button>
                 </div>
               </div>
@@ -260,9 +260,10 @@ export default function InteractiveDrawer({
 
         {/* Footer */}
         <div className="p-4 border-t border-slate-200 bg-slate-50 text-center text-xs font-medium text-slate-400">
-          Propulsé par la plateforme LAKOLI • Session {school.session}
+          PropulsÃ© par la plateforme LAKOLI â€¢ Session {school.session}
         </div>
       </div>
     </div>
   );
 }
+

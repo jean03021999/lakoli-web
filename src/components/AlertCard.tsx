@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import * as Icons from 'lucide-react';
 
 interface AlertCardProps {
@@ -76,3 +76,4 @@ export default function AlertCard({
     </div>
   );
 }
+

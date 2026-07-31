@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { School, UserSession } from '../types';
 import { School as SchoolIcon, Calendar, Shield, LogOut, CheckCircle, Award } from 'lucide-react';
 
@@ -44,7 +44,7 @@ export default function Header({
               <SchoolIcon className="w-3.5 h-3.5 text-slate-500" />
               {session.role === 'Fondateur' ? (
                 <div className="text-left">
-                  <span className="text-[10px] font-bold text-slate-700">Vue Consolidée Multi-écoles</span>
+                  <span className="text-[10px] font-bold text-slate-700">Vue ConsolidÃ©e Multi-Ã©coles</span>
                 </div>
               ) : (
                 <select
@@ -81,7 +81,7 @@ export default function Header({
         <div className="flex flex-wrap items-center justify-between lg:justify-end gap-4 border-t lg:border-t-0 pt-4 lg:pt-0 border-slate-100">
           {/* Simulation Role Switcher */}
           <div className="flex items-center gap-1 bg-slate-100/80 p-1 rounded-xl border border-slate-200/60">
-            <span className="text-[9px] uppercase font-bold text-slate-500 px-2">Rôle :</span>
+            <span className="text-[9px] uppercase font-bold text-slate-500 px-2">RÃ´le :</span>
             {(['Directeur', 'Comptable', 'Fondateur'] as const).map((role) => (
               <button
                 key={role}
@@ -115,3 +115,4 @@ export default function Header({
     </header>
   );
 }
+
