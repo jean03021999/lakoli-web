@@ -11,7 +11,11 @@ import TableauDeBord from "./pages/modules/TableauDeBord";
 import Eleves from "./pages/modules/Eleves";
 import EleveFiche from "./pages/modules/EleveFiche";
 import AjouterEleve from "./pages/modules/AjouterEleve";
+
+import ImporterExcel from "./pages/modules/ImporterExcel";
 import Enseignants from "./pages/modules/Enseignants";
+import EnseignantFiche from "./pages/modules/EnseignantFiche";
+import AjouterEnseignant from "./pages/modules/AjouterEnseignant";
 import Matieres from "./pages/modules/Matieres";
 import EmploiDuTemps from "./pages/modules/EmploiDuTemps";
 import Notes from "./pages/modules/Notes";
@@ -45,7 +49,11 @@ function AppContent() {
         <Route path="/eleves" element={<Eleves />} />
         <Route path="/eleves/:id" element={<EleveFiche />} />
         <Route path="/eleves-ajouter" element={<AjouterEleve />} />
+
+        <Route path="/eleves-importer" element={<ImporterExcel />} />
         <Route path="/enseignants" element={<Enseignants />} />
+        <Route path="/enseignants/:id" element={<EnseignantFiche />} />
+        <Route path="/enseignants-ajouter" element={<AjouterEnseignant />} />
         <Route path="/matieres" element={<Matieres />} />
         <Route path="/emploi-du-temps" element={<EmploiDuTemps />} />
         <Route path="/notes" element={<Notes />} />
@@ -65,5 +73,7 @@ export default function App() {
     </BrowserRouter>
   );
 }
+
+
 
 

@@ -1,9 +1,140 @@
-﻿import { COULEURS } from "../../components/Layout";
+﻿import { useState, useEffect } from "react";
+import api from "../../services/api";
+import { COULEURS } from "../../components/Layout";
+
+const NIVEAUX_COLLEGE_LYCEE = ["7eme", "8eme", "9eme", "10eme", "11eme", "12eme", "Terminale"];
+const MATIERES_SUGGEREES = ["Francais", "Mathematiques", "Anglais", "Histoire", "Geographie", "SVT", "Physique-Chimie", "EPS", "Philosophie", "Economie"];
 
 export default function Matieres() {
+  const [matieres, setMatieres] = useState([]);
+  const [filieres, setFilieres] = useState([]);
+  const [nomMatiere, setNomMatiere] = useState("");
+  const [coefficient, setCoefficient] = useState("");
+  const [filiereId, setFiliereId] = useState("");
+  const [niveau, setNiveau] = useState("");
+  const [nomFiliere, setNomFiliere] = useState("");
+  const [erreur, setErreur] = useState("");
+
+  const charger = async () => {
+    try {
+      const response = await api.get("/matieres");
+      setMatieres(response.data.matieres);
+      setFilieres(response.data.filieres);
+    } catch (err) {
+      setErreur("Impossible de charger les matières.");
+    }
+  };
+
+  useEffect(() => { charger(); }, []);
+
+  const ajouterMatiere = async (e) => {
+    e.preventDefault();
+    try {
+      await api.post("/matieres", {
+        nom: nomMatiere,
+        coefficient: coefficient || null,
+        filiere_id: filiereId || null,
+        niveau: niveau || null,
+      });
+      setNomMatiere(""); setCoefficient(""); setFiliereId(""); setNiveau("");
+      charger();
+    } catch (err) {
+      setErreur(err.response?.data?.message || "Erreur lors de l'ajout.");
+    }
+  };
+
+  const ajouterFiliere = async (e) => {
+    e.preventDefault();
+    try {
+      await api.post("/filieres", { nom: nomFiliere, niveau_a_partir_de: "11eme" });
+      setNomFiliere("");
+      charger();
+    } catch (err) {
+      setErreur("Erreur lors de l'ajout de la filière.");
+    }
+  };
+
+  const carte = { backgroundColor: "#FFFFFF", borderRadius: "16px", padding: "24px", boxShadow: "0 1px 3px rgba(0,0,0,0.08)", marginBottom: "16px" };
+  const champStyle = { padding: "10px 14px", borderRadius: "8px", border: "1px solid #D1D5DB", fontSize: "13px", color: COULEURS.texte, backgroundColor: "#FFFFFF" };
+
   return (
-    <div style={{ backgroundColor: "#FFFFFF", borderRadius: "16px", padding: "48px", textAlign: "center", boxShadow: "0 1px 3px rgba(0,0,0,0.08)" }}>
-      <p style={{ color: COULEURS.gris, fontSize: "14px" }}>Module "Gestion des Matières" — en construction, bientôt connecté à l'API.</p>
+    <div>
+      <div style={{ backgroundColor: COULEURS.navy, borderRadius: "16px", padding: "24px", color: "#FFFFFF", marginBottom: "24px" }}>
+        <h1 style={{ fontSize: "24px", fontWeight: "800", margin: 0 }}>Gestion des Matières & Coefficients</h1>
+      </div>
+
+      {erreur && <p style={{ color: COULEURS.rouge, fontSize: "13px" }}>{erreur}</p>}
+
+      <div style={carte}>
+        <p style={{ fontSize: "13px", fontWeight: "700", color: COULEURS.gris, marginBottom: "16px", textTransform: "uppercase" }}>Ajouter une matière</p>
+        <form onSubmit={ajouterMatiere} style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "flex-end" }}>
+          <div>
+            <label style={{ fontSize: "11px", color: COULEURS.gris, display: "block", marginBottom: "4px" }}>Matière</label>
+            <select value={nomMatiere} onChange={(e) => setNomMatiere(e.target.value)} style={champStyle} required>
+              <option value="">Sélectionner...</option>
+              {MATIERES_SUGGEREES.map((m) => <option key={m} value={m}>{m}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={{ fontSize: "11px", color: COULEURS.gris, display: "block", marginBottom: "4px" }}>Coefficient</label>
+            <input type="number" value={coefficient} onChange={(e) => setCoefficient(e.target.value)} style={{ ...champStyle, width: "80px" }} />
+          </div>
+          <div>
+            <label style={{ fontSize: "11px", color: COULEURS.gris, display: "block", marginBottom: "4px" }}>Niveau</label>
+            <select value={niveau} onChange={(e) => setNiveau(e.target.value)} style={champStyle}>
+              <option value="">Tous niveaux</option>
+              {NIVEAUX_COLLEGE_LYCEE.map((n) => <option key={n} value={n}>{n}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={{ fontSize: "11px", color: COULEURS.gris, display: "block", marginBottom: "4px" }}>Filière (si Lycée)</label>
+            <select value={filiereId} onChange={(e) => setFiliereId(e.target.value)} style={champStyle}>
+              <option value="">Aucune</option>
+              {filieres.map((f) => <option key={f.id} value={f.id}>{f.nom}</option>)}
+            </select>
+          </div>
+          <button type="submit" style={{ padding: "10px 20px", borderRadius: "8px", border: "none", backgroundColor: COULEURS.navy, color: "#FFFFFF", fontWeight: "700", fontSize: "13px", cursor: "pointer" }}>
+            Ajouter
+          </button>
+        </form>
+      </div>
+
+      <div style={carte}>
+        <p style={{ fontSize: "13px", fontWeight: "700", color: COULEURS.gris, marginBottom: "16px", textTransform: "uppercase" }}>Ajouter une filière (Lycée)</p>
+        <form onSubmit={ajouterFiliere} style={{ display: "flex", gap: "10px" }}>
+          <input type="text" placeholder="ex: Scientifique, Littéraire..." value={nomFiliere} onChange={(e) => setNomFiliere(e.target.value)} style={{ ...champStyle, flex: 1 }} required />
+          <button type="submit" style={{ padding: "10px 20px", borderRadius: "8px", border: `2px solid ${COULEURS.navy}`, backgroundColor: "#FFFFFF", color: COULEURS.navy, fontWeight: "700", fontSize: "13px", cursor: "pointer" }}>
+            Ajouter la filière
+          </button>
+        </form>
+      </div>
+
+      <div style={carte}>
+        <p style={{ fontSize: "13px", fontWeight: "700", color: COULEURS.gris, marginBottom: "16px", textTransform: "uppercase" }}>Matières existantes</p>
+        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <thead>
+            <tr style={{ borderBottom: "2px solid #E5E7EB" }}>
+              <th style={{ textAlign: "left", padding: "8px", fontSize: "11px", color: COULEURS.gris }}>Matière</th>
+              <th style={{ textAlign: "left", padding: "8px", fontSize: "11px", color: COULEURS.gris }}>Coefficients définis</th>
+            </tr>
+          </thead>
+          <tbody>
+            {matieres.map((m) => (
+              <tr key={m.id} style={{ borderBottom: "1px solid #F3F4F6" }}>
+                <td style={{ padding: "10px 8px", fontSize: "13px", fontWeight: "600", color: COULEURS.texte }}>{m.nom}</td>
+                <td style={{ padding: "10px 8px", fontSize: "12px", color: COULEURS.gris }}>
+                  {m.coefficients?.length > 0
+                    ? m.coefficients.map((c) => `${c.filiere?.nom || c.niveau || "Général"}: ${c.coefficient}`).join(" · ")
+                    : "Non défini"}
+                </td>
+              </tr>
+            ))}
+            {matieres.length === 0 && (
+              <tr><td colSpan="2" style={{ padding: "24px", textAlign: "center", color: COULEURS.gris, fontSize: "13px" }}>Aucune matière ajoutée.</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
