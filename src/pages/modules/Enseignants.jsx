@@ -2,6 +2,7 @@
 import { useNavigate } from "react-router-dom";
 import api from "../../services/api";
 import { COULEURS } from "../../components/Layout";
+import { Users, CheckCircle2, UserPlus } from "lucide-react";
 
 export default function Enseignants() {
   const [enseignants, setEnseignants] = useState([]);
@@ -109,3 +110,4 @@ export default function Enseignants() {
     </div>
   );
 }
+
