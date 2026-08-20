@@ -1,13 +1,18 @@
-﻿import { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import api from "../../services/api";
 import { COULEURS } from "../../components/Layout";
 
+const TOUS_NIVEAUX = ["Petite Section", "Moyenne Section", "Grande Section", "1ere annee", "2eme annee", "3eme annee", "4eme annee", "5eme annee", "6eme annee", "7eme", "8eme", "9eme", "10eme", "11eme", "12eme", "Terminale"];
 const NIVEAUX_COLLEGE_LYCEE = ["7eme", "8eme", "9eme", "10eme", "11eme", "12eme", "Terminale"];
 const MATIERES_SUGGEREES = ["Francais", "Mathematiques", "Anglais", "Histoire", "Geographie", "SVT", "Physique-Chimie", "EPS", "Philosophie", "Economie"];
 
 export default function Matieres() {
   const [matieres, setMatieres] = useState([]);
   const [filieres, setFilieres] = useState([]);
+  const [classes, setClasses] = useState([]);
+  const [nomClasse, setNomClasse] = useState("");
+  const [niveauClasse, setNiveauClasse] = useState("");
+  const [filiereClasse, setFiliereClasse] = useState("");
   const [nomMatiere, setNomMatiere] = useState("");
   const [coefficient, setCoefficient] = useState("");
   const [filiereId, setFiliereId] = useState("");
@@ -20,8 +25,22 @@ export default function Matieres() {
       const response = await api.get("/matieres");
       setMatieres(response.data.matieres);
       setFilieres(response.data.filieres);
+      const resClasses = await api.get("/classes");
+      setClasses(resClasses.data);
     } catch (err) {
-      setErreur("Impossible de charger les matières.");
+      setErreur("Impossible de charger les données.");
+    }
+  };
+
+  const ajouterClasse = async (e) => {
+    e.preventDefault();
+    setErreur("");
+    try {
+      await api.post("/classes", { nom: nomClasse, niveau: niveauClasse, filiere_id: filiereClasse || null });
+      setNomClasse(""); setNiveauClasse(""); setFiliereClasse("");
+      charger();
+    } catch (err) {
+      setErreur(err.response?.data?.message || "Erreur lors de l'ajout de la classe.");
     }
   };
 
@@ -110,6 +129,51 @@ export default function Matieres() {
       </div>
 
       <div style={carte}>
+        <p style={{ fontSize: "13px", fontWeight: "700", color: COULEURS.gris, marginBottom: "16px", textTransform: "uppercase" }}>Ajouter une classe</p>
+        <form onSubmit={ajouterClasse} style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+          <input type="text" placeholder="Nom (ex: 6ème A)" value={nomClasse} onChange={(e) => setNomClasse(e.target.value)} style={champStyle} required />
+          <select value={niveauClasse} onChange={(e) => setNiveauClasse(e.target.value)} style={champStyle} required>
+            <option value="">Niveau...</option>
+            {TOUS_NIVEAUX.map((n) => <option key={n} value={n}>{n}</option>)}
+          </select>
+          <select value={filiereClasse} onChange={(e) => setFiliereClasse(e.target.value)} style={champStyle}>
+            <option value="">Sans filière</option>
+            {filieres.map((f) => <option key={f.id} value={f.id}>{f.nom}</option>)}
+          </select>
+          <button type="submit" style={{ padding: "10px 20px", borderRadius: "8px", border: "none", backgroundColor: COULEURS.navy, color: "#FFFFFF", fontWeight: "700", fontSize: "13px", cursor: "pointer" }}>
+            Ajouter la classe
+          </button>
+        </form>
+      </div>
+
+      <div style={carte}>
+        <p style={{ fontSize: "13px", fontWeight: "700", color: COULEURS.gris, marginBottom: "16px", textTransform: "uppercase" }}>Classes existantes</p>
+        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <thead>
+            <tr style={{ borderBottom: "2px solid #E5E7EB" }}>
+              <th style={{ textAlign: "left", padding: "8px", fontSize: "11px", color: COULEURS.gris }}>Classe</th>
+              <th style={{ textAlign: "left", padding: "8px", fontSize: "11px", color: COULEURS.gris }}>Niveau</th>
+              <th style={{ textAlign: "left", padding: "8px", fontSize: "11px", color: COULEURS.gris }}>Filière</th>
+              <th style={{ textAlign: "left", padding: "8px", fontSize: "11px", color: COULEURS.gris }}>Élèves</th>
+            </tr>
+          </thead>
+          <tbody>
+            {classes.map((c) => (
+              <tr key={c.id} style={{ borderBottom: "1px solid #F3F4F6" }}>
+                <td style={{ padding: "10px 8px", fontSize: "13px", fontWeight: "600", color: COULEURS.texte }}>{c.nom}</td>
+                <td style={{ padding: "10px 8px", fontSize: "13px", color: COULEURS.texte }}>{c.niveau}</td>
+                <td style={{ padding: "10px 8px", fontSize: "13px", color: COULEURS.texte }}>{c.filiere || "—"}</td>
+                <td style={{ padding: "10px 8px", fontSize: "13px", color: COULEURS.texte }}>{c.nombre_eleves}</td>
+              </tr>
+            ))}
+            {classes.length === 0 && (
+              <tr><td colSpan="4" style={{ padding: "24px", textAlign: "center", color: COULEURS.gris, fontSize: "13px" }}>Aucune classe créée.</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      <div style={carte}>
         <p style={{ fontSize: "13px", fontWeight: "700", color: COULEURS.gris, marginBottom: "16px", textTransform: "uppercase" }}>Matières existantes</p>
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
@@ -138,3 +202,5 @@ export default function Matieres() {
     </div>
   );
 }
+
+
