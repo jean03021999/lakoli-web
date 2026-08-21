@@ -19,6 +19,8 @@ import AjouterEnseignant from "./pages/modules/AjouterEnseignant";
 import Matieres from "./pages/modules/Matieres";
 import EmploiDuTemps from "./pages/modules/EmploiDuTemps";
 import Notes from "./pages/modules/Notes";
+import SaisieNotes from "./pages/modules/SaisieNotes";
+import ValidationNotes from "./pages/modules/ValidationNotes";
 import Bulletins from "./pages/modules/Bulletins";
 import FraisScolarite from "./pages/modules/FraisScolarite";
 import Parametres from "./pages/modules/Parametres";
@@ -56,7 +58,9 @@ function AppContent() {
         <Route path="/enseignants-ajouter" element={<AjouterEnseignant />} />
         <Route path="/matieres" element={<Matieres />} />
         <Route path="/emploi-du-temps" element={<EmploiDuTemps />} />
-        <Route path="/notes" element={<Notes />} />
+        <Route path="/notes" element={<Notes role={role} />} />
+        <Route path="/notes/:id/saisie" element={<SaisieNotes />} />
+        <Route path="/notes/validation/:id" element={<ValidationNotes />} />
         <Route path="/bulletins" element={<Bulletins />} />
         <Route path="/frais-scolarite" element={<FraisScolarite />} />
         <Route path="/parametres" element={<Parametres />} />
@@ -73,6 +77,7 @@ export default function App() {
     </BrowserRouter>
   );
 }
+
 
 
 
