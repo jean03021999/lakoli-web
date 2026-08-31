@@ -17,6 +17,7 @@ import Enseignants from "./pages/modules/Enseignants";
 import EnseignantFiche from "./pages/modules/EnseignantFiche";
 import AjouterEnseignant from "./pages/modules/AjouterEnseignant";
 import Matieres from "./pages/modules/Matieres";
+import Affectations from "./pages/modules/Affectations";
 import EmploiDuTemps from "./pages/modules/EmploiDuTemps";
 import Notes from "./pages/modules/Notes";
 import SaisieNotes from "./pages/modules/SaisieNotes";
@@ -57,6 +58,7 @@ function AppContent() {
         <Route path="/enseignants/:id" element={<EnseignantFiche />} />
         <Route path="/enseignants-ajouter" element={<AjouterEnseignant />} />
         <Route path="/matieres" element={<Matieres />} />
+        <Route path="/affectations" element={<Affectations />} />
         <Route path="/emploi-du-temps" element={<EmploiDuTemps />} />
         <Route path="/notes" element={<Notes role={role} />} />
         <Route path="/notes/:id/saisie" element={<SaisieNotes />} />
@@ -77,6 +79,7 @@ export default function App() {
     </BrowserRouter>
   );
 }
+
 
 
 

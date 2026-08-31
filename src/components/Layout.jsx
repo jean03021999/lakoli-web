@@ -1,4 +1,4 @@
-﻿import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useState } from "react";
 
 const COULEURS = {
@@ -19,6 +19,7 @@ const MODULES = [
   { nom: "Gestion des Élèves", chemin: "/eleves", roles: ["COMPTABLE", "DIRECTEUR", "FONDATEUR"] },
   { nom: "Gestion des Enseignants", chemin: "/enseignants", roles: ["COMPTABLE", "DIRECTEUR", "FONDATEUR", "ENSEIGNANT"] },
   { nom: "Gestion des Matières", chemin: "/matieres", roles: ["COMPTABLE", "DIRECTEUR", "FONDATEUR"] },
+  { nom: "Affectations", chemin: "/affectations", roles: ["COMPTABLE", "DIRECTEUR", "FONDATEUR"] },
   { nom: "Emploi du Temps", chemin: "/emploi-du-temps", roles: ["COMPTABLE", "DIRECTEUR", "FONDATEUR", "ENSEIGNANT"] },
   { nom: "Gestion des Notes", chemin: "/notes", roles: ["DIRECTEUR", "ENSEIGNANT"] },
   { nom: "Bulletins", chemin: "/bulletins", roles: ["DIRECTEUR", "FONDATEUR", "ENSEIGNANT"] },
@@ -128,3 +129,5 @@ export default function Layout({ children, role, setRole }) {
     </div>
   );
 }
+
+

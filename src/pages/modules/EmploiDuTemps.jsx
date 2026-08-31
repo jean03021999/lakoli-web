@@ -1,5 +1,6 @@
-﻿import { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import api from "../../services/api";
+import ChampMatiere from "../../components/ChampMatiere";
 import { COULEURS } from "../../components/Layout";
 
 const JOURS = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"];
@@ -185,3 +186,4 @@ export default function EmploiDuTemps() {
     </div>
   );
 }
+

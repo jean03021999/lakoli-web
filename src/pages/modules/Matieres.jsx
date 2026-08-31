@@ -1,10 +1,26 @@
 import { useState, useEffect } from "react";
 import api from "../../services/api";
+import ChampMatiere from "../../components/ChampMatiere";
 import { COULEURS } from "../../components/Layout";
 
 const TOUS_NIVEAUX = ["Petite Section", "Moyenne Section", "Grande Section", "1ere annee", "2eme annee", "3eme annee", "4eme annee", "5eme annee", "6eme annee", "7eme", "8eme", "9eme", "10eme", "11eme", "12eme", "Terminale"];
 const NIVEAUX_COLLEGE_LYCEE = ["7eme", "8eme", "9eme", "10eme", "11eme", "12eme", "Terminale"];
-const MATIERES_SUGGEREES = ["Francais", "Mathematiques", "Anglais", "Histoire", "Geographie", "SVT", "Physique-Chimie", "EPS", "Philosophie", "Economie"];
+
+const MATIERES_PAR_NIVEAU = {
+  primaire: ["Calcul", "Francais", "Eveil Scientifique", "Education Civique et Morale", "EPS", "Arts Plastiques", "Chant"],
+  college: ["Francais", "Mathematiques", "Anglais", "Histoire", "Geographie", "SVT", "Physique-Chimie", "EPS", "Education Civique", "Arts Plastiques"],
+  lycee: ["Francais", "Mathematiques", "Anglais", "Histoire", "Geographie", "Philosophie", "EPS", "Physique-Chimie", "SVT", "Economie", "Biologie", "Chimie"],
+};
+
+const niveauxPrimaire = ["1ere annee", "2eme annee", "3eme annee", "4eme annee", "5eme annee", "6eme annee"];
+const niveauxCollege = ["7eme", "8eme", "9eme", "10eme"];
+
+function matieresSuggereesPourNiveau(niveau) {
+  if (niveauxPrimaire.includes(niveau)) return MATIERES_PAR_NIVEAU.primaire;
+  if (niveauxCollege.includes(niveau)) return MATIERES_PAR_NIVEAU.college;
+  if (niveau) return MATIERES_PAR_NIVEAU.lycee;
+  return [...new Set([...MATIERES_PAR_NIVEAU.primaire, ...MATIERES_PAR_NIVEAU.college, ...MATIERES_PAR_NIVEAU.lycee])];
+}
 
 export default function Matieres() {
   const [matieres, setMatieres] = useState([]);
@@ -15,6 +31,7 @@ export default function Matieres() {
   const [filiereClasse, setFiliereClasse] = useState("");
   const [nomMatiere, setNomMatiere] = useState("");
   const [coefficient, setCoefficient] = useState("");
+  const [compteDansMoyenne, setCompteDansMoyenne] = useState(true);
   const [filiereId, setFiliereId] = useState("");
   const [niveau, setNiveau] = useState("");
   const [nomFiliere, setNomFiliere] = useState("");
@@ -54,8 +71,9 @@ export default function Matieres() {
         coefficient: coefficient || null,
         filiere_id: filiereId || null,
         niveau: niveau || null,
+        compte_dans_moyenne: compteDansMoyenne,
       });
-      setNomMatiere(""); setCoefficient(""); setFiliereId(""); setNiveau("");
+      setNomMatiere(""); setCoefficient(""); setFiliereId(""); setNiveau(""); setCompteDansMoyenne(true);
       charger();
     } catch (err) {
       setErreur(err.response?.data?.message || "Erreur lors de l'ajout.");
@@ -89,10 +107,13 @@ export default function Matieres() {
         <form onSubmit={ajouterMatiere} style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "flex-end" }}>
           <div>
             <label style={{ fontSize: "11px", color: COULEURS.gris, display: "block", marginBottom: "4px" }}>Matière</label>
-            <select value={nomMatiere} onChange={(e) => setNomMatiere(e.target.value)} style={champStyle} required>
-              <option value="">Sélectionner...</option>
-              {MATIERES_SUGGEREES.map((m) => <option key={m} value={m}>{m}</option>)}
-            </select>
+            <ChampMatiere
+              value={nomMatiere}
+              onChange={setNomMatiere}
+              niveau={niveau}
+              style={champStyle}
+              required
+            />
           </div>
           <div>
             <label style={{ fontSize: "11px", color: COULEURS.gris, display: "block", marginBottom: "4px" }}>Coefficient</label>
@@ -202,5 +223,10 @@ export default function Matieres() {
     </div>
   );
 }
+
+
+
+
+
 
 
