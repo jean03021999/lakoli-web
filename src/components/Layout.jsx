@@ -15,14 +15,14 @@ const COULEURS = {
 };
 
 const MODULES = [
-  { nom: "Tableau de bord", chemin: "/tableau-de-bord", roles: ["COMPTABLE", "DIRECTEUR", "FONDATEUR", "ENSEIGNANT"] },
+  { nom: "Tableau de bord", chemin: "/tableau-de-bord", roles: ["COMPTABLE", "DIRECTEUR", "FONDATEUR", "PROVISEUR", "CENSEUR"] },
   { nom: "Gestion des Élèves", chemin: "/eleves", roles: ["COMPTABLE", "DIRECTEUR", "FONDATEUR"] },
-  { nom: "Gestion des Enseignants", chemin: "/enseignants", roles: ["COMPTABLE", "DIRECTEUR", "FONDATEUR", "ENSEIGNANT"] },
+  { nom: "Gestion des Enseignants", chemin: "/enseignants", roles: ["COMPTABLE", "DIRECTEUR", "FONDATEUR", "PROVISEUR", "CENSEUR"] },
   { nom: "Gestion des Matières", chemin: "/matieres", roles: ["COMPTABLE", "DIRECTEUR", "FONDATEUR"] },
   { nom: "Affectations", chemin: "/affectations", roles: ["COMPTABLE", "DIRECTEUR", "FONDATEUR"] },
-  { nom: "Emploi du Temps", chemin: "/emploi-du-temps", roles: ["COMPTABLE", "DIRECTEUR", "FONDATEUR", "ENSEIGNANT"] },
-  { nom: "Gestion des Notes", chemin: "/notes", roles: ["DIRECTEUR", "ENSEIGNANT"] },
-  { nom: "Bulletins", chemin: "/bulletins", roles: ["DIRECTEUR", "FONDATEUR", "ENSEIGNANT"] },
+  { nom: "Emploi du Temps", chemin: "/emploi-du-temps", roles: ["COMPTABLE", "DIRECTEUR", "FONDATEUR", "PROVISEUR", "CENSEUR"] },
+  { nom: "Gestion des Notes", chemin: "/notes", roles: ["DIRECTEUR", "PROVISEUR", "CENSEUR"] },
+  { nom: "Bulletins", chemin: "/bulletins", roles: ["DIRECTEUR", "FONDATEUR", "PROVISEUR", "CENSEUR"] },
   { nom: "Frais de Scolarité", chemin: "/frais-scolarite", roles: ["COMPTABLE", "DIRECTEUR", "FONDATEUR"] },
 ];
 
@@ -56,7 +56,7 @@ export default function Layout({ children, role, setRole }) {
         <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
           {/* Sélecteur de rôle temporaire, pour démonstration uniquement */}
           <div style={{ display: "flex", backgroundColor: COULEURS.grisClair, borderRadius: "10px", padding: "4px", gap: "4px" }}>
-            {["COMPTABLE", "DIRECTEUR", "FONDATEUR", "ENSEIGNANT"].map((r) => (
+            {["COMPTABLE", "DIRECTEUR", "FONDATEUR", "PROVISEUR", "CENSEUR"].map((r) => (
               <button
                 key={r}
                 onClick={() => setRole(r)}

@@ -1,4 +1,4 @@
-﻿import { useState } from "react";
+import { useState } from "react";
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 
 import Login from "./pages/Login";
@@ -23,6 +23,7 @@ import Notes from "./pages/modules/Notes";
 import SaisieNotes from "./pages/modules/SaisieNotes";
 import ValidationNotes from "./pages/modules/ValidationNotes";
 import Bulletins from "./pages/modules/Bulletins";
+import BulletinApercu from "./pages/modules/BulletinApercu";
 import FraisScolarite from "./pages/modules/FraisScolarite";
 import Parametres from "./pages/modules/Parametres";
 
@@ -63,7 +64,8 @@ function AppContent() {
         <Route path="/notes" element={<Notes role={role} />} />
         <Route path="/notes/:id/saisie" element={<SaisieNotes />} />
         <Route path="/notes/validation/:id" element={<ValidationNotes />} />
-        <Route path="/bulletins" element={<Bulletins />} />
+        <Route path="/bulletins" element={<Bulletins role={role} />} />
+        <Route path="/bulletins/:id" element={<BulletinApercu />} />
         <Route path="/frais-scolarite" element={<FraisScolarite />} />
         <Route path="/parametres" element={<Parametres />} />
         <Route path="*" element={<Navigate to="/tableau-de-bord" />} />
@@ -79,6 +81,7 @@ export default function App() {
     </BrowserRouter>
   );
 }
+
 
 
 
