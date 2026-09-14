@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import api from "../../services/api";
+import { ArrowLeft, Printer } from "lucide-react";
 import { COULEURS } from "../../components/Layout";
+import { Button } from "../../components/ui/LakoliDesignSystem";
 
 export default function BulletinApercu() {
   const { id } = useParams();
@@ -61,13 +63,13 @@ export default function BulletinApercu() {
 
   return (
     <div>
-      <div style={{ display: "flex", gap: "12px", marginBottom: "20px" }}>
-        <button onClick={() => navigate("/bulletins")} style={{ padding: "10px 20px", borderRadius: "8px", border: "none", backgroundColor: COULEURS.gris, color: "#FFFFFF", fontWeight: "700", fontSize: "13px", cursor: "pointer" }}>
-          ← Retour
-        </button>
-        <button onClick={imprimer} style={{ padding: "10px 20px", borderRadius: "8px", border: "none", backgroundColor: COULEURS.navy, color: "#FFFFFF", fontWeight: "700", fontSize: "13px", cursor: "pointer" }}>
-          🖨️ Imprimer
-        </button>
+      <div className="flex gap-3 mb-5">
+        <Button variant="secondary" icon={ArrowLeft} onClick={() => navigate("/bulletins")}>
+          Retour
+        </Button>
+        <Button variant="primary" icon={Printer} onClick={imprimer}>
+          Imprimer
+        </Button>
       </div>
 
       <div ref={printRef} style={{ backgroundColor: "#FFFFFF", borderRadius: "16px", padding: "40px", boxShadow: "0 2px 8px rgba(0,0,0,0.1)", maxWidth: "750px", margin: "0 auto" }}>

@@ -1,34 +1,27 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import api from "../../services/api";
 import ChampMatiere from "../../components/ChampMatiere";
-import { COULEURS } from "../../components/Layout";
+import { School } from "lucide-react";
+import { PageHeader, Card, Button, Input, Select } from "../../components/ui/LakoliDesignSystem";
 
-const TOUS_NIVEAUX = ["Petite Section", "Moyenne Section", "Grande Section", "1ere annee", "2eme annee", "3eme annee", "4eme annee", "5eme annee", "6eme annee", "7eme", "8eme", "9eme", "10eme", "11eme", "12eme", "Terminale"];
 const NIVEAUX_COLLEGE_LYCEE = ["7eme", "8eme", "9eme", "10eme", "11eme", "12eme", "Terminale"];
 
-const MATIERES_PAR_NIVEAU = {
-  primaire: ["Calcul", "Francais", "Eveil Scientifique", "Education Civique et Morale", "EPS", "Arts Plastiques", "Chant"],
-  college: ["Francais", "Mathematiques", "Anglais", "Histoire", "Geographie", "SVT", "Physique-Chimie", "EPS", "Education Civique", "Arts Plastiques"],
-  lycee: ["Francais", "Mathematiques", "Anglais", "Histoire", "Geographie", "Philosophie", "EPS", "Physique-Chimie", "SVT", "Economie", "Biologie", "Chimie"],
+const champMatiereStyle = {
+  width: "100%",
+  padding: "10px 14px",
+  borderRadius: "10px",
+  border: "1px solid #E2E8F0",
+  fontSize: "13px",
+  color: "#1e293b",
+  backgroundColor: "#FFFFFF",
+  boxSizing: "border-box",
 };
 
-const niveauxPrimaire = ["1ere annee", "2eme annee", "3eme annee", "4eme annee", "5eme annee", "6eme annee"];
-const niveauxCollege = ["7eme", "8eme", "9eme", "10eme"];
-
-function matieresSuggereesPourNiveau(niveau) {
-  if (niveauxPrimaire.includes(niveau)) return MATIERES_PAR_NIVEAU.primaire;
-  if (niveauxCollege.includes(niveau)) return MATIERES_PAR_NIVEAU.college;
-  if (niveau) return MATIERES_PAR_NIVEAU.lycee;
-  return [...new Set([...MATIERES_PAR_NIVEAU.primaire, ...MATIERES_PAR_NIVEAU.college, ...MATIERES_PAR_NIVEAU.lycee])];
-}
-
 export default function Matieres() {
+  const navigate = useNavigate();
   const [matieres, setMatieres] = useState([]);
   const [filieres, setFilieres] = useState([]);
-  const [classes, setClasses] = useState([]);
-  const [nomClasse, setNomClasse] = useState("");
-  const [niveauClasse, setNiveauClasse] = useState("");
-  const [filiereClasse, setFiliereClasse] = useState("");
   const [nomMatiere, setNomMatiere] = useState("");
   const [coefficient, setCoefficient] = useState("");
   const [compteDansMoyenne, setCompteDansMoyenne] = useState(true);
@@ -42,22 +35,8 @@ export default function Matieres() {
       const response = await api.get("/matieres");
       setMatieres(response.data.matieres);
       setFilieres(response.data.filieres);
-      const resClasses = await api.get("/classes");
-      setClasses(resClasses.data);
     } catch (err) {
       setErreur("Impossible de charger les données.");
-    }
-  };
-
-  const ajouterClasse = async (e) => {
-    e.preventDefault();
-    setErreur("");
-    try {
-      await api.post("/classes", { nom: nomClasse, niveau: niveauClasse, filiere_id: filiereClasse || null });
-      setNomClasse(""); setNiveauClasse(""); setFiliereClasse("");
-      charger();
-    } catch (err) {
-      setErreur(err.response?.data?.message || "Erreur lors de l'ajout de la classe.");
     }
   };
 
@@ -91,142 +70,92 @@ export default function Matieres() {
     }
   };
 
-  const carte = { backgroundColor: "#FFFFFF", borderRadius: "16px", padding: "24px", boxShadow: "0 1px 3px rgba(0,0,0,0.08)", marginBottom: "16px" };
-  const champStyle = { padding: "10px 14px", borderRadius: "8px", border: "1px solid #D1D5DB", fontSize: "13px", color: COULEURS.texte, backgroundColor: "#FFFFFF" };
-
   return (
-    <div>
-      <div style={{ backgroundColor: COULEURS.navy, borderRadius: "16px", padding: "24px", color: "#FFFFFF", marginBottom: "24px" }}>
-        <h1 style={{ fontSize: "24px", fontWeight: "800", margin: 0 }}>Gestion des Matières & Coefficients</h1>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="Gestion des Matières & Coefficients"
+        description="Créez les matières et les filières de l'établissement."
+        actions={
+          <Button variant="secondary" icon={School} onClick={() => navigate("/classes")}>
+            Gérer les classes
+          </Button>
+        }
+      />
 
-      {erreur && <p style={{ color: COULEURS.rouge, fontSize: "13px" }}>{erreur}</p>}
+      {erreur && <p className="text-sm text-rose-600">{erreur}</p>}
 
-      <div style={carte}>
-        <p style={{ fontSize: "13px", fontWeight: "700", color: COULEURS.gris, marginBottom: "16px", textTransform: "uppercase" }}>Ajouter une matière</p>
-        <form onSubmit={ajouterMatiere} style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "flex-end" }}>
+      <Card className="space-y-4">
+        <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Ajouter une matière</p>
+        <form onSubmit={ajouterMatiere} className="flex flex-wrap items-end gap-3">
           <div>
-            <label style={{ fontSize: "11px", color: COULEURS.gris, display: "block", marginBottom: "4px" }}>Matière</label>
-            <ChampMatiere
-              value={nomMatiere}
-              onChange={setNomMatiere}
-              niveau={niveau}
-              style={champStyle}
-              required
-            />
+            <label className="block text-xs font-semibold text-slate-500 mb-1">Matière</label>
+            <ChampMatiere value={nomMatiere} onChange={setNomMatiere} niveau={niveau} style={champMatiereStyle} required />
           </div>
           <div>
-            <label style={{ fontSize: "11px", color: COULEURS.gris, display: "block", marginBottom: "4px" }}>Coefficient</label>
-            <input type="number" value={coefficient} onChange={(e) => setCoefficient(e.target.value)} style={{ ...champStyle, width: "80px" }} />
+            <label className="block text-xs font-semibold text-slate-500 mb-1">Coefficient</label>
+            <Input type="number" value={coefficient} onChange={(e) => setCoefficient(e.target.value)} className="w-20" />
           </div>
           <div>
-            <label style={{ fontSize: "11px", color: COULEURS.gris, display: "block", marginBottom: "4px" }}>Niveau</label>
-            <select value={niveau} onChange={(e) => setNiveau(e.target.value)} style={champStyle}>
+            <label className="block text-xs font-semibold text-slate-500 mb-1">Niveau</label>
+            <Select value={niveau} onChange={(e) => setNiveau(e.target.value)}>
               <option value="">Tous niveaux</option>
               {NIVEAUX_COLLEGE_LYCEE.map((n) => <option key={n} value={n}>{n}</option>)}
-            </select>
+            </Select>
           </div>
           <div>
-            <label style={{ fontSize: "11px", color: COULEURS.gris, display: "block", marginBottom: "4px" }}>Filière (si Lycée)</label>
-            <select value={filiereId} onChange={(e) => setFiliereId(e.target.value)} style={champStyle}>
+            <label className="block text-xs font-semibold text-slate-500 mb-1">Filière (si Lycée)</label>
+            <Select value={filiereId} onChange={(e) => setFiliereId(e.target.value)}>
               <option value="">Aucune</option>
               {filieres.map((f) => <option key={f.id} value={f.id}>{f.nom}</option>)}
-            </select>
+            </Select>
           </div>
-          <button type="submit" style={{ padding: "10px 20px", borderRadius: "8px", border: "none", backgroundColor: COULEURS.navy, color: "#FFFFFF", fontWeight: "700", fontSize: "13px", cursor: "pointer" }}>
-            Ajouter
-          </button>
+          <Button type="submit" variant="primary">Ajouter</Button>
         </form>
-      </div>
+      </Card>
 
-      <div style={carte}>
-        <p style={{ fontSize: "13px", fontWeight: "700", color: COULEURS.gris, marginBottom: "16px", textTransform: "uppercase" }}>Ajouter une filière (Lycée)</p>
-        <form onSubmit={ajouterFiliere} style={{ display: "flex", gap: "10px" }}>
-          <input type="text" placeholder="ex: Scientifique, Littéraire..." value={nomFiliere} onChange={(e) => setNomFiliere(e.target.value)} style={{ ...champStyle, flex: 1 }} required />
-          <button type="submit" style={{ padding: "10px 20px", borderRadius: "8px", border: `2px solid ${COULEURS.navy}`, backgroundColor: "#FFFFFF", color: COULEURS.navy, fontWeight: "700", fontSize: "13px", cursor: "pointer" }}>
-            Ajouter la filière
-          </button>
+      <Card className="space-y-4">
+        <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Ajouter une filière (Lycée)</p>
+        <form onSubmit={ajouterFiliere} className="flex gap-3">
+          <Input
+            type="text"
+            placeholder="ex: Scientifique, Littéraire..."
+            value={nomFiliere}
+            onChange={(e) => setNomFiliere(e.target.value)}
+            className="flex-1"
+            required
+          />
+          <Button type="submit" variant="secondary">Ajouter la filière</Button>
         </form>
-      </div>
+      </Card>
 
-      <div style={carte}>
-        <p style={{ fontSize: "13px", fontWeight: "700", color: COULEURS.gris, marginBottom: "16px", textTransform: "uppercase" }}>Ajouter une classe</p>
-        <form onSubmit={ajouterClasse} style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
-          <input type="text" placeholder="Nom (ex: 6ème A)" value={nomClasse} onChange={(e) => setNomClasse(e.target.value)} style={champStyle} required />
-          <select value={niveauClasse} onChange={(e) => setNiveauClasse(e.target.value)} style={champStyle} required>
-            <option value="">Niveau...</option>
-            {TOUS_NIVEAUX.map((n) => <option key={n} value={n}>{n}</option>)}
-          </select>
-          <select value={filiereClasse} onChange={(e) => setFiliereClasse(e.target.value)} style={champStyle}>
-            <option value="">Sans filière</option>
-            {filieres.map((f) => <option key={f.id} value={f.id}>{f.nom}</option>)}
-          </select>
-          <button type="submit" style={{ padding: "10px 20px", borderRadius: "8px", border: "none", backgroundColor: COULEURS.navy, color: "#FFFFFF", fontWeight: "700", fontSize: "13px", cursor: "pointer" }}>
-            Ajouter la classe
-          </button>
-        </form>
-      </div>
-
-      <div style={carte}>
-        <p style={{ fontSize: "13px", fontWeight: "700", color: COULEURS.gris, marginBottom: "16px", textTransform: "uppercase" }}>Classes existantes</p>
-        <table style={{ width: "100%", borderCollapse: "collapse" }}>
-          <thead>
-            <tr style={{ borderBottom: "2px solid #E5E7EB" }}>
-              <th style={{ textAlign: "left", padding: "8px", fontSize: "11px", color: COULEURS.gris }}>Classe</th>
-              <th style={{ textAlign: "left", padding: "8px", fontSize: "11px", color: COULEURS.gris }}>Niveau</th>
-              <th style={{ textAlign: "left", padding: "8px", fontSize: "11px", color: COULEURS.gris }}>Filière</th>
-              <th style={{ textAlign: "left", padding: "8px", fontSize: "11px", color: COULEURS.gris }}>Élèves</th>
-            </tr>
-          </thead>
-          <tbody>
-            {classes.map((c) => (
-              <tr key={c.id} style={{ borderBottom: "1px solid #F3F4F6" }}>
-                <td style={{ padding: "10px 8px", fontSize: "13px", fontWeight: "600", color: COULEURS.texte }}>{c.nom}</td>
-                <td style={{ padding: "10px 8px", fontSize: "13px", color: COULEURS.texte }}>{c.niveau}</td>
-                <td style={{ padding: "10px 8px", fontSize: "13px", color: COULEURS.texte }}>{c.filiere || "—"}</td>
-                <td style={{ padding: "10px 8px", fontSize: "13px", color: COULEURS.texte }}>{c.nombre_eleves}</td>
+      <Card className="p-0 overflow-hidden">
+        <p className="text-xs font-bold text-slate-500 uppercase tracking-wider p-5 pb-0">Matières existantes</p>
+        <div className="overflow-x-auto p-5 pt-3">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="border-b border-slate-100 text-slate-400 text-[11px] font-semibold uppercase tracking-wider">
+                <th className="py-2 px-2">Matière</th>
+                <th className="py-2 px-2">Coefficients définis</th>
               </tr>
-            ))}
-            {classes.length === 0 && (
-              <tr><td colSpan="4" style={{ padding: "24px", textAlign: "center", color: COULEURS.gris, fontSize: "13px" }}>Aucune classe créée.</td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      <div style={carte}>
-        <p style={{ fontSize: "13px", fontWeight: "700", color: COULEURS.gris, marginBottom: "16px", textTransform: "uppercase" }}>Matières existantes</p>
-        <table style={{ width: "100%", borderCollapse: "collapse" }}>
-          <thead>
-            <tr style={{ borderBottom: "2px solid #E5E7EB" }}>
-              <th style={{ textAlign: "left", padding: "8px", fontSize: "11px", color: COULEURS.gris }}>Matière</th>
-              <th style={{ textAlign: "left", padding: "8px", fontSize: "11px", color: COULEURS.gris }}>Coefficients définis</th>
-            </tr>
-          </thead>
-          <tbody>
-            {matieres.map((m) => (
-              <tr key={m.id} style={{ borderBottom: "1px solid #F3F4F6" }}>
-                <td style={{ padding: "10px 8px", fontSize: "13px", fontWeight: "600", color: COULEURS.texte }}>{m.nom}</td>
-                <td style={{ padding: "10px 8px", fontSize: "12px", color: COULEURS.gris }}>
-                  {m.coefficients?.length > 0
-                    ? m.coefficients.map((c) => `${c.filiere?.nom || c.niveau || "Général"}: ${c.coefficient}`).join(" · ")
-                    : "Non défini"}
-                </td>
-              </tr>
-            ))}
-            {matieres.length === 0 && (
-              <tr><td colSpan="2" style={{ padding: "24px", textAlign: "center", color: COULEURS.gris, fontSize: "13px" }}>Aucune matière ajoutée.</td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {matieres.map((m) => (
+                <tr key={m.id}>
+                  <td className="py-2.5 px-2 text-sm font-semibold text-slate-900">{m.nom}</td>
+                  <td className="py-2.5 px-2 text-xs text-slate-500">
+                    {m.coefficients?.length > 0
+                      ? m.coefficients.map((c) => `${c.filiere?.nom || c.niveau || "Général"}: ${c.coefficient}`).join(" · ")
+                      : "Non défini"}
+                  </td>
+                </tr>
+              ))}
+              {matieres.length === 0 && (
+                <tr><td colSpan="2" className="py-8 text-center text-sm text-slate-400">Aucune matière ajoutée.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Card>
     </div>
   );
 }
-
-
-
-
-
-
-

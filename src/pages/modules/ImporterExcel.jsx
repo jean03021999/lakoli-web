@@ -1,43 +1,51 @@
-﻿import { useState, useRef } from "react";
+import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../../services/api";
-import { COULEURS } from "../../components/Layout";
+import {
+  ArrowLeft,
+  Download,
+  UploadCloud,
+  FileSpreadsheet,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  Check,
+} from "lucide-react";
+import { Card, Button, Badge } from "../../components/ui/LakoliDesignSystem";
 
 const ETAPES = ["Importer le fichier", "Vérifier les données", "Confirmation"];
 const LIGNES_PAR_PAGE = 10;
 
 function Stepper({ etapeActive }) {
   return (
-    <div style={{ display: "flex", alignItems: "center", marginBottom: "24px" }}>
+    <div className="flex items-center mb-6">
       {ETAPES.map((nom, i) => (
-        <div key={nom} style={{ display: "flex", alignItems: "center", flex: i < ETAPES.length - 1 ? 1 : "unset" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+        <div key={nom} className={`flex items-center ${i < ETAPES.length - 1 ? "flex-1" : ""}`}>
+          <div className="flex items-center gap-2.5">
             <div
-              style={{
-                width: "32px",
-                height: "32px",
-                borderRadius: "50%",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontWeight: "800",
-                fontSize: "13px",
-                backgroundColor: i <= etapeActive ? COULEURS.navy : COULEURS.grisClair,
-                color: i <= etapeActive ? "#FFFFFF" : COULEURS.gris,
-                flexShrink: 0,
-              }}
+              className={`h-8 w-8 rounded-full flex items-center justify-center font-extrabold text-xs shrink-0 ${
+                i <= etapeActive ? "bg-[#2563EB] text-white" : "bg-slate-100 text-slate-400"
+              }`}
             >
-              {i < etapeActive ? "✓" : i + 1}
+              {i < etapeActive ? <Check className="h-4 w-4" /> : i + 1}
             </div>
-            <span style={{ fontSize: "13px", fontWeight: "700", color: i <= etapeActive ? COULEURS.texte : COULEURS.gris, whiteSpace: "nowrap" }}>{nom}</span>
+            <span className={`text-xs font-bold whitespace-nowrap ${i <= etapeActive ? "text-slate-900" : "text-slate-400"}`}>
+              {nom}
+            </span>
           </div>
           {i < ETAPES.length - 1 && (
-            <div style={{ flex: 1, height: "2px", backgroundColor: i < etapeActive ? COULEURS.navy : "#E5E7EB", margin: "0 16px" }} />
+            <div className={`flex-1 h-0.5 mx-4 ${i < etapeActive ? "bg-[#2563EB]" : "bg-slate-200"}`} />
           )}
         </div>
       ))}
     </div>
   );
+}
+
+function badgeStatut(statut) {
+  if (statut === "ok") return <Badge variant="blue" icon={CheckCircle2}>Valide</Badge>;
+  if (statut === "doublon") return <Badge variant="outline">Doublon</Badge>;
+  return <Badge variant="neutral" className="!bg-rose-50 !text-rose-600 !border-rose-100">Erreur</Badge>;
 }
 
 export default function ImporterExcel() {
@@ -134,70 +142,59 @@ export default function ImporterExcel() {
     setPage(1);
   };
 
-  const badgeStatut = (statut) => {
-    if (statut === "ok") return { texte: "✓ Valide", couleur: COULEURS.vert, fond: COULEURS.vertClair };
-    if (statut === "doublon") return { texte: "🔄 Doublon", couleur: "#D97706", fond: "#FEF3C7" };
-    return { texte: "✕ Erreur", couleur: COULEURS.rouge, fond: COULEURS.rougeClair };
-  };
-
-  const carte = { backgroundColor: "#FFFFFF", borderRadius: "16px", padding: "24px", boxShadow: "0 1px 3px rgba(0,0,0,0.08)", marginBottom: "16px" };
-
   const lignesFiltrees = resultat ? resultat.lignes.filter((l) => filtreStatut === "tous" || l.statut === filtreStatut) : [];
   const totalPages = Math.ceil(lignesFiltrees.length / LIGNES_PAR_PAGE) || 1;
   const lignesPage = lignesFiltrees.slice((page - 1) * LIGNES_PAR_PAGE, page * LIGNES_PAR_PAGE);
 
-  // ÉCRAN FINAL — RAPPORT
   if (termine !== null) {
     return (
-      <div>
+      <div className="space-y-6">
         <Stepper etapeActive={2} />
-        <div style={{ ...carte, textAlign: "center", padding: "48px" }}>
-          <div style={{ width: "64px", height: "64px", borderRadius: "50%", backgroundColor: COULEURS.vertClair, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px", fontSize: "28px" }}>✓</div>
-          <h2 style={{ color: COULEURS.texte, fontSize: "20px", fontWeight: "800", margin: "0 0 8px" }}>Import terminé</h2>
-          <p style={{ color: COULEURS.vert, fontSize: "16px", fontWeight: "700", margin: "0 0 4px" }}>{termine} élève(s) importé(s) avec succès</p>
+        <Card className="text-center py-12">
+          <div className="h-16 w-16 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto mb-4">
+            <CheckCircle2 className="h-8 w-8" />
+          </div>
+          <h2 className="text-xl font-bold text-slate-900 mb-1">Import terminé</h2>
+          <p className="text-base font-bold text-emerald-600 mb-1">{termine} élève(s) importé(s) avec succès</p>
           {resultat && (resultat.stats.doublons > 0 || resultat.stats.erreurs > 0) && (
-            <p style={{ color: COULEURS.gris, fontSize: "13px", margin: "0 0 24px" }}>
+            <p className="text-sm text-slate-400 mb-6">
               {resultat.stats.doublons > 0 && `${resultat.stats.doublons} doublon(s) ignoré(s)`}
               {resultat.stats.doublons > 0 && resultat.stats.erreurs > 0 && " · "}
               {resultat.stats.erreurs > 0 && `${resultat.stats.erreurs} ligne(s) rejetée(s)`}
             </p>
           )}
-          <div style={{ display: "flex", gap: "12px", justifyContent: "center", marginTop: "24px" }}>
-            <button onClick={() => navigate("/eleves")} style={{ padding: "12px 24px", borderRadius: "8px", border: "none", backgroundColor: COULEURS.navy, color: "#FFFFFF", fontWeight: "700", cursor: "pointer" }}>
-              Voir les élèves importés
-            </button>
-            <button onClick={recommencer} style={{ padding: "12px 24px", borderRadius: "8px", border: `2px solid ${COULEURS.navy}`, backgroundColor: "#FFFFFF", color: COULEURS.navy, fontWeight: "700", cursor: "pointer" }}>
-              Nouvel import
-            </button>
+          <div className="flex gap-3 justify-center mt-6">
+            <Button variant="primary" onClick={() => navigate("/eleves")}>Voir les élèves importés</Button>
+            <Button variant="secondary" onClick={recommencer}>Nouvel import</Button>
           </div>
-        </div>
+        </Card>
       </div>
     );
   }
 
   return (
-    <div>
-      <button onClick={() => navigate("/eleves")} style={{ background: "none", border: "none", color: COULEURS.navy, fontWeight: "700", fontSize: "13px", cursor: "pointer", marginBottom: "16px", padding: 0 }}>
-        ← Retour à la liste
+    <div className="space-y-6">
+      <button
+        onClick={() => navigate("/eleves")}
+        className="inline-flex items-center gap-2 text-slate-500 hover:text-slate-800 text-sm font-semibold transition-colors group cursor-pointer"
+      >
+        <ArrowLeft className="h-4 w-4 transform group-hover:-translate-x-1 transition-transform" />
+        Retour à la liste
       </button>
 
-      <h2 style={{ fontSize: "20px", fontWeight: "800", color: COULEURS.texte, marginBottom: "20px" }}>Importer des élèves depuis Excel</h2>
+      <h2 className="text-xl font-bold text-slate-900">Importer des élèves depuis Excel</h2>
 
       <Stepper etapeActive={etapeActive} />
 
-      {/* ÉTAPE 1 — SÉLECTION DU FICHIER */}
       {!resultat && (
-        <div style={carte}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-            <p style={{ fontSize: "13px", color: COULEURS.gris, margin: 0 }}>
+        <Card className="space-y-4">
+          <div className="flex items-start justify-between gap-4">
+            <p className="text-sm text-slate-500">
               Colonnes reconnues automatiquement : Nom, Prénom, Matricule, Classe, Date de naissance, Lieu de naissance, filiation. La photo n'est pas importée depuis Excel.
             </p>
-            <button
-              onClick={telechargerModele}
-              style={{ padding: "8px 16px", borderRadius: "8px", border: `1px solid ${COULEURS.navy}`, backgroundColor: "#FFFFFF", color: COULEURS.navy, fontWeight: "700", fontSize: "12px", cursor: "pointer", whiteSpace: "nowrap", marginLeft: "16px" }}
-            >
-              ⬇ Modèle Excel
-            </button>
+            <Button variant="secondary" size="sm" icon={Download} onClick={telechargerModele} className="whitespace-nowrap">
+              Modèle Excel
+            </Button>
           </div>
 
           {!fichier ? (
@@ -206,29 +203,21 @@ export default function ImporterExcel() {
               onDragLeave={() => setSurvole(false)}
               onDrop={handleDrop}
               onClick={() => inputRef.current?.click()}
-              style={{
-                border: `2px dashed ${survole ? COULEURS.navy : "#D1D5DB"}`,
-                borderRadius: "16px",
-                padding: "48px 24px",
-                textAlign: "center",
-                cursor: "pointer",
-                backgroundColor: survole ? COULEURS.navyClair : "#FAFAFA",
-                transition: "all 0.15s",
-              }}
+              className={`border-2 border-dashed rounded-xl p-10 text-center cursor-pointer transition-all ${
+                survole ? "border-[#2563EB] bg-blue-50" : "border-slate-300 bg-slate-50 hover:bg-slate-100/50"
+              }`}
             >
-              <div style={{ fontSize: "40px", marginBottom: "12px" }}>📊</div>
-              <p style={{ fontSize: "15px", fontWeight: "700", color: COULEURS.texte, margin: "0 0 4px" }}>
-                Glissez-déposez votre fichier Excel ici
-              </p>
-              <p style={{ fontSize: "13px", color: COULEURS.gris, margin: "0 0 16px" }}>ou</p>
-              <button
+              <UploadCloud className="h-10 w-10 text-slate-400 mx-auto mb-3" />
+              <p className="text-sm font-bold text-slate-800 mb-1">Glissez-déposez votre fichier Excel ici</p>
+              <p className="text-xs text-slate-400 mb-4">ou</p>
+              <Button
                 type="button"
+                variant="primary"
                 onClick={(e) => { e.stopPropagation(); inputRef.current?.click(); }}
-                style={{ padding: "10px 20px", borderRadius: "8px", border: "none", backgroundColor: COULEURS.navy, color: "#FFFFFF", fontWeight: "700", fontSize: "13px", cursor: "pointer" }}
               >
                 Parcourir les fichiers
-              </button>
-              <p style={{ fontSize: "11px", color: COULEURS.gris, marginTop: "16px" }}>
+              </Button>
+              <p className="text-[11px] text-slate-400 mt-4">
                 Formats acceptés : .xlsx, .xls, .csv — Taille maximale : 10 Mo
               </p>
               <input
@@ -236,119 +225,131 @@ export default function ImporterExcel() {
                 type="file"
                 accept=".xlsx,.xls,.csv"
                 onChange={(e) => selectionnerFichier(e.target.files[0])}
-                style={{ display: "none" }}
+                className="hidden"
               />
             </div>
           ) : (
-            <div style={{ display: "flex", alignItems: "center", gap: "16px", padding: "16px", backgroundColor: COULEURS.grisClair, borderRadius: "12px" }}>
-              <div style={{ width: "44px", height: "44px", borderRadius: "10px", backgroundColor: COULEURS.vertClair, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px", flexShrink: 0 }}>📄</div>
-              <div style={{ flex: 1 }}>
-                <p style={{ fontSize: "13px", fontWeight: "700", color: COULEURS.texte, margin: 0 }}>{fichier.name}</p>
-                <p style={{ fontSize: "12px", color: COULEURS.gris, margin: "2px 0 0" }}>{formatTaille(fichier.size)} · Prêt à analyser</p>
+            <div className="flex items-center gap-4 p-4 bg-slate-50 rounded-xl border border-slate-100">
+              <div className="h-11 w-11 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                <FileSpreadsheet className="h-5 w-5" />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-bold text-slate-900">{fichier.name}</p>
+                <p className="text-xs text-slate-400 mt-0.5">{formatTaille(fichier.size)} · Prêt à analyser</p>
               </div>
               <button
                 onClick={() => { setFichier(null); setErreur(""); }}
-                style={{ padding: "6px 12px", borderRadius: "6px", border: "1px solid #D1D5DB", backgroundColor: "#FFFFFF", color: COULEURS.rouge, fontSize: "12px", fontWeight: "700", cursor: "pointer" }}
+                className="px-3 py-1.5 rounded-lg border border-slate-200 text-rose-600 text-xs font-bold hover:bg-rose-50 transition-colors cursor-pointer"
               >
                 Remplacer
               </button>
             </div>
           )}
 
-          {erreur && <p style={{ color: COULEURS.rouge, fontSize: "13px", marginTop: "12px" }}>{erreur}</p>}
+          {erreur && <p className="text-sm text-rose-600">{erreur}</p>}
 
           {fichier && (
-            <button
-              onClick={handleAnalyser}
-              disabled={analyseEnCours}
-              style={{ marginTop: "16px", width: "100%", padding: "12px 20px", borderRadius: "8px", border: "none", backgroundColor: COULEURS.navy, color: "#FFFFFF", fontWeight: "700", fontSize: "14px", cursor: "pointer" }}
-            >
+            <Button variant="primary" size="lg" disabled={analyseEnCours} onClick={handleAnalyser} className="w-full">
               {analyseEnCours ? "Analyse en cours..." : "Analyser le fichier →"}
-            </button>
+            </Button>
           )}
-        </div>
+        </Card>
       )}
 
-      {/* ÉTAPE 2 — VÉRIFICATION */}
       {resultat && (
         <>
-          <div style={{ display: "flex", gap: "16px", marginBottom: "16px" }}>
-            <button onClick={() => setFiltreStatut("tous")} style={{ ...carte, flex: 1, margin: 0, cursor: "pointer", border: filtreStatut === "tous" ? `2px solid ${COULEURS.navy}` : "2px solid transparent", textAlign: "left" }}>
-              <p style={{ fontSize: "24px", fontWeight: "800", color: COULEURS.texte, margin: 0 }}>{resultat.stats.total}</p>
-              <p style={{ fontSize: "12px", color: COULEURS.gris, margin: 0 }}>Total analysées</p>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <button
+              onClick={() => setFiltreStatut("tous")}
+              className={`bg-white rounded-xl p-4 text-left border-2 transition-colors ${filtreStatut === "tous" ? "border-[#2563EB]" : "border-transparent"} shadow-xs`}
+            >
+              <p className="text-2xl font-extrabold text-slate-900">{resultat.stats.total}</p>
+              <p className="text-xs text-slate-400">Total analysées</p>
             </button>
-            <button onClick={() => setFiltreStatut("ok")} style={{ ...carte, flex: 1, margin: 0, cursor: "pointer", backgroundColor: COULEURS.vertClair, border: filtreStatut === "ok" ? `2px solid ${COULEURS.vert}` : "2px solid transparent", textAlign: "left" }}>
-              <p style={{ fontSize: "24px", fontWeight: "800", color: COULEURS.vert, margin: 0 }}>{resultat.stats.valides}</p>
-              <p style={{ fontSize: "12px", color: COULEURS.vert, margin: 0 }}>✓ Valides</p>
+            <button
+              onClick={() => setFiltreStatut("ok")}
+              className={`bg-emerald-50 rounded-xl p-4 text-left border-2 transition-colors ${filtreStatut === "ok" ? "border-emerald-500" : "border-transparent"} shadow-xs`}
+            >
+              <p className="text-2xl font-extrabold text-emerald-600">{resultat.stats.valides}</p>
+              <p className="text-xs text-emerald-600">Valides</p>
             </button>
-            <button onClick={() => setFiltreStatut("doublon")} style={{ ...carte, flex: 1, margin: 0, cursor: "pointer", backgroundColor: "#FEF3C7", border: filtreStatut === "doublon" ? "2px solid #D97706" : "2px solid transparent", textAlign: "left" }}>
-              <p style={{ fontSize: "24px", fontWeight: "800", color: "#D97706", margin: 0 }}>{resultat.stats.doublons}</p>
-              <p style={{ fontSize: "12px", color: "#D97706", margin: 0 }}>🔄 Doublons</p>
+            <button
+              onClick={() => setFiltreStatut("doublon")}
+              className={`bg-amber-50 rounded-xl p-4 text-left border-2 transition-colors ${filtreStatut === "doublon" ? "border-amber-500" : "border-transparent"} shadow-xs`}
+            >
+              <p className="text-2xl font-extrabold text-amber-600">{resultat.stats.doublons}</p>
+              <p className="text-xs text-amber-600">Doublons</p>
             </button>
-            <button onClick={() => setFiltreStatut("erreur")} style={{ ...carte, flex: 1, margin: 0, cursor: "pointer", backgroundColor: COULEURS.rougeClair, border: filtreStatut === "erreur" ? `2px solid ${COULEURS.rouge}` : "2px solid transparent", textAlign: "left" }}>
-              <p style={{ fontSize: "24px", fontWeight: "800", color: COULEURS.rouge, margin: 0 }}>{resultat.stats.erreurs}</p>
-              <p style={{ fontSize: "12px", color: COULEURS.rouge, margin: 0 }}>✕ Erreurs</p>
+            <button
+              onClick={() => setFiltreStatut("erreur")}
+              className={`bg-rose-50 rounded-xl p-4 text-left border-2 transition-colors ${filtreStatut === "erreur" ? "border-rose-500" : "border-transparent"} shadow-xs`}
+            >
+              <p className="text-2xl font-extrabold text-rose-600">{resultat.stats.erreurs}</p>
+              <p className="text-xs text-rose-600">Erreurs</p>
             </button>
           </div>
 
-          <div style={carte}>
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead>
-                <tr style={{ borderBottom: "2px solid #E5E7EB" }}>
-                  <th style={{ textAlign: "left", padding: "8px", fontSize: "11px", color: COULEURS.gris }}>Statut</th>
-                  <th style={{ textAlign: "left", padding: "8px", fontSize: "11px", color: COULEURS.gris }}>Nom</th>
-                  <th style={{ textAlign: "left", padding: "8px", fontSize: "11px", color: COULEURS.gris }}>Prénom</th>
-                  <th style={{ textAlign: "left", padding: "8px", fontSize: "11px", color: COULEURS.gris }}>Classe</th>
-                  <th style={{ textAlign: "left", padding: "8px", fontSize: "11px", color: COULEURS.gris }}>Détail</th>
-                </tr>
-              </thead>
-              <tbody>
-                {lignesPage.map((ligne, i) => {
-                  const badge = badgeStatut(ligne.statut);
-                  return (
-                    <tr key={i} style={{ borderBottom: "1px solid #F3F4F6" }}>
-                      <td style={{ padding: "10px 8px" }}>
-                        <span style={{ backgroundColor: badge.fond, color: badge.couleur, padding: "3px 10px", borderRadius: "10px", fontSize: "11px", fontWeight: "700", whiteSpace: "nowrap" }}>{badge.texte}</span>
-                      </td>
-                      <td style={{ padding: "10px 8px", fontSize: "13px", color: COULEURS.texte }}>{ligne.nom}</td>
-                      <td style={{ padding: "10px 8px", fontSize: "13px", color: COULEURS.texte }}>{ligne.prenom}</td>
-                      <td style={{ padding: "10px 8px", fontSize: "13px", color: COULEURS.texte }}>{ligne.classe_nom}</td>
-                      <td style={{ padding: "10px 8px", fontSize: "12px", color: COULEURS.gris }}>{ligne.message}</td>
+          <Card className="p-0 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-slate-100 text-slate-400 text-[11px] font-semibold uppercase tracking-wider bg-slate-50/20">
+                    <th className="py-3 px-5">Statut</th>
+                    <th className="py-3 px-5">Nom</th>
+                    <th className="py-3 px-5">Prénom</th>
+                    <th className="py-3 px-5">Classe</th>
+                    <th className="py-3 px-5">Détail</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-sm">
+                  {lignesPage.map((ligne, i) => (
+                    <tr key={i}>
+                      <td className="py-3 px-5">{badgeStatut(ligne.statut)}</td>
+                      <td className="py-3 px-5 text-slate-800">{ligne.nom}</td>
+                      <td className="py-3 px-5 text-slate-800">{ligne.prenom}</td>
+                      <td className="py-3 px-5 text-slate-800">{ligne.classe_nom}</td>
+                      <td className="py-3 px-5 text-xs text-slate-400">{ligne.message}</td>
                     </tr>
-                  );
-                })}
-                {lignesPage.length === 0 && (
-                  <tr><td colSpan="5" style={{ padding: "24px", textAlign: "center", color: COULEURS.gris, fontSize: "13px" }}>Aucune ligne dans cette catégorie.</td></tr>
-                )}
-              </tbody>
-            </table>
+                  ))}
+                  {lignesPage.length === 0 && (
+                    <tr><td colSpan="5" className="py-8 text-center text-sm text-slate-400">Aucune ligne dans cette catégorie.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
 
             {totalPages > 1 && (
-              <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "12px", marginTop: "16px" }}>
-                <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} style={{ padding: "6px 12px", borderRadius: "6px", border: "1px solid #D1D5DB", backgroundColor: "#FFFFFF", cursor: page === 1 ? "default" : "pointer", opacity: page === 1 ? 0.4 : 1 }}>←</button>
-                <span style={{ fontSize: "13px", color: COULEURS.gris }}>Page {page} / {totalPages}</span>
-                <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages} style={{ padding: "6px 12px", borderRadius: "6px", border: "1px solid #D1D5DB", backgroundColor: "#FFFFFF", cursor: page === totalPages ? "default" : "pointer", opacity: page === totalPages ? 0.4 : 1 }}>→</button>
+              <div className="flex items-center justify-center gap-3 py-4">
+                <button
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                  className="p-1.5 rounded-lg border border-slate-200 disabled:opacity-40 cursor-pointer disabled:cursor-default"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+                <span className="text-xs text-slate-500">Page {page} / {totalPages}</span>
+                <button
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={page === totalPages}
+                  className="p-1.5 rounded-lg border border-slate-200 disabled:opacity-40 cursor-pointer disabled:cursor-default"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </button>
               </div>
             )}
 
-            <div style={{ marginTop: "20px", padding: "16px", backgroundColor: COULEURS.navyClair, borderRadius: "10px" }}>
-              <p style={{ fontSize: "13px", color: COULEURS.texte, margin: "0 0 12px", fontWeight: "600" }}>
+            <div className="m-5 mt-0 p-4 bg-blue-50 rounded-xl">
+              <p className="text-sm font-semibold text-slate-800 mb-3">
                 {resultat.stats.valides} élève(s) seront importés · {resultat.stats.doublons + resultat.stats.erreurs} ligne(s) seront ignorées
               </p>
-              <div style={{ display: "flex", gap: "12px" }}>
-                <button
-                  onClick={handleImporter}
-                  disabled={resultat.stats.valides === 0 || importEnCours}
-                  style={{ padding: "12px 24px", borderRadius: "8px", border: "none", backgroundColor: resultat.stats.valides === 0 ? COULEURS.gris : COULEURS.vert, color: "#FFFFFF", fontWeight: "700", cursor: resultat.stats.valides === 0 ? "default" : "pointer" }}
-                >
+              <div className="flex gap-3">
+                <Button variant="primary" disabled={resultat.stats.valides === 0 || importEnCours} onClick={handleImporter}>
                   {importEnCours ? "Import en cours..." : `Confirmer l'import (${resultat.stats.valides})`}
-                </button>
-                <button onClick={recommencer} style={{ padding: "12px 24px", borderRadius: "8px", border: `1px solid ${COULEURS.gris}`, backgroundColor: "#FFFFFF", color: COULEURS.texte, fontWeight: "700", cursor: "pointer" }}>
-                  Recommencer
-                </button>
+                </Button>
+                <Button variant="secondary" onClick={recommencer}>Recommencer</Button>
               </div>
             </div>
-          </div>
+          </Card>
         </>
       )}
     </div>

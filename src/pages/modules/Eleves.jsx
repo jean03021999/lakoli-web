@@ -1,13 +1,61 @@
-﻿import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect, useMemo } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import api from "../../services/api";
-import { COULEURS } from "../../components/Layout";
-import { Users, CheckCircle2, AlertTriangle, Search, Upload, UserPlus } from "lucide-react";
+import {
+  Search,
+  Filter,
+  Plus,
+  Upload,
+  ChevronRight,
+  Users,
+  CheckCircle2,
+  AlertTriangle,
+} from "lucide-react";
+import { PageHeader, Button } from "../../components/ui/LakoliDesignSystem";
+
+function badgeStatut(statut) {
+  if (statut === "a_jour") {
+    return (
+      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-600">
+        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5" />
+        À jour
+      </span>
+    );
+  }
+  if (statut === "en_retard") {
+    return (
+      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-600">
+        <span className="w-1.5 h-1.5 rounded-full bg-rose-500 mr-1.5" />
+        En retard
+      </span>
+    );
+  }
+  if (statut === "a_echoir") {
+    return (
+      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-600">
+        <span className="w-1.5 h-1.5 rounded-full bg-amber-500 mr-1.5" />
+        À échoir
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-500">
+      Aucun frais
+    </span>
+  );
+}
+
+function getInitials(nom, prenom) {
+  return `${nom?.[0] || ""}${prenom?.[0] || ""}`.toUpperCase();
+}
 
 export default function Eleves() {
+  const [searchParams] = useSearchParams();
   const [eleves, setEleves] = useState([]);
-  const [stats, setStats] = useState({ total: 0, a_jour: 0, en_retard: 0 });
-  const [recherche, setRecherche] = useState("");
+  const [stats, setStats] = useState({ total: 0, a_jour: 0, en_retard: 0, a_echoir: 0 });
+  const [recherche, setRecherche] = useState(searchParams.get("recherche") || "");
+  const [classeFiltre, setClasseFiltre] = useState("all");
+  const [statutFiltre, setStatutFiltre] = useState(searchParams.get("statut") || "all");
   const [chargement, setChargement] = useState(true);
   const [erreur, setErreur] = useState("");
   const navigate = useNavigate();
@@ -27,106 +75,189 @@ export default function Eleves() {
     }
   };
 
-  useEffect(() => { chargerEleves(); }, []);
+  useEffect(() => {
+    chargerEleves();
+  }, []);
 
-  const handleRecherche = (e) => { e.preventDefault(); chargerEleves(); };
-
-  const badgeStatut = (statut) => {
-    if (statut === "a_jour") return { texte: "À jour", couleur: COULEURS.vert, fond: COULEURS.vertClair };
-    if (statut === "en_retard") return { texte: "En retard", couleur: COULEURS.rouge, fond: COULEURS.rougeClair };
-    return { texte: "Aucun frais", couleur: COULEURS.gris, fond: COULEURS.grisClair };
+  const handleRecherche = (e) => {
+    e.preventDefault();
+    chargerEleves();
   };
 
-  const carteStat = (icone, titre, valeur, couleur, fond) => (
-    <div style={{ backgroundColor: "#FFFFFF", borderRadius: "16px", padding: "20px", boxShadow: "0 1px 3px rgba(0,0,0,0.08)", flex: 1, display: "flex", alignItems: "center", gap: "16px" }}>
-      <div style={{ width: "44px", height: "44px", borderRadius: "12px", backgroundColor: fond, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-        {icone}
-      </div>
-      <div>
-        <p style={{ fontSize: "11px", fontWeight: "700", color: COULEURS.gris, textTransform: "uppercase", margin: 0 }}>{titre}</p>
-        <p style={{ fontSize: "26px", fontWeight: "800", color: couleur, margin: "2px 0 0" }}>{valeur}</p>
-      </div>
-    </div>
-  );
+  const classesDisponibles = useMemo(() => {
+    const uniques = new Set(eleves.map((e) => e.classe).filter(Boolean));
+    return Array.from(uniques).sort();
+  }, [eleves]);
+
+  const elevesFiltres = eleves.filter((e) => {
+    const matchClasse = classeFiltre === "all" || e.classe === classeFiltre;
+    const matchStatut = statutFiltre === "all" || e.statut_paiement === statutFiltre;
+    return matchClasse && matchStatut;
+  });
 
   return (
-    <div>
-      <div style={{ backgroundColor: COULEURS.navy, borderRadius: "16px", padding: "24px", color: "#FFFFFF", marginBottom: "24px" }}>
-        <h1 style={{ fontSize: "24px", fontWeight: "800", margin: 0 }}>Gestion de la Scolarité & des Élèves</h1>
-        <p style={{ fontSize: "13px", opacity: 0.85, margin: "6px 0 0" }}>Suivi en temps réel des inscriptions et des paiements de l'établissement.</p>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="Gestion de la Scolarité & des Élèves"
+        description="Suivi en temps réel des inscriptions et des paiements de l'établissement."
+      />
 
-      <div style={{ display: "flex", gap: "16px", marginBottom: "24px" }}>
-        {carteStat(<Users size={20} color={COULEURS.navy} />, "Total élèves", stats.total, COULEURS.texte, COULEURS.navyClair)}
-        {carteStat(<CheckCircle2 size={20} color={COULEURS.vert} />, "Paiements à jour", stats.a_jour, COULEURS.vert, COULEURS.vertClair)}
-        {carteStat(<AlertTriangle size={20} color={COULEURS.rouge} />, "Paiements en retard", stats.en_retard, COULEURS.rouge, COULEURS.rougeClair)}
-      </div>
-
-      <div style={{ backgroundColor: "#FFFFFF", borderRadius: "16px", padding: "24px", boxShadow: "0 1px 3px rgba(0,0,0,0.08)" }}>
-        <form onSubmit={handleRecherche} style={{ marginBottom: "20px", display: "flex", gap: "8px" }}>
-          <div style={{ flex: 1, position: "relative" }}>
-            <Search size={16} color={COULEURS.gris} style={{ position: "absolute", left: "14px", top: "50%", transform: "translateY(-50%)" }} />
+      {/* Barre de recherche et filtres */}
+      <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <form onSubmit={handleRecherche} className="relative flex-1 max-w-md flex gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
             <input
               type="text"
               placeholder="Rechercher par nom, prénom ou matricule..."
               value={recherche}
               onChange={(e) => setRecherche(e.target.value)}
-              style={{ width: "100%", padding: "10px 14px 10px 38px", borderRadius: "8px", border: "1px solid #D1D5DB", fontSize: "13px", color: COULEURS.texte, backgroundColor: "#FFFFFF", boxSizing: "border-box" }}
+              className="w-full pl-9 pr-4 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2563EB] focus:border-[#2563EB] transition-colors"
             />
           </div>
-          <button type="submit" style={{ padding: "10px 20px", borderRadius: "8px", border: "none", backgroundColor: COULEURS.navy, color: "#FFFFFF", fontWeight: "700", fontSize: "13px", cursor: "pointer" }}>
+          <Button type="submit" variant="primary" size="md">
             Rechercher
-          </button>
-          <button type="button" onClick={() => navigate("/eleves-importer")} style={{ display: "flex", alignItems: "center", gap: "6px", padding: "10px 16px", borderRadius: "8px", border: `2px solid ${COULEURS.navy}`, backgroundColor: "#FFFFFF", color: COULEURS.navy, fontWeight: "700", fontSize: "13px", cursor: "pointer" }}>
-            <Upload size={15} /> Importer Excel
-          </button>
-          <button type="button" onClick={() => navigate("/eleves-ajouter")} style={{ display: "flex", alignItems: "center", gap: "6px", padding: "10px 16px", borderRadius: "8px", border: "none", backgroundColor: COULEURS.navy, color: "#FFFFFF", fontWeight: "700", fontSize: "13px", cursor: "pointer" }}>
-            <UserPlus size={15} /> Ajouter un élève
-          </button>
+          </Button>
         </form>
 
-        {erreur && <p style={{ color: COULEURS.rouge, fontSize: "13px" }}>{erreur}</p>}
-        {chargement && <p style={{ color: COULEURS.gris, fontSize: "13px" }}>Chargement...</p>}
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-1.5">
+            <Filter className="h-3.5 w-3.5 text-slate-400" />
+            <select
+              value={classeFiltre}
+              onChange={(e) => setClasseFiltre(e.target.value)}
+              className="bg-white border border-slate-200 text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#2563EB]"
+            >
+              <option value="all">Toutes les classes</option>
+              {classesDisponibles.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          </div>
+
+          <select
+            value={statutFiltre}
+            onChange={(e) => setStatutFiltre(e.target.value)}
+            className="bg-white border border-slate-200 text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#2563EB]"
+          >
+            <option value="all">Tous les statuts de paiement</option>
+            <option value="a_jour">À jour</option>
+            <option value="a_echoir">À échoir</option>
+            <option value="en_retard">En retard</option>
+          </select>
+
+          <Button variant="secondary" icon={Upload} onClick={() => navigate("/eleves-importer")}>
+            Importer Excel
+          </Button>
+          <Button variant="primary" icon={Plus} onClick={() => navigate("/eleves-ajouter")}>
+            Ajouter un élève
+          </Button>
+        </div>
+      </div>
+
+      {/* 4 cartes statistiques */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+        <div className="bg-white p-5 rounded-xl border border-slate-200/80 shadow-xs flex items-center gap-4">
+          <div className="p-3 bg-blue-50 rounded-lg">
+            <Users className="h-6 w-6 text-[#2563EB]" />
+          </div>
+          <div>
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total élèves</p>
+            <h3 className="text-2xl font-bold text-slate-900 mt-0.5">{stats.total}</h3>
+          </div>
+        </div>
+
+        <div className="bg-white p-5 rounded-xl border border-slate-200/80 shadow-xs flex items-center gap-4">
+          <div className="p-3 bg-emerald-50 rounded-lg">
+            <CheckCircle2 className="h-6 w-6 text-emerald-600" />
+          </div>
+          <div>
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Paiements à jour</p>
+            <h3 className="text-2xl font-bold text-slate-900 mt-0.5">{stats.a_jour}</h3>
+          </div>
+        </div>
+
+        <div className="bg-white p-5 rounded-xl border border-slate-200/80 shadow-xs flex items-center gap-4">
+          <div className="p-3 bg-amber-50 rounded-lg">
+            <AlertTriangle className="h-6 w-6 text-amber-500" />
+          </div>
+          <div>
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Paiements à échoir</p>
+            <h3 className="text-2xl font-bold text-slate-900 mt-0.5">{stats.a_echoir}</h3>
+          </div>
+        </div>
+
+        <div className="bg-white p-5 rounded-xl border border-slate-200/80 shadow-xs flex items-center gap-4">
+          <div className="p-3 bg-rose-50 rounded-lg">
+            <AlertTriangle className="h-6 w-6 text-rose-600" />
+          </div>
+          <div>
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Paiements en retard</p>
+            <h3 className="text-2xl font-bold text-slate-900 mt-0.5">{stats.en_retard}</h3>
+          </div>
+        </div>
+      </div>
+
+      {/* Tableau */}
+      <div className="bg-white rounded-xl border border-slate-200/80 shadow-xs overflow-hidden">
+        <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+          <h2 className="text-sm font-bold text-slate-900">Répertoire des élèves ({elevesFiltres.length})</h2>
+          <span className="text-xs text-slate-500">Cliquez sur un élève pour voir sa fiche détaillée</span>
+        </div>
+
+        {erreur && <p className="px-5 py-3 text-sm text-rose-600">{erreur}</p>}
+        {chargement && <p className="px-5 py-3 text-sm text-slate-500">Chargement...</p>}
 
         {!chargement && !erreur && (
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead>
-              <tr style={{ borderBottom: "2px solid #E5E7EB" }}>
-                <th style={{ textAlign: "left", padding: "10px", fontSize: "11px", color: COULEURS.gris, textTransform: "uppercase" }}>Élève</th>
-                <th style={{ textAlign: "left", padding: "10px", fontSize: "11px", color: COULEURS.gris, textTransform: "uppercase" }}>Classe</th>
-                <th style={{ textAlign: "left", padding: "10px", fontSize: "11px", color: COULEURS.gris, textTransform: "uppercase" }}>Statut paiement</th>
-                <th style={{ padding: "10px" }}></th>
-              </tr>
-            </thead>
-            <tbody>
-              {eleves.map((eleve) => {
-                const badge = badgeStatut(eleve.statut_paiement);
-                return (
-                  <tr key={eleve.id} onClick={() => navigate(`/eleves/${eleve.id}`)} style={{ borderBottom: "1px solid #F3F4F6", cursor: "pointer" }}>
-                    <td style={{ padding: "12px 10px" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                        <div style={{ width: "36px", height: "36px", borderRadius: "10px", backgroundColor: COULEURS.navyClair, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px", fontWeight: "800", color: COULEURS.navy, flexShrink: 0 }}>
-                          {eleve.nom?.[0]}{eleve.prenom?.[0]}
-                        </div>
-                        <div>
-                          <p style={{ margin: 0, fontWeight: "700", fontSize: "13px", color: COULEURS.texte }}>{eleve.nom} {eleve.prenom}</p>
-                          <p style={{ margin: 0, fontSize: "11px", color: COULEURS.gris }}>{eleve.matricule}</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td style={{ padding: "12px 10px", fontSize: "13px", color: COULEURS.texte }}>{eleve.classe || "—"}</td>
-                    <td style={{ padding: "12px 10px" }}>
-                      <span style={{ backgroundColor: badge.fond, color: badge.couleur, padding: "4px 10px", borderRadius: "12px", fontSize: "11px", fontWeight: "700" }}>{badge.texte}</span>
-                    </td>
-                    <td style={{ padding: "12px 10px", textAlign: "right", color: COULEURS.gris }}>›</td>
+          <div className="overflow-x-auto">
+            {elevesFiltres.length > 0 ? (
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-slate-100 text-slate-400 text-[11px] font-semibold uppercase tracking-wider bg-slate-50/20">
+                    <th className="py-3 px-5">Élève</th>
+                    <th className="py-3 px-5">Classe</th>
+                    <th className="py-3 px-5">Statut Paiement</th>
+                    <th className="py-3 px-5 text-right">Actions</th>
                   </tr>
-                );
-              })}
-              {eleves.length === 0 && (
-                <tr><td colSpan="4" style={{ padding: "24px", textAlign: "center", color: COULEURS.gris, fontSize: "13px" }}>Aucun élève trouvé.</td></tr>
-              )}
-            </tbody>
-          </table>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-sm">
+                  {elevesFiltres.map((eleve) => (
+                    <tr
+                      key={eleve.id}
+                      onClick={() => navigate(`/eleves/${eleve.id}`)}
+                      className="hover:bg-slate-50/80 transition-colors cursor-pointer group"
+                    >
+                      <td className="py-3.5 px-5">
+                        <div className="flex items-center gap-3">
+                          <div className="h-10 w-10 rounded-full bg-blue-50 text-[#2563EB] border border-blue-100 flex items-center justify-center font-bold text-xs uppercase shrink-0">
+                            {getInitials(eleve.nom, eleve.prenom)}
+                          </div>
+                          <div>
+                            <div className="font-bold text-slate-900 group-hover:text-[#2563EB] transition-colors">
+                              {eleve.nom} {eleve.prenom}
+                            </div>
+                            <div className="text-xs text-slate-400 font-mono mt-0.5">{eleve.matricule}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="py-3.5 px-5 text-slate-600 font-medium">{eleve.classe || "—"}</td>
+                      <td className="py-3.5 px-5">{badgeStatut(eleve.statut_paiement)}</td>
+                      <td className="py-3.5 px-5 text-right">
+                        <div className="inline-flex items-center text-slate-400 group-hover:text-[#2563EB] transition-all transform group-hover:translate-x-1">
+                          <ChevronRight className="h-4 w-4" />
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <div className="text-center py-12 px-4">
+                <Users className="h-12 w-12 text-slate-300 mx-auto mb-3" />
+                <p className="text-slate-500 font-medium text-sm">Aucun élève ne correspond aux filtres appliqués</p>
+              </div>
+            )}
+          </div>
         )}
       </div>
     </div>

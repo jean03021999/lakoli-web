@@ -1,7 +1,8 @@
-﻿import { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import api from "../../services/api";
-import { COULEURS } from "../../components/Layout";
+import { ArrowLeft, Check, X, Send } from "lucide-react";
+import { Card, Button, Badge } from "../../components/ui/LakoliDesignSystem";
 
 export default function ValidationNotes() {
   const { id } = useParams();
@@ -44,75 +45,91 @@ export default function ValidationNotes() {
     } catch (err) { setErreur(err.response?.data?.message || "Erreur lors de la publication."); }
   };
 
-  if (!evaluation) return <p style={{ color: COULEURS.gris }}>Chargement...</p>;
-
-  const carte = { backgroundColor: "#FFFFFF", borderRadius: "16px", padding: "24px", boxShadow: "0 1px 3px rgba(0,0,0,0.08)" };
+  if (!evaluation) return <p className="text-sm text-slate-500">Chargement...</p>;
 
   return (
-    <div>
-      <button onClick={() => navigate("/notes")} style={{ background: "none", border: "none", color: COULEURS.navy, fontWeight: "700", fontSize: "13px", cursor: "pointer", marginBottom: "16px", padding: 0 }}>
-        ← Retour
+    <div className="space-y-6">
+      <button
+        onClick={() => navigate("/notes")}
+        className="inline-flex items-center gap-2 text-slate-500 hover:text-slate-800 text-sm font-semibold transition-colors group cursor-pointer"
+      >
+        <ArrowLeft className="h-4 w-4 transform group-hover:-translate-x-1 transition-transform" />
+        Retour
       </button>
 
-      <div style={{ backgroundColor: COULEURS.navy, borderRadius: "16px", padding: "24px", color: "#FFFFFF", marginBottom: "16px" }}>
-        <p style={{ fontSize: "11px", opacity: 0.8, margin: 0 }}>{evaluation.code}</p>
-        <h2 style={{ fontSize: "20px", fontWeight: "800", margin: "4px 0" }}>{evaluation.libelle}</h2>
-        <p style={{ fontSize: "12px", opacity: 0.85, margin: 0 }}>{evaluation.affectation?.classe?.nom} — {evaluation.affectation?.matiere?.nom} — Statut: {evaluation.statut}</p>
+      <div className="bg-white rounded-xl border border-slate-200/80 shadow-xs p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <p className="text-xs text-slate-400">{evaluation.code}</p>
+          <h2 className="text-xl font-bold text-slate-900 mt-0.5">{evaluation.libelle}</h2>
+          <p className="text-xs text-slate-500 mt-1">
+            {evaluation.affectation?.classe?.nom} — {evaluation.affectation?.matiere?.nom}
+          </p>
+        </div>
+        <Badge variant={evaluation.statut === "valide" ? "blue" : "outline"}>{evaluation.statut}</Badge>
       </div>
 
-      {erreur && <p style={{ color: COULEURS.rouge, fontSize: "13px" }}>{erreur}</p>}
+      {erreur && <p className="text-sm text-rose-600">{erreur}</p>}
 
-      <div style={carte}>
-        <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: "20px" }}>
-          <thead>
-            <tr style={{ borderBottom: "2px solid #E5E7EB" }}>
-              <th style={{ textAlign: "left", padding: "10px", fontSize: "11px", color: COULEURS.gris }}>Élève</th>
-              <th style={{ textAlign: "left", padding: "10px", fontSize: "11px", color: COULEURS.gris }}>Note / {evaluation.bareme}</th>
-              <th style={{ textAlign: "left", padding: "10px", fontSize: "11px", color: COULEURS.gris }}>Présence</th>
-            </tr>
-          </thead>
-          <tbody>
-            {evaluation.notes?.map((n) => (
-              <tr key={n.id} style={{ borderBottom: "1px solid #F3F4F6" }}>
-                <td style={{ padding: "10px", fontSize: "13px", color: COULEURS.texte }}>{n.eleve?.nom} {n.eleve?.prenom}</td>
-                <td style={{ padding: "10px", fontSize: "13px", color: COULEURS.texte }}>{n.valeur ?? "—"}</td>
-                <td style={{ padding: "10px", fontSize: "12px", color: COULEURS.gris }}>{n.statut_presence.replace("_", " ")}</td>
+      <Card className="p-0 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="border-b border-slate-100 text-slate-400 text-[11px] font-semibold uppercase tracking-wider bg-slate-50/20">
+                <th className="py-3 px-5">Élève</th>
+                <th className="py-3 px-5">Note / {evaluation.bareme}</th>
+                <th className="py-3 px-5">Présence</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-slate-100 text-sm">
+              {evaluation.notes?.map((n) => (
+                <tr key={n.id}>
+                  <td className="py-3 px-5 text-slate-800 font-medium">{n.eleve?.nom} {n.eleve?.prenom}</td>
+                  <td className="py-3 px-5 text-slate-800">{n.valeur ?? "—"}</td>
+                  <td className="py-3 px-5 text-xs text-slate-500">{n.statut_presence.replace("_", " ")}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
 
-        {evaluation.statut === "soumis" && (
-          <div style={{ display: "flex", gap: "12px" }}>
-            <button onClick={valider} style={{ padding: "12px 24px", borderRadius: "8px", border: "none", backgroundColor: COULEURS.vert, color: "#FFFFFF", fontWeight: "700", cursor: "pointer" }}>
-              ✓ Valider
-            </button>
-            <button onClick={() => setAfficherRejet(!afficherRejet)} style={{ padding: "12px 24px", borderRadius: "8px", border: `2px solid ${COULEURS.rouge}`, backgroundColor: "#FFFFFF", color: COULEURS.rouge, fontWeight: "700", cursor: "pointer" }}>
-              ✕ Rejeter
-            </button>
-          </div>
-        )}
+        <div className="p-5 border-t border-slate-100 space-y-4">
+          {evaluation.statut === "soumis" && (
+            <div className="flex gap-3">
+              <Button variant="primary" icon={Check} onClick={valider}>Valider</Button>
+              <Button
+                variant="secondary"
+                icon={X}
+                className="!text-rose-600 !border-rose-200 hover:!bg-rose-50"
+                onClick={() => setAfficherRejet(!afficherRejet)}
+              >
+                Rejeter
+              </Button>
+            </div>
+          )}
 
-        {evaluation.statut === "valide" && (
-          <button onClick={publier} style={{ padding: "12px 24px", borderRadius: "8px", border: "none", backgroundColor: "#2563EB", color: "#FFFFFF", fontWeight: "700", cursor: "pointer" }}>
-            📢 Publier
-          </button>
-        )}
+          {evaluation.statut === "valide" && (
+            <Button variant="primary" icon={Send} onClick={publier}>Publier</Button>
+          )}
 
-        {afficherRejet && (
-          <div style={{ marginTop: "16px" }}>
-            <textarea
-              placeholder="Motif du rejet (obligatoire)..."
-              value={commentaire}
-              onChange={(e) => setCommentaire(e.target.value)}
-              style={{ width: "100%", padding: "10px", borderRadius: "8px", border: "1px solid #D1D5DB", fontSize: "13px", minHeight: "80px", boxSizing: "border-box" }}
-            />
-            <button onClick={rejeter} disabled={!commentaire} style={{ marginTop: "8px", padding: "10px 20px", borderRadius: "8px", border: "none", backgroundColor: COULEURS.rouge, color: "#FFFFFF", fontWeight: "700", cursor: "pointer" }}>
-              Confirmer le rejet
-            </button>
-          </div>
-        )}
-      </div>
+          {afficherRejet && (
+            <div className="space-y-2">
+              <textarea
+                placeholder="Motif du rejet (obligatoire)..."
+                value={commentaire}
+                onChange={(e) => setCommentaire(e.target.value)}
+                className="w-full px-3.5 py-2.5 rounded-lg border border-slate-200 text-sm min-h-[80px] focus:outline-none focus:ring-1 focus:ring-[#2563EB]"
+              />
+              <button
+                onClick={rejeter}
+                disabled={!commentaire}
+                className="px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-sm font-semibold cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                Confirmer le rejet
+              </button>
+            </div>
+          )}
+        </div>
+      </Card>
     </div>
   );
 }

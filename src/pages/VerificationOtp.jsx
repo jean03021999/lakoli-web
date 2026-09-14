@@ -1,5 +1,6 @@
-﻿import { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { GraduationCap, ShieldCheck } from "lucide-react";
 import api from "../services/api";
 
 export default function VerificationOtp() {
@@ -51,54 +52,63 @@ export default function VerificationOtp() {
   };
 
   return (
-    <div style={styles.conteneur}>
-      <div style={styles.carte}>
-        <h1 style={styles.titre}>Verification de securite</h1>
-        <p style={styles.sousTitre}>Un code a ete envoye a {identifiant}</p>
+    <div className="min-h-screen w-full bg-[#0b1320] text-[#f1f5f9] flex items-center justify-center p-4 font-sans">
+      <div className="w-full max-w-md bg-[#1e293b] rounded-2xl border border-[#334155] shadow-2xl p-8">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="h-11 w-11 rounded-2xl bg-[#0C447C] flex items-center justify-center shadow-lg">
+            <ShieldCheck className="h-6 w-6 text-[#f1f5f9]" />
+          </div>
+          <div>
+            <span className="text-lg font-black tracking-tight text-[#f1f5f9] block leading-none">
+              Vérification de sécurité
+            </span>
+            <span className="text-xs text-[#94a3b8]">Un code a été envoyé à {identifiant}</span>
+          </div>
+        </div>
 
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} className="space-y-4">
           <input
             type="text"
-            placeholder="Code a 6 chiffres"
+            placeholder="Code à 6 chiffres"
             value={code}
             onChange={(e) => setCode(e.target.value)}
             maxLength={6}
-            style={styles.champ}
+            className="w-full px-4 py-3 rounded-lg bg-[#0f172a] border border-[#334155] text-white text-center text-lg tracking-[0.3em] placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#0C447C] focus:border-transparent"
             required
           />
 
-          <label style={styles.label}>
+          <label className="flex items-center gap-2 text-sm text-[#94a3b8] cursor-pointer">
             <input
               type="checkbox"
               checked={confiance}
               onChange={(e) => setConfiance(e.target.checked)}
+              className="h-4 w-4 rounded border-[#334155] bg-[#0f172a] text-[#0C447C] focus:ring-[#0C447C]"
             />
-            {" "}Faire confiance a cet appareil pendant 30 jours
+            Faire confiance à cet appareil pendant 30 jours
           </label>
 
-          {erreur && <p style={styles.erreur}>{erreur}</p>}
+          {erreur && (
+            <p className="text-sm text-red-400 bg-red-500/10 border border-red-500/30 rounded-lg px-3 py-2">
+              {erreur}
+            </p>
+          )}
 
-          <button type="submit" style={styles.bouton} disabled={chargement}>
-            {chargement ? "Verification..." : "Verifier"}
+          <button
+            type="submit"
+            disabled={chargement}
+            className="w-full py-3 rounded-lg bg-[#0C447C] text-white font-semibold hover:bg-[#0a3663] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            {chargement ? "Vérification..." : "Vérifier"}
           </button>
         </form>
 
-        <p style={styles.lien} onClick={renvoyerCode}>
+        <p
+          onClick={renvoyerCode}
+          className="text-center mt-5 text-sm text-blue-400 hover:text-blue-300 hover:underline cursor-pointer"
+        >
           Renvoyer le code
         </p>
       </div>
     </div>
   );
 }
-
-const styles = {
-  conteneur: { display: "flex", justifyContent: "center", alignItems: "center", minHeight: "100vh", backgroundColor: "#F8FAFC" },
-  carte: { backgroundColor: "#FFFFFF", borderRadius: "24px", padding: "48px", boxShadow: "0 10px 40px rgba(0,0,0,0.08)", width: "400px" },
-  titre: { color: "#0C447C", fontSize: "24px", fontWeight: "bold", marginBottom: "4px" },
-  sousTitre: { color: "#6B7280", marginBottom: "24px", fontSize: "14px" },
-  champ: { width: "100%", padding: "12px", marginBottom: "16px", borderRadius: "8px", border: "1px solid #D1D5DB", boxSizing: "border-box", textAlign: "center", fontSize: "18px", letterSpacing: "4px" },
-  label: { display: "block", fontSize: "14px", color: "#374151", marginBottom: "16px" },
-  bouton: { width: "100%", padding: "14px", backgroundColor: "#0C447C", color: "#FFFFFF", border: "none", borderRadius: "8px", fontWeight: "bold", cursor: "pointer" },
-  erreur: { color: "#DC2626", fontSize: "14px", marginBottom: "12px" },
-  lien: { color: "#0C447C", textAlign: "center", marginTop: "16px", cursor: "pointer", fontSize: "14px" },
-};

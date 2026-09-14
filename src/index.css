@@ -1,4 +1,4 @@
-﻿@import "tailwindcss";
+@import "tailwindcss";
 
 @theme {
   --color-lakoli-navy: #0C447C;
@@ -18,5 +18,4 @@ body {
 #root {
   min-height: 100vh;
 }
-
 
