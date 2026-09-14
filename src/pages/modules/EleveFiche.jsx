@@ -84,7 +84,7 @@ export default function EleveFiche() {
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
                 <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Classe</span>
-                <span className="font-semibold text-slate-800">{eleve.classe?.nom || "—"}</span>
+                <span className="font-semibold text-slate-800">{eleve.inscription_active?.classe?.nom || "—"}</span>
               </div>
               <div>
                 <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Né(e) le</span>
@@ -99,6 +99,14 @@ export default function EleveFiche() {
                   <MapPin className="h-4 w-4 text-slate-400" />
                   {eleve.lieu_naissance || "Non renseigné"}
                 </span>
+              </div>
+              <div>
+                <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Type d'inscription</span>
+                <span className="font-semibold text-slate-800">{eleve.inscription_active?.type_inscription || "—"}</span>
+              </div>
+              <div>
+                <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Statut inscription</span>
+                <span className="font-semibold text-slate-800">{eleve.inscription_active?.statut || "—"}</span>
               </div>
             </div>
           </div>
