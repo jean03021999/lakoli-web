@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import api from "../../services/api";
 import { PageHeader, Card, Button, Input, Select } from "../../components/ui/LakoliDesignSystem";
+import { TOUS_NIVEAUX } from "../../constants/niveaux";
 
 export default function Classes() {
   const [classes, setClasses] = useState([]);
@@ -49,8 +50,11 @@ export default function Classes() {
       <Card className="space-y-4">
         <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Ajouter une classe</p>
         <form onSubmit={ajouterClasse} className="flex flex-wrap gap-3">
-          <Input type="text" placeholder="Nom (ex: 6ème A)" value={nom} onChange={(e) => setNom(e.target.value)} required />
-          <Input type="text" placeholder="Niveau (ex: 6eme annee)" value={niveau} onChange={(e) => setNiveau(e.target.value)} required />
+          <Input type="text" placeholder="Nom (ex: 6ème Année A)" value={nom} onChange={(e) => setNom(e.target.value)} required />
+          <Select value={niveau} onChange={(e) => setNiveau(e.target.value)} required>
+            <option value="">Choisir un niveau...</option>
+            {TOUS_NIVEAUX.map((n) => <option key={n} value={n}>{n}</option>)}
+          </Select>
           <Select value={filiereId} onChange={(e) => setFiliereId(e.target.value)}>
             <option value="">Sans filière</option>
             {filieres.map((f) => <option key={f.id} value={f.id}>{f.nom}</option>)}

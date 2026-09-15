@@ -128,6 +128,10 @@ function TableauDeBordComptable() {
   const [suggestionsRetardOuvertes, setSuggestionsRetardOuvertes] = useState(false);
   const [statsParClasse, setStatsParClasse] = useState([]);
   const [statsClasseDisponibles, setStatsClasseDisponibles] = useState(true);
+  const [finances, setFinances] = useState({ inscriptions: 0, reinscriptions: 0, scolarite: 0, autres: 0 });
+  const [financesDisponibles, setFinancesDisponibles] = useState(true);
+  const [situationInscriptions, setSituationInscriptions] = useState({ nouveaux: 0, reinscrits: 0, aReinscrire: 0, total: 0 });
+  const [inscriptionsDisponibles, setInscriptionsDisponibles] = useState(true);
 
   useEffect(() => {
     async function charger() {
@@ -163,6 +167,33 @@ function TableauDeBordComptable() {
         setStatsClasseDisponibles(true);
       } else {
         setStatsClasseDisponibles(false);
+      }
+
+      if (eleves.status === "fulfilled") {
+        const listeEleves = eleves.value.data.eleves;
+        const nouveaux = listeEleves.filter((e) => e.inscription_active?.type_inscription === "nouvelle").length;
+        const reinscrits = listeEleves.filter((e) => e.inscription_active?.type_inscription === "reinscription").length;
+        const aReinscrire = listeEleves.filter((e) => !e.inscription_active).length;
+        setSituationInscriptions({ nouveaux, reinscrits, aReinscrire, total: listeEleves.length });
+        setInscriptionsDisponibles(true);
+      } else {
+        setInscriptionsDisponibles(false);
+      }
+
+      if (paiements.status === "fulfilled") {
+        const totaux = { inscriptions: 0, reinscriptions: 0, scolarite: 0, autres: 0 };
+        paiements.value.data.forEach((p) => {
+          const nom = normaliser(p.type_frais);
+          const montant = parseFloat(p.montant) || 0;
+          if (nom.includes("reinscription")) totaux.reinscriptions += montant;
+          else if (nom.includes("inscription")) totaux.inscriptions += montant;
+          else if (nom.includes("scolarite")) totaux.scolarite += montant;
+          else totaux.autres += montant;
+        });
+        setFinances(totaux);
+        setFinancesDisponibles(true);
+      } else {
+        setFinancesDisponibles(false);
       }
     }
     charger();
@@ -233,6 +264,10 @@ function TableauDeBordComptable() {
     return Array.from(noms).slice(0, 6);
   })();
 
+  // Poids de chaque catégorie de frais dans le total, pour les barres de progression
+  const totalFinances = finances.inscriptions + finances.reinscriptions + finances.scolarite + finances.autres;
+  const pctFinance = (valeur) => (totalFinances > 0 ? Math.round((valeur / totalFinances) * 100) : 0);
+
   return (
     <div className="space-y-6" style={{ backgroundColor: "#f8fafc" }}>
       <div
@@ -279,6 +314,109 @@ function TableauDeBordComptable() {
           progression={pctEncaisseGlobal}
         />
       </div>
+
+      {/* Répartition financière */}
+      <div className="space-y-3">
+        <h3 className="text-sm font-bold text-slate-900">Répartition financière</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <CarteStatistique
+            titre="Inscriptions"
+            valeur={financesDisponibles ? formaterGNF(finances.inscriptions) : "—"}
+            icone={FileText}
+            degrade="linear-gradient(135deg, #1d4ed8, #3b82f6)"
+            badge={financesDisponibles ? `${pctFinance(finances.inscriptions)}% du total` : "—"}
+            progression={financesDisponibles ? pctFinance(finances.inscriptions) : 0}
+          />
+          <CarteStatistique
+            titre="Réinscriptions"
+            valeur={financesDisponibles ? formaterGNF(finances.reinscriptions) : "—"}
+            icone={Activity}
+            degrade="linear-gradient(135deg, #059669, #10b981)"
+            badge={financesDisponibles ? `${pctFinance(finances.reinscriptions)}% du total` : "—"}
+            progression={financesDisponibles ? pctFinance(finances.reinscriptions) : 0}
+          />
+          <CarteStatistique
+            titre="Scolarité"
+            valeur={financesDisponibles ? formaterGNF(finances.scolarite) : "—"}
+            icone={GraduationCap}
+            degrade="linear-gradient(135deg, #d97706, #f59e0b)"
+            badge={financesDisponibles ? `${pctFinance(finances.scolarite)}% du total` : "—"}
+            progression={financesDisponibles ? pctFinance(finances.scolarite) : 0}
+          />
+          <CarteStatistique
+            titre="Autres frais"
+            valeur={financesDisponibles ? formaterGNF(finances.autres) : "—"}
+            icone={Wallet}
+            degrade="linear-gradient(135deg, #7c3aed, #a78bfa)"
+            badge={financesDisponibles ? `${pctFinance(finances.autres)}% du total` : "—"}
+            progression={financesDisponibles ? pctFinance(finances.autres) : 0}
+          />
+        </div>
+      </div>
+
+      {/* Situation des inscriptions */}
+      <Card className="space-y-4">
+        <div className="flex justify-between items-center pb-2 border-b border-slate-100">
+          <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+            <Users className="h-4 w-4 text-[#2563EB]" />
+            Situation des Inscriptions
+          </h3>
+        </div>
+
+        {!inscriptionsDisponibles ? (
+          <div className="py-8 text-center text-slate-400 text-xs">
+            Impossible de charger la situation des inscriptions.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            <div className="space-y-4">
+              <div>
+                <div className="flex justify-between items-center text-xs mb-1.5">
+                  <span className="font-semibold text-slate-600">Nouveaux élèves</span>
+                  <span className="font-bold text-slate-900">{situationInscriptions.nouveaux}</span>
+                </div>
+                <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-blue-500 transition-all"
+                    style={{
+                      width: `${situationInscriptions.total > 0 ? Math.round((situationInscriptions.nouveaux / situationInscriptions.total) * 100) : 0}%`,
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <div className="flex justify-between items-center text-xs mb-1.5">
+                  <span className="font-semibold text-slate-600">Réinscrits</span>
+                  <span className="font-bold text-slate-900">{situationInscriptions.reinscrits}</span>
+                </div>
+                <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-emerald-500 transition-all"
+                    style={{
+                      width: `${situationInscriptions.total > 0 ? Math.round((situationInscriptions.reinscrits / situationInscriptions.total) * 100) : 0}%`,
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex justify-between items-center text-xs">
+                <span className="font-semibold text-slate-600">À réinscrire</span>
+                <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-amber-50 text-amber-600 text-[11px] font-bold">
+                  {situationInscriptions.aReinscrire}
+                </span>
+              </div>
+
+              <div className="pt-3 border-t border-slate-100 flex justify-between items-center text-xs">
+                <span className="font-semibold text-slate-500">Total</span>
+                <span className="font-bold text-slate-900">{situationInscriptions.total}</span>
+              </div>
+            </div>
+          </div>
+        )}
+      </Card>
 
       {/* Derniers versements encaissés — liste déroulante avec recherche */}
       <Card className="p-0 overflow-hidden">
@@ -639,14 +777,19 @@ function TableauDeBordGenerique({ role }) {
 
   const [derniersPaiements, setDerniersPaiements] = useState([]);
   const [paiementsDisponibles, setPaiementsDisponibles] = useState(true);
+  const [finances, setFinances] = useState({ inscriptions: 0, reinscriptions: 0, scolarite: 0, autres: 0 });
+  const [financesDisponibles, setFinancesDisponibles] = useState(true);
+  const [situationInscriptions, setSituationInscriptions] = useState({ nouveaux: 0, reinscrits: 0, aReinscrire: 0, total: 0 });
+  const [inscriptionsDisponibles, setInscriptionsDisponibles] = useState(true);
 
   useEffect(() => {
     async function charger() {
-      const [eleves, enseignants, evaluations, paiements] = await Promise.allSettled([
+      const [eleves, enseignants, evaluations, paiements, tousPaiements] = await Promise.allSettled([
         api.get("/eleves"),
         api.get("/enseignants"),
         api.get("/evaluations", { params: { vue: "direction" } }),
         api.get("/frais/paiements/recent"),
+        api.get("/frais/paiements"),
       ]);
 
       const listeEvaluations = evaluations.status === "fulfilled" ? evaluations.value.data : [];
@@ -668,9 +811,40 @@ function TableauDeBordGenerique({ role }) {
       } else {
         setPaiementsDisponibles(false);
       }
+
+      if (eleves.status === "fulfilled") {
+        const listeEleves = eleves.value.data.eleves;
+        const nouveaux = listeEleves.filter((e) => e.inscription_active?.type_inscription === "nouvelle").length;
+        const reinscrits = listeEleves.filter((e) => e.inscription_active?.type_inscription === "reinscription").length;
+        const aReinscrire = listeEleves.filter((e) => !e.inscription_active).length;
+        setSituationInscriptions({ nouveaux, reinscrits, aReinscrire, total: listeEleves.length });
+        setInscriptionsDisponibles(true);
+      } else {
+        setInscriptionsDisponibles(false);
+      }
+
+      if (tousPaiements.status === "fulfilled") {
+        const totaux = { inscriptions: 0, reinscriptions: 0, scolarite: 0, autres: 0 };
+        tousPaiements.value.data.forEach((p) => {
+          const nom = normaliser(p.type_frais);
+          const montant = parseFloat(p.montant) || 0;
+          if (nom.includes("reinscription")) totaux.reinscriptions += montant;
+          else if (nom.includes("inscription")) totaux.inscriptions += montant;
+          else if (nom.includes("scolarite")) totaux.scolarite += montant;
+          else totaux.autres += montant;
+        });
+        setFinances(totaux);
+        setFinancesDisponibles(true);
+      } else {
+        setFinancesDisponibles(false);
+      }
     }
     charger();
   }, []);
+
+  // Poids de chaque catégorie de frais dans le total, pour les barres de progression
+  const totalFinances = finances.inscriptions + finances.reinscriptions + finances.scolarite + finances.autres;
+  const pctFinance = (valeur) => (totalFinances > 0 ? Math.round((valeur / totalFinances) * 100) : 0);
 
   return (
     <div className="space-y-6">
@@ -722,6 +896,45 @@ function TableauDeBordGenerique({ role }) {
         />
       </div>
 
+      {/* Répartition financière */}
+      <div className="space-y-3">
+        <h3 className="text-sm font-bold text-slate-900">Répartition financière</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <CarteStatistique
+            titre="Inscriptions"
+            valeur={financesDisponibles ? formaterGNF(finances.inscriptions) : "—"}
+            icone={FileText}
+            degrade="linear-gradient(135deg, #1d4ed8, #3b82f6)"
+            badge={financesDisponibles ? `${pctFinance(finances.inscriptions)}% du total` : "—"}
+            progression={financesDisponibles ? pctFinance(finances.inscriptions) : 0}
+          />
+          <CarteStatistique
+            titre="Réinscriptions"
+            valeur={financesDisponibles ? formaterGNF(finances.reinscriptions) : "—"}
+            icone={Activity}
+            degrade="linear-gradient(135deg, #059669, #10b981)"
+            badge={financesDisponibles ? `${pctFinance(finances.reinscriptions)}% du total` : "—"}
+            progression={financesDisponibles ? pctFinance(finances.reinscriptions) : 0}
+          />
+          <CarteStatistique
+            titre="Scolarité"
+            valeur={financesDisponibles ? formaterGNF(finances.scolarite) : "—"}
+            icone={GraduationCap}
+            degrade="linear-gradient(135deg, #d97706, #f59e0b)"
+            badge={financesDisponibles ? `${pctFinance(finances.scolarite)}% du total` : "—"}
+            progression={financesDisponibles ? pctFinance(finances.scolarite) : 0}
+          />
+          <CarteStatistique
+            titre="Autres frais"
+            valeur={financesDisponibles ? formaterGNF(finances.autres) : "—"}
+            icone={Wallet}
+            degrade="linear-gradient(135deg, #7c3aed, #a78bfa)"
+            badge={financesDisponibles ? `${pctFinance(finances.autres)}% du total` : "—"}
+            progression={financesDisponibles ? pctFinance(finances.autres) : 0}
+          />
+        </div>
+      </div>
+
       {/* Deux colonnes : versements & évaluations */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="space-y-4">
@@ -762,35 +975,96 @@ function TableauDeBordGenerique({ role }) {
           )}
         </Card>
 
-        <Card className="space-y-4">
-          <div className="flex justify-between items-center pb-2 border-b border-slate-100">
-            <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-              <Activity className="h-4 w-4 text-[#2563EB]" />
-              Suivi des Évaluations
-            </h3>
-            <Button variant="ghost" size="sm" onClick={() => navigate("/notes")}>
-              Gérer les notes
-            </Button>
-          </div>
-
-          {stats.dernieresEvaluations.length === 0 ? (
-            <div className="py-8 text-center text-slate-400 text-xs">Aucune évaluation récente.</div>
-          ) : (
-            <div className="divide-y divide-slate-100">
-              {stats.dernieresEvaluations.map((ev, i) => (
-                <div key={ev.id ?? i} className="py-3 flex justify-between items-center text-xs">
-                  <div>
-                    <p className="font-bold text-slate-900">{ev.libelle}</p>
-                    <p className="text-[10px] text-slate-400">
-                      {ev.affectation?.classe?.nom} — {ev.affectation?.matiere?.nom}
-                    </p>
-                  </div>
-                  <div>{badgeStatut(ev.statut)}</div>
-                </div>
-              ))}
+        <div className="space-y-6">
+          <Card className="space-y-4">
+            <div className="flex justify-between items-center pb-2 border-b border-slate-100">
+              <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                <Activity className="h-4 w-4 text-[#2563EB]" />
+                Suivi des Évaluations
+              </h3>
+              <Button variant="ghost" size="sm" onClick={() => navigate("/notes")}>
+                Gérer les notes
+              </Button>
             </div>
-          )}
-        </Card>
+
+            {stats.dernieresEvaluations.length === 0 ? (
+              <div className="py-8 text-center text-slate-400 text-xs">Aucune évaluation récente.</div>
+            ) : (
+              <div className="divide-y divide-slate-100">
+                {stats.dernieresEvaluations.map((ev, i) => (
+                  <div key={ev.id ?? i} className="py-3 flex justify-between items-center text-xs">
+                    <div>
+                      <p className="font-bold text-slate-900">{ev.libelle}</p>
+                      <p className="text-[10px] text-slate-400">
+                        {ev.affectation?.classe?.nom} — {ev.affectation?.matiere?.nom}
+                      </p>
+                    </div>
+                    <div>{badgeStatut(ev.statut)}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
+
+          <Card className="space-y-4">
+            <div className="flex justify-between items-center pb-2 border-b border-slate-100">
+              <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                <Users className="h-4 w-4 text-[#2563EB]" />
+                Situation des Inscriptions
+              </h3>
+            </div>
+
+            {!inscriptionsDisponibles ? (
+              <div className="py-8 text-center text-slate-400 text-xs">
+                Impossible de charger la situation des inscriptions.
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div>
+                  <div className="flex justify-between items-center text-xs mb-1.5">
+                    <span className="font-semibold text-slate-600">Nouveaux élèves</span>
+                    <span className="font-bold text-slate-900">{situationInscriptions.nouveaux}</span>
+                  </div>
+                  <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-blue-500 transition-all"
+                      style={{
+                        width: `${situationInscriptions.total > 0 ? Math.round((situationInscriptions.nouveaux / situationInscriptions.total) * 100) : 0}%`,
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex justify-between items-center text-xs mb-1.5">
+                    <span className="font-semibold text-slate-600">Réinscrits</span>
+                    <span className="font-bold text-slate-900">{situationInscriptions.reinscrits}</span>
+                  </div>
+                  <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-emerald-500 transition-all"
+                      style={{
+                        width: `${situationInscriptions.total > 0 ? Math.round((situationInscriptions.reinscrits / situationInscriptions.total) * 100) : 0}%`,
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-between items-center text-xs">
+                  <span className="font-semibold text-slate-600">À réinscrire</span>
+                  <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-amber-50 text-amber-600 text-[11px] font-bold">
+                    {situationInscriptions.aReinscrire}
+                  </span>
+                </div>
+
+                <div className="pt-3 border-t border-slate-100 flex justify-between items-center text-xs">
+                  <span className="font-semibold text-slate-500">Total</span>
+                  <span className="font-bold text-slate-900">{situationInscriptions.total}</span>
+                </div>
+              </div>
+            )}
+          </Card>
+        </div>
       </div>
 
       {/* Raccourcis rapides */}

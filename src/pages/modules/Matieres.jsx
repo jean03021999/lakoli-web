@@ -4,8 +4,9 @@ import api from "../../services/api";
 import ChampMatiere from "../../components/ChampMatiere";
 import { School } from "lucide-react";
 import { PageHeader, Card, Button, Input, Select } from "../../components/ui/LakoliDesignSystem";
+import { TOUS_NIVEAUX } from "../../constants/niveaux";
 
-const NIVEAUX_COLLEGE_LYCEE = ["7eme", "8eme", "9eme", "10eme", "11eme", "12eme", "Terminale"];
+const MATIERES_NON_COEFFICIENTEES = ["EPS", "Chant et Récitation", "Arts Plastiques", "Langage", "Éveil"];
 
 const champMatiereStyle = {
   width: "100%",
@@ -42,6 +43,11 @@ export default function Matieres() {
 
   useEffect(() => { charger(); }, []);
 
+  const changerNomMatiere = (val) => {
+    setNomMatiere(val);
+    setCompteDansMoyenne(!MATIERES_NON_COEFFICIENTEES.includes(val));
+  };
+
   const ajouterMatiere = async (e) => {
     e.preventDefault();
     try {
@@ -62,7 +68,7 @@ export default function Matieres() {
   const ajouterFiliere = async (e) => {
     e.preventDefault();
     try {
-      await api.post("/filieres", { nom: nomFiliere, niveau_a_partir_de: "11eme" });
+      await api.post("/filieres", { nom: nomFiliere, niveau_a_partir_de: "11ème Année" });
       setNomFiliere("");
       charger();
     } catch (err) {
@@ -89,7 +95,7 @@ export default function Matieres() {
         <form onSubmit={ajouterMatiere} className="flex flex-wrap items-end gap-3">
           <div>
             <label className="block text-xs font-semibold text-slate-500 mb-1">Matière</label>
-            <ChampMatiere value={nomMatiere} onChange={setNomMatiere} niveau={niveau} style={champMatiereStyle} required />
+            <ChampMatiere value={nomMatiere} onChange={changerNomMatiere} niveau={niveau} style={champMatiereStyle} required />
           </div>
           <div>
             <label className="block text-xs font-semibold text-slate-500 mb-1">Coefficient</label>
@@ -99,7 +105,7 @@ export default function Matieres() {
             <label className="block text-xs font-semibold text-slate-500 mb-1">Niveau</label>
             <Select value={niveau} onChange={(e) => setNiveau(e.target.value)}>
               <option value="">Tous niveaux</option>
-              {NIVEAUX_COLLEGE_LYCEE.map((n) => <option key={n} value={n}>{n}</option>)}
+              {TOUS_NIVEAUX.map((n) => <option key={n} value={n}>{n}</option>)}
             </Select>
           </div>
           <div>
@@ -109,6 +115,14 @@ export default function Matieres() {
               {filieres.map((f) => <option key={f.id} value={f.id}>{f.nom}</option>)}
             </Select>
           </div>
+          <label className="flex items-center gap-2 text-xs font-semibold text-slate-600 pb-2.5">
+            <input
+              type="checkbox"
+              checked={compteDansMoyenne}
+              onChange={(e) => setCompteDansMoyenne(e.target.checked)}
+            />
+            Cette matière est coefficientée (compte dans la moyenne générale)
+          </label>
           <Button type="submit" variant="primary">Ajouter</Button>
         </form>
       </Card>

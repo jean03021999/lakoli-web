@@ -53,6 +53,7 @@ export default function Eleves() {
   const [searchParams] = useSearchParams();
   const [eleves, setEleves] = useState([]);
   const [stats, setStats] = useState({ total: 0, a_jour: 0, en_retard: 0, a_echoir: 0 });
+  const [ordreClasses, setOrdreClasses] = useState([]);
   const [recherche, setRecherche] = useState(searchParams.get("recherche") || "");
   const [classeFiltre, setClasseFiltre] = useState("all");
   const [statutFiltre, setStatutFiltre] = useState(searchParams.get("statut") || "all");
@@ -77,6 +78,7 @@ export default function Eleves() {
 
   useEffect(() => {
     chargerEleves();
+    api.get("/classes").then((res) => setOrdreClasses(res.data.map((c) => c.nom))).catch(() => {});
   }, []);
 
   const handleRecherche = (e) => {
@@ -84,10 +86,12 @@ export default function Eleves() {
     chargerEleves();
   };
 
+  // Suit l'ordre pedagogique renvoye par /classes (Maternelle -> Primaire -> College -> Lycee)
+  // plutot qu'un tri alphabetique, qui melangeait les niveaux (ex: "CE1" avant "CP").
   const classesDisponibles = useMemo(() => {
-    const uniques = new Set(eleves.map((e) => e.classe).filter(Boolean));
-    return Array.from(uniques).sort();
-  }, [eleves]);
+    const presentes = new Set(eleves.map((e) => e.classe).filter(Boolean));
+    return ordreClasses.filter((nom) => presentes.has(nom));
+  }, [eleves, ordreClasses]);
 
   const elevesFiltres = eleves.filter((e) => {
     const matchClasse = classeFiltre === "all" || e.classe === classeFiltre;
