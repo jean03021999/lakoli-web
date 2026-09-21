@@ -1,7 +1,11 @@
 import { useState, useEffect } from "react";
 import api from "../../services/api";
 import { PageHeader, Card, Button, Input, Select } from "../../components/ui/LakoliDesignSystem";
+import ChampAutocomplete from "../../components/ChampAutocomplete";
 import { TOUS_NIVEAUX } from "../../constants/niveaux";
+
+const champNiveauClassName =
+  "w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-[#2563EB] focus:ring-1 focus:ring-[#2563EB] transition-colors duration-150";
 
 export default function Classes() {
   const [classes, setClasses] = useState([]);
@@ -51,10 +55,14 @@ export default function Classes() {
         <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Ajouter une classe</p>
         <form onSubmit={ajouterClasse} className="flex flex-wrap gap-3">
           <Input type="text" placeholder="Nom (ex: 6ème Année A)" value={nom} onChange={(e) => setNom(e.target.value)} required />
-          <Select value={niveau} onChange={(e) => setNiveau(e.target.value)} required>
-            <option value="">Choisir un niveau...</option>
-            {TOUS_NIVEAUX.map((n) => <option key={n} value={n}>{n}</option>)}
-          </Select>
+          <ChampAutocomplete
+            value={niveau}
+            onChange={setNiveau}
+            suggestions={TOUS_NIVEAUX}
+            placeholder="Niveau (ex: 6ème Année)"
+            className={champNiveauClassName}
+            required
+          />
           <Select value={filiereId} onChange={(e) => setFiliereId(e.target.value)}>
             <option value="">Sans filière</option>
             {filieres.map((f) => <option key={f.id} value={f.id}>{f.nom}</option>)}

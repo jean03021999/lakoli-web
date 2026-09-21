@@ -53,7 +53,7 @@ const MODULES = [
   { nom: "Emploi du Temps", icone: Calendar, chemin: "/emploi-du-temps", roles: ["COMPTABLE", "DIRECTEUR", "FONDATEUR", "PROVISEUR", "CENSEUR"] },
   { nom: "Gestion des Notes", icone: Award, chemin: "/notes", roles: ["DIRECTEUR", "PROVISEUR", "CENSEUR"] },
   { nom: "Bulletins", icone: FileSpreadsheet, chemin: "/bulletins", roles: ["DIRECTEUR", "FONDATEUR", "PROVISEUR", "CENSEUR"] },
-  { nom: "Frais de Scolarité", icone: Wallet, chemin: "/frais-scolarite", roles: ["COMPTABLE", "DIRECTEUR", "FONDATEUR"] },
+  { nom: "Frais de Scolarité", icone: Wallet, chemin: "/frais-scolarite", roles: ["COMPTABLE", "FONDATEUR"] },
   { nom: "Journal de Caisse", icone: CreditCard, chemin: "/paiements", roles: ["COMPTABLE", "PROVISEUR"] },
   { nom: "Périodes Scolaires", icone: Clock, chemin: "/periodes", roles: ["DIRECTEUR", "PROVISEUR", "CENSEUR"] },
   { nom: "Utilisateurs", icone: UserCog, chemin: "/utilisateurs", roles: ["DIRECTEUR", "FONDATEUR", "PROVISEUR", "CENSEUR"] },

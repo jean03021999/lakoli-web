@@ -2,8 +2,11 @@ import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import api from "../../services/api";
 import { ArrowLeft, Calendar, MapPin, Users, Phone, CreditCard, Clock } from "lucide-react";
+import { calculerStatutEcheance, STATUTS_ECHEANCE } from "../../constants/statutEcheance";
+import { genererReleveHtml, imprimerDocument } from "../../utils/impression";
 
-export default function EleveFiche() {
+export default function EleveFiche({ permissions = [] }) {
+  const peutImprimer = permissions.includes("frais.voir");
   const { id } = useParams();
   const navigate = useNavigate();
   const [eleve, setEleve] = useState(null);
@@ -34,6 +37,41 @@ export default function EleveFiche() {
   const tuteur = filiationParType("tuteur");
 
   const getInitials = (nom, prenom) => `${nom?.[0] || ""}${prenom?.[0] || ""}`.toUpperCase();
+
+  const aDesEcheances = eleve.frais_eleves?.some((f) => f.echeances?.length > 0);
+
+  const imprimerHistorique = () => {
+    const lignes = (eleve.frais_eleves || []).flatMap((frais) =>
+      (frais.echeances || []).map((ech) => {
+        const paiements = ech.paiements || [];
+        const paye = paiements.reduce((s, p) => s + parseFloat(p.montant), 0);
+        const dates = paiements.map((p) => p.date_paiement).filter(Boolean).sort();
+        return {
+          libelle: ech.libelle,
+          montant: Number(ech.montant),
+          paye,
+          statut: STATUTS_ECHEANCE[calculerStatutEcheance({ ...ech, montant_paye: paye })].libelle,
+          dernierPaiement: dates.length > 0 ? dates[dates.length - 1] : null,
+        };
+      })
+    );
+
+    const html = genererReleveHtml({
+      etablissement: eleve.etablissement?.nom,
+      eleve: {
+        nom: eleve.nom,
+        prenom: eleve.prenom,
+        matricule: eleve.matricule,
+        classe: eleve.inscription_active?.classe?.nom,
+        session: eleve.inscription_active?.session_scolaire?.libelle,
+      },
+      lignes,
+    });
+
+    if (!imprimerDocument(`Relevé de paiements - ${eleve.nom} ${eleve.prenom}`, html)) {
+      window.alert("Le navigateur a bloqué la fenêtre d'impression. Autorisez les pop-ups pour ce site.");
+    }
+  };
 
   const blocFiliation = (titre, data) => (
     <div className="p-3 bg-slate-50 rounded-lg border border-slate-100/80">
@@ -132,14 +170,24 @@ export default function EleveFiche() {
                 <CreditCard className="h-4.5 w-4.5 text-[#2563EB]" />
                 Historique des paiements de scolarité
               </h3>
+              {peutImprimer && (
+                <button
+                  onClick={imprimerHistorique}
+                  disabled={!aDesEcheances}
+                  className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  🖨️ Imprimer l'historique
+                </button>
+              )}
             </div>
 
             <div className="flex-1 overflow-x-auto">
-              {eleve.frais_eleves?.some((f) => f.echeances?.length > 0) ? (
+              {aDesEcheances ? (
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="border-b border-slate-100 text-slate-400 text-[10px] font-bold uppercase tracking-wider bg-slate-50/10">
                       <th className="py-3 px-5">Échéance</th>
+                      <th className="py-3 px-5">Statut</th>
                       <th className="py-3 px-5 text-right">Payé / Montant</th>
                     </tr>
                   </thead>
@@ -147,15 +195,16 @@ export default function EleveFiche() {
                     {eleve.frais_eleves.map((frais) =>
                       frais.echeances?.map((ech) => {
                         const paye = ech.paiements?.reduce((s, p) => s + parseFloat(p.montant), 0) || 0;
-                        const complet = ech.paiements?.length > 0 && paye >= ech.montant;
+                        const statut = STATUTS_ECHEANCE[calculerStatutEcheance({ ...ech, montant_paye: paye })];
                         return (
                           <tr key={ech.id} className="hover:bg-slate-50/50 transition-colors">
                             <td className="py-3 px-5 font-semibold text-slate-800">{ech.libelle}</td>
-                            <td
-                              className={`py-3 px-5 text-right font-bold font-mono ${
-                                complet ? "text-emerald-600" : "text-rose-600"
-                              }`}
-                            >
+                            <td className="py-3 px-5">
+                              <span className={`inline-flex px-2.5 py-1 rounded-full border text-[11px] font-semibold ${statut.badge}`}>
+                                {statut.libelle}
+                              </span>
+                            </td>
+                            <td className={`py-3 px-5 text-right font-bold font-mono ${statut.texte}`}>
                               {paye} / {ech.montant} GNF
                             </td>
                           </tr>

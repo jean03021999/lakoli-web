@@ -13,7 +13,6 @@ import {
   Calendar,
   MoreVertical,
   Plus,
-  Upload,
   ChevronDown,
   Search,
 } from "lucide-react";
@@ -744,7 +743,6 @@ function TableauDeBordComptable() {
           </button>
           {[
             { texte: "Enregistrer un paiement", chemin: "/frais-scolarite", icon: Wallet },
-            { texte: "Importer des élèves (Excel)", chemin: "/eleves-importer", icon: Upload },
             { texte: "Journal de caisse", chemin: "/paiements", icon: CreditCard },
           ].map((raccourci) => (
             <button

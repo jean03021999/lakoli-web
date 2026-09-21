@@ -84,7 +84,7 @@ export default function AjouterEleve() {
               <Select name="classe_id" value={form.classe_id} onChange={handleChange} className="w-full" required>
                 <option value="">Sélectionner une classe</option>
                 {classes.map((c) => (
-                  <option key={c.id} value={c.id}>{c.nom} ({c.niveau})</option>
+                  <option key={c.id} value={c.id}>{c.nom}</option>
                 ))}
               </Select>
             </div>

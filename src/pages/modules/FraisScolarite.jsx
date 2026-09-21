@@ -12,28 +12,73 @@ import {
   FileSpreadsheet,
   School,
   Receipt,
+  Search,
 } from "lucide-react";
 import { Card, Button, Input, Select, Badge } from "../../components/ui/LakoliDesignSystem";
+import { calculerStatutEcheance, STATUTS_ECHEANCE } from "../../constants/statutEcheance";
+import {
+  ouvrirFenetreVierge,
+  ecrireDocumentImpression,
+  genererRecuHtml,
+  genererRecuInscriptionHtml,
+} from "../../utils/impression";
 
 function getInitiales(nom, prenom) {
   return `${nom?.[0] || ""}${prenom?.[0] || ""}`.toUpperCase();
 }
 
-function badgeStatutEcheance(statut) {
-  if (statut === "payee") return <Badge variant="blue">Payée</Badge>;
-  if (statut === "partiellement_payee") return <Badge variant="outline">Partiellement payée</Badge>;
-  if (statut === "en_retard") return <Badge variant="neutral" className="!bg-rose-50 !text-rose-600 !border-rose-100">En retard</Badge>;
-  return <Badge variant="neutral">À échoir</Badge>;
+function badgeStatutEcheance(ech) {
+  const statut = STATUTS_ECHEANCE[calculerStatutEcheance(ech)];
+  return <Badge variant="neutral" className={statut.badge}>{statut.libelle}</Badge>;
 }
 
 function formaterGNF(montant) {
   return `${Number(montant).toLocaleString("fr-FR")} GNF`;
 }
 
-export default function FraisScolarite() {
+// Total annuel / total paye / reste de la SCOLARITE de l'eleve : les frais d'inscription et de
+// reinscription sont exclus (meme regle que le statut global cote backend : nom en "scolarit%").
+function totauxDepuisSuivi(suivi) {
+  if (!suivi) return null;
+  const echeances = suivi.frais
+    .filter((f) => normaliser(f.type_frais).startsWith("scolarit"))
+    .flatMap((f) => f.echeances);
+  return {
+    total: echeances.reduce((s, e) => s + Number(e.montant), 0),
+    paye: echeances.reduce((s, e) => s + Number(e.montant_paye), 0),
+  };
+}
+
+// Minuscules et sans accents, pour que "aminata" trouve "Aminata" et "helene" trouve "Hélène".
+function normaliser(texte) {
+  return (texte || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+}
+
+// Memorise la classe choisie pour la retrouver au retour sur la page.
+const CLE_CLASSE_FILTRE = "frais_classe_filtre";
+
+function lireClasseFiltre() {
+  try {
+    return sessionStorage.getItem(CLE_CLASSE_FILTRE) || "";
+  } catch {
+    return "";
+  }
+}
+
+export default function FraisScolarite({ permissions = [] }) {
+  const peutImprimer = permissions.includes("frais.voir");
+  const peutInscrire = permissions.includes("frais.voir");
   const [onglet, setOnglet] = useState("suivi");
   const [eleves, setEleves] = useState([]);
+  const [classeId, setClasseId] = useState(lireClasseFiltre);
+  const [recherche, setRecherche] = useState("");
+  const [afficherSuggestions, setAfficherSuggestions] = useState(false);
+  const [chargementEleves, setChargementEleves] = useState(false);
   const [eleveSelectionne, setEleveSelectionne] = useState(null);
+  const [eleveInfos, setEleveInfos] = useState(null);
+  const [dernierRecu, setDernierRecu] = useState(null);
+  const [inscriptionEnCours, setInscriptionEnCours] = useState(null);
+  const [formInscription, setFormInscription] = useState(null);
   const [suivi, setSuivi] = useState(null);
   const [classes, setClasses] = useState([]);
   const [typesFrais, setTypesFrais] = useState([]);
@@ -49,11 +94,57 @@ export default function FraisScolarite() {
   const [paiement, setPaiement] = useState({ echeance_eleve_id: "", montant: "", moyen_paiement: "especes", date_paiement: "" });
 
   useEffect(() => {
-    api.get("/eleves").then((res) => setEleves(res.data.eleves));
     api.get("/classes").then((res) => setClasses(res.data));
     api.get("/frais/types").then((res) => setTypesFrais(res.data));
     chargerGrilles();
   }, []);
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(CLE_CLASSE_FILTRE, classeId);
+    } catch {
+      // stockage indisponible (navigation privee...) : le filtre reste simplement non memorise
+    }
+  }, [classeId]);
+
+  // Une classe supprimee depuis la derniere visite ne doit pas rester selectionnee.
+  useEffect(() => {
+    if (classeId && classes.length > 0 && !classes.some((c) => String(c.id) === String(classeId))) {
+      setClasseId("");
+    }
+  }, [classes, classeId]);
+
+  // Les eleves ne sont charges que pour la classe choisie (pas toute l'ecole d'un coup).
+  useEffect(() => {
+    if (!classeId) {
+      setEleves([]);
+      setChargementEleves(false);
+      return;
+    }
+
+    let annule = false;
+    setChargementEleves(true);
+    setErreur("");
+    api
+      .get("/eleves", { params: { classe_id: classeId } })
+      .then((res) => {
+        if (!annule) setEleves(res.data.eleves);
+      })
+      .catch(() => {
+        if (!annule) {
+          setEleves([]);
+          setErreur("Impossible de charger les élèves de cette classe.");
+        }
+      })
+      .finally(() => {
+        if (!annule) setChargementEleves(false);
+      });
+
+    // Ignore la reponse d'une classe precedente si l'utilisateur en a change entre-temps.
+    return () => {
+      annule = true;
+    };
+  }, [classeId]);
 
   const chargerGrilles = async () => {
     try {
@@ -84,8 +175,10 @@ export default function FraisScolarite() {
     try {
       const res = await api.get(`/frais/eleves/${eleveId}`);
       setSuivi(res.data);
+      return res.data;
     } catch (err) {
       setErreur("Impossible de charger le suivi de cet élève.");
+      return null;
     }
   };
 
@@ -120,18 +213,123 @@ export default function FraisScolarite() {
     }
   };
 
+  const MESSAGE_POPUP_BLOQUE =
+    "Le navigateur a bloqué la fenêtre du reçu. Autorisez les pop-ups pour ce site, puis cliquez sur « Réimprimer le reçu ».";
+
+  const ouvrirRecu = (fenetre, recu) => {
+    if (!fenetre) {
+      setErreur(MESSAGE_POPUP_BLOQUE);
+    } else if (recu.genre === "inscription") {
+      ecrireDocumentImpression(fenetre, "Reçu d'inscription", genererRecuInscriptionHtml(recu));
+    } else {
+      ecrireDocumentImpression(fenetre, "Reçu de paiement", genererRecuHtml(recu));
+    }
+  };
+
+  // Clic sur "Inscrire" / "Réinscrire" : affiche le formulaire (montant pre-rempli avec la grille, modifiable).
+  const ouvrirFormulaireInscription = (reinscription) => {
+    const type = reinscription ? typeReinscription : typeInscription;
+    if (!type) {
+      setErreur(`Le type de frais « ${reinscription ? "Réinscription" : "Inscription"} » est introuvable.`);
+      return;
+    }
+    setErreur(""); setSucces("");
+    setFormInscription({
+      reinscription,
+      montant: String(montantGrille(type) ?? ""),
+      moyen_paiement: "especes",
+    });
+  };
+
+  // Cree les frais, enregistre le paiement et ouvre le recu, en un seul appel.
+  const confirmerInscription = async (e) => {
+    e.preventDefault();
+    const { reinscription, montant, moyen_paiement } = formInscription;
+    const type = reinscription ? typeReinscription : typeInscription;
+    setErreur(""); setSucces("");
+    setInscriptionEnCours(reinscription ? "reinscription" : "inscription");
+    // Fenetre du recu ouverte pendant le clic : sinon le navigateur la bloque apres l'appel reseau.
+    const fenetre = ouvrirFenetreVierge();
+    try {
+      const res = await api.post("/frais/appliquer-inscription", {
+        eleve_id: eleveInfos.id,
+        type_frais_id: type.id,
+        montant,
+        moyen_paiement,
+      });
+      await chargerSuivi(eleveInfos.id);
+      setSucces(res.data.message);
+      setFormInscription(null);
+      const recu = { genre: "inscription", eleve: eleveInfos, reponse: res.data, reinscription };
+      setDernierRecu(recu);
+      ouvrirRecu(fenetre, recu);
+    } catch (err) {
+      fenetre?.close();
+      setErreur(
+        err.response?.status === 409
+          ? "Frais déjà appliqués"
+          : err.response?.data?.message || "Erreur lors de l'application des frais."
+      );
+    } finally {
+      setInscriptionEnCours(null);
+    }
+  };
+
   const enregistrerPaiement = async (e) => {
     e.preventDefault();
     setErreur(""); setSucces("");
+    // Ouverte tout de suite, pendant le clic : les navigateurs bloquent une fenetre ouverte apres l'appel reseau.
+    const fenetreRecu = peutImprimer ? ouvrirFenetreVierge() : null;
     try {
-      await api.post("/frais/paiements", paiement);
+      const res = await api.post("/frais/paiements", paiement);
+      // Recharge le suivi avant d'afficher le succes (chargerSuivi efface les messages) et
+      // pour que le recu contienne le total paye a jour, paiement inclus.
+      const suiviMaj = await chargerSuivi(eleveSelectionne);
       setSucces("Paiement enregistré avec succès.");
-      chargerSuivi(eleveSelectionne);
       setPaiement({ echeance_eleve_id: "", montant: "", moyen_paiement: "especes", date_paiement: "" });
+
+      if (peutImprimer) {
+        const recu = {
+          paiement: res.data,
+          eleve: eleveInfos,
+          totaux: totauxDepuisSuivi(suiviMaj),
+          caissier: localStorage.getItem("user_name") || "",
+        };
+        setDernierRecu(recu);
+        ouvrirRecu(fenetreRecu, recu);
+      }
     } catch (err) {
+      fenetreRecu?.close();
       setErreur(err.response?.data?.message || "Erreur lors de l'enregistrement du paiement.");
     }
   };
+
+  // Chaque mot saisi doit se retrouver dans nom ou prenom (ordre libre).
+  const termes = normaliser(recherche).split(/\s+/).filter(Boolean);
+  const elevesFiltres = eleves.filter((e) => {
+    const cible = normaliser(`${e.nom} ${e.prenom}`);
+    return termes.every((t) => cible.includes(t));
+  });
+  const suggestions = termes.length > 0 ? elevesFiltres.slice(0, 6) : [];
+
+  const choisirSuggestion = (eleve) => {
+    setRecherche(`${eleve.nom} ${eleve.prenom}`);
+    setAfficherSuggestions(false);
+  };
+
+  // Types "Inscription" / "Réinscription" retrouves par leur nom (les ids different d'un etablissement a l'autre)
+  // et montant de la grille de la classe de l'eleve.
+  const typeInscription = typesFrais.find((t) => normaliser(t.nom) === "inscription");
+  const typeReinscription = typesFrais.find((t) => normaliser(t.nom) === "reinscription");
+  const montantGrille = (type) => {
+    if (!type || !eleveInfos) return null;
+    const g = grillesExistantes.find(
+      (x) => x.type_frais_id === type.id && String(x.classe_id) === String(eleveInfos.classe_id)
+    );
+    return g ? Number(g.montant) : null;
+  };
+  const libelleMontant = (montant) => (montant != null ? ` (${formaterGNF(montant)})` : "");
+  const typeInscriptionEleve = eleveInfos?.inscription_active?.type_inscription;
 
   return (
     <div className="space-y-6">
@@ -189,6 +387,64 @@ export default function FraisScolarite() {
         <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-50 border border-emerald-100 text-sm text-emerald-600 font-medium">
           <CheckCircle2 className="h-4 w-4 shrink-0" />
           {succes}
+          {peutImprimer && dernierRecu && (
+            <button
+              onClick={() => ouvrirRecu(ouvrirFenetreVierge(), dernierRecu)}
+              className="ml-auto px-3 py-1 rounded-lg border border-emerald-200 bg-white text-emerald-700 text-xs font-semibold hover:bg-emerald-100 transition-colors cursor-pointer"
+            >
+              Réimprimer le reçu
+            </button>
+          )}
+        </div>
+      )}
+
+      {onglet === "suivi" && (
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+          <Select
+            value={classeId}
+            onChange={(e) => {
+              setClasseId(e.target.value);
+              setRecherche("");
+            }}
+            aria-label="Filtrer par classe"
+          >
+            <option value="">Filtrer par classe...</option>
+            {classes.map((c) => <option key={c.id} value={c.id}>{c.nom}</option>)}
+          </Select>
+
+          <div className="relative flex-1 min-w-[300px]">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <Input
+              type="text"
+              placeholder="Rechercher un élève par nom ou prénom..."
+              value={recherche}
+              disabled={!classeId}
+              onChange={(e) => {
+                setRecherche(e.target.value);
+                setAfficherSuggestions(true);
+              }}
+              onFocus={() => setAfficherSuggestions(true)}
+              // Delai pour laisser le clic sur une suggestion se faire avant de fermer la liste
+              onBlur={() => setTimeout(() => setAfficherSuggestions(false), 200)}
+              autoComplete="off"
+              className="pl-9 disabled:bg-slate-50 disabled:cursor-not-allowed"
+            />
+            {afficherSuggestions && suggestions.length > 0 && (
+              <ul className="absolute left-0 right-0 top-full mt-1 z-20 bg-white border border-slate-200 rounded-lg shadow-lg overflow-hidden">
+                {suggestions.map((e) => (
+                  <li key={e.id}>
+                    <button
+                      type="button"
+                      onClick={() => choisirSuggestion(e)}
+                      className="w-full text-left px-3.5 py-2 text-sm text-slate-700 hover:bg-blue-50 transition-colors cursor-pointer"
+                    >
+                      {e.nom} {e.prenom}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         </div>
       )}
 
@@ -199,13 +455,24 @@ export default function FraisScolarite() {
               <div className="h-7 w-7 rounded-lg bg-blue-50 text-[#2563EB] flex items-center justify-center shrink-0">
                 <Users className="h-3.5 w-3.5" />
               </div>
-              <p className="text-xs font-bold text-slate-700 uppercase tracking-wider m-0">Élèves ({eleves.length})</p>
+              <p className="text-xs font-bold text-slate-700 uppercase tracking-wider m-0">
+                Élèves{classeId ? ` (${elevesFiltres.length})` : ""}
+              </p>
             </div>
             <div className="p-2">
-              {eleves.map((e) => (
+              {!classeId && (
+                <p className="text-sm text-slate-400 text-center px-3 py-8 m-0">Sélectionnez une classe pour voir les élèves</p>
+              )}
+              {classeId && chargementEleves && (
+                <p className="text-sm text-slate-400 text-center px-3 py-8 m-0">Chargement...</p>
+              )}
+              {classeId && !chargementEleves && elevesFiltres.length === 0 && (
+                <p className="text-sm text-slate-400 text-center px-3 py-8 m-0">Aucun élève trouvé</p>
+              )}
+              {classeId && !chargementEleves && elevesFiltres.map((e) => (
                 <div
                   key={e.id}
-                  onClick={() => chargerSuivi(e.id)}
+                  onClick={() => { setEleveInfos({ ...e, classe_id: classeId }); setFormInscription(null); chargerSuivi(e.id); }}
                   className={`flex items-center gap-2.5 p-2.5 rounded-xl cursor-pointer mb-1 transition-colors ${
                     eleveSelectionne === e.id ? "bg-blue-50" : "hover:bg-slate-50"
                   }`}
@@ -224,6 +491,73 @@ export default function FraisScolarite() {
           </Card>
 
           <div className="flex-1 space-y-4">
+            {peutInscrire && eleveInfos && (
+              <Card className="p-0 overflow-hidden border-blue-100">
+                <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold text-slate-900 m-0 truncate">{eleveInfos.nom} {eleveInfos.prenom}</p>
+                    <p className="text-xs text-slate-500 m-0 mt-0.5">
+                      <span className="font-mono">{eleveInfos.matricule}</span> · {eleveInfos.classe || "—"}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      variant={typeInscriptionEleve === "nouvelle" ? "primary" : "secondary"}
+                      disabled={inscriptionEnCours !== null}
+                      onClick={() => ouvrirFormulaireInscription(false)}
+                    >
+                      📋 Inscrire{libelleMontant(montantGrille(typeInscription))}
+                    </Button>
+                    <Button
+                      variant={typeInscriptionEleve === "reinscription" ? "primary" : "secondary"}
+                      disabled={inscriptionEnCours !== null}
+                      onClick={() => ouvrirFormulaireInscription(true)}
+                    >
+                      🔄 Réinscrire{libelleMontant(montantGrille(typeReinscription))}
+                    </Button>
+                  </div>
+                </div>
+
+                {formInscription && (
+                  <form
+                    onSubmit={confirmerInscription}
+                    className="flex flex-wrap items-end gap-3 px-5 py-4 border-t border-blue-100 bg-blue-50/40"
+                  >
+                    <p className="w-full text-xs font-bold text-slate-700 uppercase tracking-wider m-0">
+                      {formInscription.reinscription ? "Réinscription" : "Inscription"} · paiement immédiat
+                    </p>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-500 mb-1">Montant à payer (GNF)</label>
+                      <Input
+                        type="number"
+                        min="1"
+                        value={formInscription.montant}
+                        onChange={(e) => setFormInscription({ ...formInscription, montant: e.target.value })}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-500 mb-1">Moyen de paiement</label>
+                      <Select
+                        value={formInscription.moyen_paiement}
+                        onChange={(e) => setFormInscription({ ...formInscription, moyen_paiement: e.target.value })}
+                      >
+                        <option value="especes">Espèces</option>
+                        <option value="mobile_money">Mobile Money</option>
+                        <option value="virement">Virement</option>
+                        <option value="cheque">Chèque</option>
+                      </Select>
+                    </div>
+                    <Button type="submit" variant="primary" disabled={inscriptionEnCours !== null}>
+                      Confirmer et imprimer le reçu
+                    </Button>
+                    <Button type="button" variant="ghost" onClick={() => setFormInscription(null)}>
+                      Annuler
+                    </Button>
+                  </form>
+                )}
+              </Card>
+            )}
             {!suivi && (
               <Card className="flex flex-col items-center justify-center text-center py-14 gap-3">
                 <div className="h-12 w-12 rounded-2xl bg-blue-50 text-[#2563EB] flex items-center justify-center">
@@ -253,7 +587,7 @@ export default function FraisScolarite() {
                         <p className="text-xs text-slate-400 m-0 mt-0.5">Échéance : {ech.date_limite}</p>
                       </div>
                       <div className="text-right space-y-1.5">
-                        {badgeStatutEcheance(ech.statut)}
+                        {badgeStatutEcheance(ech)}
                         <p className="text-xs text-slate-500 m-0 font-medium">{formaterGNF(ech.montant_paye)} / {formaterGNF(ech.montant)}</p>
                         {ech.solde > 0 && (
                           <button
@@ -326,6 +660,7 @@ export default function FraisScolarite() {
                     ? Math.round((g.nombre_eleves_couverts / g.nombre_eleves_classe) * 100)
                     : 100;
                   const complet = g.nombre_eleves_couverts >= g.nombre_eleves_classe;
+                  const fraisParEleve = ["inscription", "reinscription"].includes(normaliser(g.type_frais?.nom));
 
                   return (
                     <div key={g.id} className="py-3.5 flex flex-wrap items-center justify-between gap-3">
@@ -335,7 +670,7 @@ export default function FraisScolarite() {
                         </div>
                         <div className="min-w-0">
                           <p className="text-sm font-bold text-slate-900 m-0">
-                            {g.classe?.nom || "—"} · {g.type_frais?.nom || "—"}
+                            {g.classe?.nom || '—'} · {g.type_frais?.nom || "—"}
                           </p>
                           <p className="text-xs text-slate-400 m-0 mt-0.5">
                             {formaterGNF(g.montant)} · {g.echeances?.length || 0} échéance{(g.echeances?.length || 0) > 1 ? "s" : ""}
@@ -355,14 +690,17 @@ export default function FraisScolarite() {
                               <AlertTriangle className="h-3.5 w-3.5" />
                               {g.nombre_eleves_couverts}/{g.nombre_eleves_classe} élèves ({couverture}%)
                             </span>
-                            <button
-                              onClick={() => synchroniserGrille(g.id)}
-                              disabled={synchronisationEnCours === g.id}
-                              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-blue-200 text-[#2563EB] text-xs font-semibold hover:bg-blue-50 transition-colors cursor-pointer disabled:opacity-50"
-                            >
-                              <RefreshCw className={`h-3.5 w-3.5 ${synchronisationEnCours === g.id ? "animate-spin" : ""}`} />
-                              Synchroniser
-                            </button>
+                            {/* title sur le <span> : un bouton desactive n'affiche pas toujours son infobulle */}
+                            <span title={fraisParEleve ? "Les frais d'inscription se gèrent élève par élève" : undefined}>
+                              <button
+                                onClick={() => synchroniserGrille(g.id)}
+                                disabled={synchronisationEnCours === g.id || fraisParEleve}
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-blue-200 text-[#2563EB] text-xs font-semibold hover:bg-blue-50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                <RefreshCw className={`h-3.5 w-3.5 ${synchronisationEnCours === g.id ? "animate-spin" : ""}`} />
+                                Synchroniser
+                              </button>
+                            </span>
                           </>
                         )}
                       </div>
