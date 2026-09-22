@@ -20,8 +20,17 @@ import {
   ouvrirFenetreVierge,
   ecrireDocumentImpression,
   genererRecuHtml,
-  genererRecuInscriptionHtml,
+  referenceLocale,
+  formaterHeure,
+  formaterDate,
 } from "../../utils/impression";
+
+const LIBELLES_MOYEN_PAIEMENT = {
+  especes: "Espèces",
+  mobile_money: "Mobile Money",
+  virement: "Virement",
+  cheque: "Chèque",
+};
 
 function getInitiales(nom, prenom) {
   return `${nom?.[0] || ""}${prenom?.[0] || ""}`.toUpperCase();
@@ -54,6 +63,23 @@ function normaliser(texte) {
   return (texte || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 }
 
+// Retrouve, dans le suivi rechargé après un paiement, l'echeance payee et le type de frais de
+// son parent (Scolarité, Inscription, Réinscription...) : le POST /frais/paiements ne renvoie
+// que la ligne "paiements", pas ce contexte.
+function trouverEcheance(suivi, echeanceId) {
+  for (const f of suivi?.frais || []) {
+    const echeance = f.echeances.find((e) => e.id === echeanceId);
+    if (echeance) return { echeance, typeFrais: f.type_frais };
+  }
+  return null;
+}
+
+// "Scolarité - Trimestre 1" pour une echeance de scolarite ; le type seul (Inscription,
+// Réinscription) pour les autres, qui n'ont qu'une echeance unique sans decoupage par periode.
+function libelleTypePaiement(typeFrais, libelleEcheance) {
+  return normaliser(typeFrais).startsWith("scolarit") ? `${typeFrais} - ${libelleEcheance}` : typeFrais;
+}
+
 // Memorise la classe choisie pour la retrouver au retour sur la page.
 const CLE_CLASSE_FILTRE = "frais_classe_filtre";
 
@@ -77,6 +103,7 @@ export default function FraisScolarite({ permissions = [] }) {
   const [eleveSelectionne, setEleveSelectionne] = useState(null);
   const [eleveInfos, setEleveInfos] = useState(null);
   const [dernierRecu, setDernierRecu] = useState(null);
+  const [recuInscriptionVisible, setRecuInscriptionVisible] = useState(false);
   const [inscriptionEnCours, setInscriptionEnCours] = useState(null);
   const [formInscription, setFormInscription] = useState(null);
   const [suivi, setSuivi] = useState(null);
@@ -216,13 +243,13 @@ export default function FraisScolarite({ permissions = [] }) {
   const MESSAGE_POPUP_BLOQUE =
     "Le navigateur a bloqué la fenêtre du reçu. Autorisez les pop-ups pour ce site, puis cliquez sur « Réimprimer le reçu ».";
 
-  const ouvrirRecu = (fenetre, recu) => {
-    if (!fenetre) {
-      setErreur(MESSAGE_POPUP_BLOQUE);
-    } else if (recu.genre === "inscription") {
-      ecrireDocumentImpression(fenetre, "Reçu d'inscription", genererRecuInscriptionHtml(recu));
-    } else {
+  // Fonction unique, reutilisee pour tous les types de paiement (scolarite, inscription,
+  // reinscription) : un seul gabarit de reçu (genererRecuHtml) pour les trois.
+  const imprimerRecu = (fenetre, recu) => {
+    if (fenetre) {
       ecrireDocumentImpression(fenetre, "Reçu de paiement", genererRecuHtml(recu));
+    } else {
+      setErreur(MESSAGE_POPUP_BLOQUE);
     }
   };
 
@@ -248,8 +275,6 @@ export default function FraisScolarite({ permissions = [] }) {
     const type = reinscription ? typeReinscription : typeInscription;
     setErreur(""); setSucces("");
     setInscriptionEnCours(reinscription ? "reinscription" : "inscription");
-    // Fenetre du recu ouverte pendant le clic : sinon le navigateur la bloque apres l'appel reseau.
-    const fenetre = ouvrirFenetreVierge();
     try {
       const res = await api.post("/frais/appliquer-inscription", {
         eleve_id: eleveInfos.id,
@@ -260,11 +285,21 @@ export default function FraisScolarite({ permissions = [] }) {
       await chargerSuivi(eleveInfos.id);
       setSucces(res.data.message);
       setFormInscription(null);
-      const recu = { genre: "inscription", eleve: eleveInfos, reponse: res.data, reinscription };
+      const recu = {
+        eleve: eleveInfos,
+        type: reinscription ? "Réinscription" : "Inscription",
+        montantPaye: Number(res.data.montant_paye),
+        complet: res.data.complet,
+        reste: Number(res.data.reste),
+        moyenPaiement: res.data.moyen_paiement,
+        date: res.data.date,
+        heure: res.data.heure,
+        reference: res.data.reference,
+        caissier: res.data.caissier || localStorage.getItem("user_name") || "",
+      };
       setDernierRecu(recu);
-      ouvrirRecu(fenetre, recu);
+      setRecuInscriptionVisible(true);
     } catch (err) {
-      fenetre?.close();
       setErreur(
         err.response?.status === 409
           ? "Frais déjà appliqués"
@@ -289,14 +324,26 @@ export default function FraisScolarite({ permissions = [] }) {
       setPaiement({ echeance_eleve_id: "", montant: "", moyen_paiement: "especes", date_paiement: "" });
 
       if (peutImprimer) {
+        // Le POST ne renvoie que la ligne "paiements" : on retrouve l'echeance (montant du,
+        // cumul deja paye dessus) et son type dans le suivi qu'on vient de recharger.
+        const info = trouverEcheance(suiviMaj, res.data.echeance_eleve_id);
+        const montantDu = info ? Number(info.echeance.montant) : null;
+        const cumule = info ? Number(info.echeance.montant_paye) : Number(res.data.montant);
         const recu = {
-          paiement: res.data,
           eleve: eleveInfos,
-          totaux: totauxDepuisSuivi(suiviMaj),
+          type: info ? libelleTypePaiement(info.typeFrais, info.echeance.libelle) : `Scolarité - ${res.data.libelle || ""}`.trim(),
+          montantPaye: Number(res.data.montant),
+          complet: montantDu === null || cumule >= montantDu,
+          reste: montantDu === null ? 0 : Math.max(0, montantDu - cumule),
+          moyenPaiement: res.data.moyen_paiement,
+          date: res.data.date_paiement,
+          heure: formaterHeure(res.data.created_at),
+          reference: referenceLocale(res.data.id, res.data.date_paiement),
           caissier: localStorage.getItem("user_name") || "",
+          totaux: totauxDepuisSuivi(suiviMaj),
         };
         setDernierRecu(recu);
-        ouvrirRecu(fenetreRecu, recu);
+        imprimerRecu(fenetreRecu, recu);
       }
     } catch (err) {
       fenetreRecu?.close();
@@ -389,7 +436,7 @@ export default function FraisScolarite({ permissions = [] }) {
           {succes}
           {peutImprimer && dernierRecu && (
             <button
-              onClick={() => ouvrirRecu(ouvrirFenetreVierge(), dernierRecu)}
+              onClick={() => imprimerRecu(ouvrirFenetreVierge(), dernierRecu)}
               className="ml-auto px-3 py-1 rounded-lg border border-emerald-200 bg-white text-emerald-700 text-xs font-semibold hover:bg-emerald-100 transition-colors cursor-pointer"
             >
               Réimprimer le reçu
@@ -398,7 +445,71 @@ export default function FraisScolarite({ permissions = [] }) {
         </div>
       )}
 
-      {onglet === "suivi" && (
+      {onglet === "suivi" && recuInscriptionVisible && dernierRecu && (
+        <div className="space-y-4">
+          <style>{`
+            @media print {
+              body * { visibility: hidden; }
+              .recu-impression, .recu-impression * { visibility: visible; }
+              .recu-impression { position: absolute; left: 0; top: 0; width: 100%; }
+              .no-print { display: none !important; }
+            }
+          `}</style>
+
+          <div className="flex justify-end gap-2 no-print">
+            <Button variant="primary" onClick={() => window.print()}>🖨️ Imprimer</Button>
+            <Button variant="secondary" onClick={() => setRecuInscriptionVisible(false)}>Fermer</Button>
+          </div>
+
+          <div className="recu-impression bg-white rounded-2xl overflow-hidden shadow-sm border border-slate-100 max-w-xl mx-auto">
+            <div className="px-6 py-5 text-white" style={{ background: "#0C447C" }}>
+              <p className="text-lg font-extrabold tracking-[0.2em] m-0">LAKOLI</p>
+              <p className="text-xs text-white/70 m-0 mt-0.5">Reçu de {dernierRecu.type}</p>
+            </div>
+
+            <div className="p-6 space-y-5 text-sm text-slate-700">
+              <div>
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider m-0 mb-1">Élève</p>
+                <p className="m-0 font-semibold text-slate-900">{dernierRecu.eleve?.nom} {dernierRecu.eleve?.prenom}</p>
+                <p className="m-0 text-xs text-slate-500 mt-0.5">
+                  <span className="font-mono">{dernierRecu.eleve?.matricule || "—"}</span> · {dernierRecu.eleve?.classe || "—"}
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider m-0 mb-1">Montant payé</p>
+                  <p className="m-0 font-bold text-[#0C447C] text-base">{formaterGNF(dernierRecu.montantPaye)}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider m-0 mb-1">Moyen de paiement</p>
+                  <p className="m-0 font-semibold">
+                    {LIBELLES_MOYEN_PAIEMENT[dernierRecu.moyenPaiement] || dernierRecu.moyenPaiement || "—"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider m-0 mb-1">Référence</p>
+                  <p className="m-0 font-mono text-xs">{dernierRecu.reference || "—"}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider m-0 mb-1">Date et heure</p>
+                  <p className="m-0 font-semibold">
+                    {formaterDate(dernierRecu.date)}{dernierRecu.heure ? ` à ${dernierRecu.heure}` : ""}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex justify-end pt-8">
+                <div className="text-center w-52 border-t border-slate-300 pt-1.5">
+                  <p className="m-0 text-xs text-slate-500">Signature du caissier</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {onglet === "suivi" && !recuInscriptionVisible && (
         <div className="flex flex-col sm:flex-row sm:items-center gap-3">
           <Select
             value={classeId}
@@ -448,7 +559,7 @@ export default function FraisScolarite({ permissions = [] }) {
         </div>
       )}
 
-      {onglet === "suivi" && (
+      {onglet === "suivi" && !recuInscriptionVisible && (
         <div className="flex flex-col lg:flex-row gap-4">
           <Card className="lg:w-72 shrink-0 max-h-[560px] overflow-y-auto p-0 overflow-hidden">
             <div className="flex items-center gap-2 px-4 py-3.5 border-b border-slate-100 bg-slate-50/60">

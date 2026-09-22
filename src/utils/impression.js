@@ -22,7 +22,7 @@ export function formaterDate(valeur) {
   return m ? `${m[3]}/${m[2]}/${m[1]}` : "—";
 }
 
-function formaterHeure(valeur) {
+export function formaterHeure(valeur) {
   const d = new Date(valeur);
   const date = Number.isNaN(d.getTime()) ? new Date() : d;
   return date.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
@@ -30,6 +30,13 @@ function formaterHeure(valeur) {
 
 function dateImpression() {
   return new Date().toLocaleString("fr-FR", { dateStyle: "long", timeStyle: "short" });
+}
+
+// Reference de secours pour un paiement de scolarite ordinaire : le backend ne genere une
+// reference (colonne paiements.reference) que pour les frais d'inscription / reinscription.
+export function referenceLocale(paiementId, datePaiement) {
+  const dateCompacte = String(datePaiement ?? "").replace(/\D/g, "").slice(0, 8);
+  return `REF-${paiementId}-${dateCompacte}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -98,6 +105,8 @@ export function montantEnLettres(montant) {
 // Fenetre d'impression
 // ---------------------------------------------------------------------------
 const LOGO_SVG = `<svg viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><rect x="1.5" y="1.5" width="41" height="41" rx="10" fill="none" stroke="#000" stroke-width="3"/><g transform="translate(10 10)" fill="none" stroke="#000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z"/><path d="M22 10v6"/><path d="M6 12.5V16a6 3 0 0 0 12 0v-3.5"/></g></svg>`;
+// Meme logo, trait blanc : utilise sur fond fonce (en-tete premium du releve).
+const LOGO_SVG_BLANC = LOGO_SVG.split('stroke="#000"').join('stroke="#fff"');
 
 const STYLES = `
   * { box-sizing: border-box; }
@@ -122,6 +131,9 @@ const STYLES = `
   table.infos td.lib { width: 36%; font-weight: bold; }
   .montant { font-size: 16px; font-weight: bold; }
   .lettres { font-style: italic; }
+  .statut-paye { color: #15803d; font-weight: bold; letter-spacing: 0.5px; }
+  .statut-partiel { color: #b45309; font-weight: bold; letter-spacing: 0.5px; }
+  .statut-partiel .reste { font-weight: normal; }
   table.tableau { width: 100%; border-collapse: collapse; }
   table.tableau th, table.tableau td { border: 1px solid #000; padding: 6px 8px; text-align: left; }
   table.tableau th { background: #eee; font-size: 11px; text-transform: uppercase; }
@@ -129,17 +141,64 @@ const STYLES = `
   table.tableau tr.total td { font-weight: bold; background: #eee; }
   .signatures { display: flex; justify-content: flex-end; margin-top: 40px; }
   .signature { width: 240px; text-align: center; border-top: 1px solid #000; padding-top: 6px; font-size: 11px; }
-  .tampon { text-align: center; margin: 4px 0 18px; }
-  .tampon span { display: inline-block; font-weight: bold; letter-spacing: 6px; padding: 4px 30px; border: 4px solid; border-radius: 6px; transform: rotate(-3deg); -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  .tampon.paye span { font-size: 44px; color: #15803d; border-color: #15803d; }
-  .tampon.partiel span { font-size: 26px; letter-spacing: 3px; color: #b45309; border-color: #b45309; }
   .pied { margin-top: 28px; border-top: 1px solid #000; padding-top: 8px; font-size: 11px; text-align: center; }
   .bloc h2, table.tableau th, table.tableau tr.total td { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+  /* Releve de paiements : design premium en couleur, isole sous .doc-releve pour ne jamais
+     affecter le recu de paiement (qui reste noir et blanc). */
+  .doc-releve * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .doc-releve .entete-premium {
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    background: #0C447C; color: #fff; padding: 20px 24px; border-radius: 10px;
+  }
+  .doc-releve .entete-premium .logo { display: flex; align-items: center; gap: 10px; }
+  .doc-releve .entete-premium .logo svg { width: 46px; height: 46px; flex-shrink: 0; }
+  .doc-releve .entete-premium .nom { font-size: 22px; font-weight: bold; letter-spacing: 3px; color: #fff; }
+  .doc-releve .entete-premium .badge-etablissement {
+    display: inline-block; margin-top: 5px; padding: 3px 10px; border-radius: 999px;
+    background: rgba(255, 255, 255, 0.2); color: #fff; font-size: 11px; font-weight: 600;
+  }
+  .doc-releve .entete-premium .titre h1 { margin: 0; font-size: 20px; letter-spacing: 1px; color: #fff; }
+
+  .doc-releve .bloc-eleve {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 14px 18px; margin: 18px 0;
+  }
+  .doc-releve .bloc-eleve h2 {
+    margin: 0 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: #0C447C;
+  }
+
+  table.tableau-premium { width: 100%; border-collapse: collapse; border-radius: 8px; overflow: hidden; }
+  table.tableau-premium th {
+    background: #0C447C; color: #fff; padding: 10px 12px; text-align: left;
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  table.tableau-premium td { padding: 9px 12px; border-bottom: 1px solid #e2e8f0; }
+  table.tableau-premium .droite { text-align: right; }
+  table.tableau-premium tbody tr:nth-child(even) { background: #f8fafc; }
+  table.tableau-premium tr.total td { background: #1e293b; color: #fff; font-weight: bold; border-bottom: none; }
+
+  .badge-statut { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: bold; }
+  .badge-paye { background: #dcfce7; color: #15803d; }
+  .badge-partiel { background: #fff7ed; color: #b45309; }
+  .badge-echoir { background: #f1f5f9; color: #64748b; }
+  .badge-retard { background: #fee2e2; color: #dc2626; }
+
+  .doc-releve .signature-zone { display: flex; justify-content: flex-end; margin-top: 50px; }
+  .doc-releve .signature-zone .cadre { width: 260px; text-align: center; }
+  .doc-releve .signature-zone .ligne { height: 40px; border-top: 1px dashed #64748b; margin-bottom: 6px; }
+  .doc-releve .signature-zone .libelle { font-size: 11px; color: #475569; }
+
+  .doc-releve .pied-premium {
+    margin-top: 24px; padding-top: 12px; border-top: 1px solid #e2e8f0;
+    text-align: center; font-size: 11px; color: #475569;
+  }
+
   @media print {
     body { padding: 0; }
     .no-print { display: none !important; }
-    .bloc, table.tableau tr { break-inside: avoid; }
-    @page { margin: 14mm; }
+    .bloc, table.tableau tr, table.tableau-premium tr { break-inside: avoid; }
+    @page { margin: 15mm; }
   }
 `;
 
@@ -209,22 +268,29 @@ const MOYENS_PAIEMENT = {
 };
 
 // ---------------------------------------------------------------------------
-// Recu de paiement
+// Recu de paiement — unique pour tous les types (scolarite, inscription, reinscription)
 // ---------------------------------------------------------------------------
-// paiement : reponse de POST /frais/paiements ; eleve : { nom, prenom, matricule, classe } ;
-// totaux : { total, paye, reste } (ou null si indisponible) ; caissier : nom de l'utilisateur.
-export function genererRecuHtml({ paiement, eleve, totaux, caissier }) {
-  const dateCompacte = String(paiement.date_paiement ?? "").replace(/\D/g, "").slice(0, 8);
-  const numero = `REF-${paiement.id}-${dateCompacte}`;
+// eleve : { nom, prenom, matricule, classe } ;
+// type : libelle du paiement, ex. "Scolarité - Trimestre 1", "Inscription", "Réinscription" ;
+// montantPaye : montant de CETTE transaction (ce qui a ete physiquement recu aujourd'hui) ;
+// complet / reste : etat de l'echeance apres ce paiement (cumul de tous ses paiements, pas
+// seulement celui-ci) — determine la mention PAYÉ EN INTÉGRALITÉ / PAIEMENT PARTIEL ;
+// totaux : { total, paye } optionnel, resume annuel de la scolarite (omis pour une inscription) ;
+// reference : generee cote serveur pour l'inscription/reinscription, sinon voir referenceLocale().
+export function genererRecuHtml({ eleve, type, montantPaye, complet, reste, moyenPaiement, date, heure, reference, caissier, totaux }) {
   const tiret = "—";
+  const nomComplet = `${eleve?.nom ?? ""} ${eleve?.prenom ?? ""}`.trim();
+  const statutHtml = complet
+    ? `<span class="statut-paye">PAYÉ EN INTÉGRALITÉ</span>`
+    : `<span class="statut-partiel">PAIEMENT PARTIEL <span class="reste">(reste ${formaterMontant(reste)} GNF)</span></span>`;
 
   return `
-  ${enteteHtml({ titre: "REÇU DE PAIEMENT", detail: numero, sousLogo: "Gestion Scolaire · Guinée" })}
+  ${enteteHtml({ titre: "REÇU DE PAIEMENT", sousLogo: "Gestion Scolaire · Guinée" })}
 
   <div class="bloc">
     <h2>Élève</h2>
     <div class="contenu"><table class="infos">
-      ${ligneInfo("Nom complet", echapperHtml(`${eleve?.nom ?? ""} ${eleve?.prenom ?? ""}`.trim() || tiret))}
+      ${ligneInfo("Nom complet", echapperHtml(nomComplet || tiret))}
       ${ligneInfo("Matricule", echapperHtml(eleve?.matricule || tiret))}
       ${ligneInfo("Classe", echapperHtml(eleve?.classe || tiret))}
     </table></div>
@@ -233,22 +299,33 @@ export function genererRecuHtml({ paiement, eleve, totaux, caissier }) {
   <div class="bloc">
     <h2>Paiement</h2>
     <div class="contenu"><table class="infos">
-      ${ligneInfo("Échéance", echapperHtml(paiement.libelle || tiret))}
-      ${ligneInfo("Montant payé", `<span class="montant">${formaterMontant(paiement.montant)} GNF</span>`)}
-      ${ligneInfo("En lettres", `<span class="lettres">${echapperHtml(montantEnLettres(paiement.montant))}</span>`)}
-      ${ligneInfo("Moyen de paiement", echapperHtml(MOYENS_PAIEMENT[paiement.moyen_paiement] || paiement.moyen_paiement || tiret))}
-      ${ligneInfo("Date et heure", `${formaterDate(paiement.date_paiement)} à ${formaterHeure(paiement.created_at)}`)}
+      ${ligneInfo("Type", echapperHtml(type || tiret))}
+      ${ligneInfo("Montant payé", `<span class="montant">${formaterMontant(montantPaye)} GNF</span>`)}
+      ${ligneInfo("Statut", statutHtml)}
+      ${ligneInfo("Moyen de paiement", echapperHtml(MOYENS_PAIEMENT[moyenPaiement] || moyenPaiement || tiret))}
+    </table></div>
+  </div>
+
+  ${totaux ? `
+  <div class="bloc">
+    <h2>Résumé de la scolarité</h2>
+    <div class="contenu"><table class="infos">
+      ${ligneInfo("Total annuel", `${formaterMontant(totaux.total)} GNF`)}
+      ${ligneInfo("Total payé à ce jour", `${formaterMontant(totaux.paye)} GNF`)}
+      ${ligneInfo("Reste à payer", `<strong>${formaterMontant(Math.max(0, totaux.total - totaux.paye))} GNF</strong>`)}
+    </table></div>
+  </div>` : ""}
+
+  <div class="bloc">
+    <div class="contenu"><table class="infos">
+      ${ligneInfo("Référence", `<span style="font-family: 'Courier New', monospace">${echapperHtml(reference || tiret)}</span>`)}
+      ${ligneInfo("Date et heure", `${formaterDate(date)}${heure ? ` à ${echapperHtml(heure)}` : ""}`)}
       ${ligneInfo("Caissier", echapperHtml(caissier || tiret))}
     </table></div>
   </div>
 
-  <div class="bloc">
-    <h2>Résumé de la scolarité</h2>
-    <div class="contenu"><table class="infos">
-      ${ligneInfo("Total annuel", totaux ? `${formaterMontant(totaux.total)} GNF` : tiret)}
-      ${ligneInfo("Total payé à ce jour", totaux ? `${formaterMontant(totaux.paye)} GNF` : tiret)}
-      ${ligneInfo("Reste à payer", totaux ? `<strong>${formaterMontant(Math.max(0, totaux.total - totaux.paye))} GNF</strong>` : tiret)}
-    </table></div>
+  <div class="signatures">
+    <div class="signature">Signature du caissier</div>
   </div>
 
   <div class="pied">
@@ -257,48 +334,19 @@ export function genererRecuHtml({ paiement, eleve, totaux, caissier }) {
   </div>`;
 }
 
-// ---------------------------------------------------------------------------
-// Recu d'inscription / de reinscription
-// ---------------------------------------------------------------------------
-// eleve : { nom, prenom, matricule } ; reponse : reponse de POST /frais/appliquer-inscription
-// ({ reference, type_frais, montant, montant_paye, reste, complet, moyen_paiement, classe,
-//    etablissement, caissier, date, heure }) ; reinscription : booleen.
-// La reference vient du serveur (stockee avec le paiement) : un recu reimprime la garde.
-export function genererRecuInscriptionHtml({ eleve, reponse, reinscription }) {
-  const tiret = "—";
-  const nomComplet = `${eleve?.nom ?? ""} ${eleve?.prenom ?? ""}`.trim();
-  const complet = Boolean(reponse.complet);
-  const tampon = complet
-    ? `<div class="tampon paye"><span>PAYÉ</span></div>`
-    : `<div class="tampon partiel"><span>PAIEMENT PARTIEL</span></div>`;
+// Minuscules et sans accents : reconnait "Inscription"/"Réinscription" quel que soit le cas.
+function normaliserTexte(texte) {
+  return (texte || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+}
 
-  return `
-  ${enteteHtml({
-    titre: reinscription ? "REÇU DE RÉINSCRIPTION" : "REÇU D'INSCRIPTION",
-    sousLogo: "Gestion Scolaire · Guinée",
-  })}
-
-  ${tampon}
-
-  <div class="bloc">
-    <div class="contenu"><table class="infos">
-      ${ligneInfo("Établissement", echapperHtml(reponse.etablissement || tiret))}
-      ${ligneInfo("Élève", echapperHtml(`${nomComplet || tiret} - ${eleve?.matricule || tiret}`))}
-      ${ligneInfo("Classe", echapperHtml(reponse.classe || tiret))}
-      ${ligneInfo("Type", reinscription ? "Réinscription" : "Inscription")}
-      ${ligneInfo("Montant des frais", `${formaterMontant(reponse.montant)} GNF`)}
-      ${ligneInfo("Montant payé", `<span class="montant">${formaterMontant(reponse.montant_paye)} GNF</span>`)}
-      ${complet ? "" : ligneInfo("Reste à payer", `<strong>${formaterMontant(reponse.reste)} GNF</strong>`)}
-      ${ligneInfo("Moyen de paiement", echapperHtml(MOYENS_PAIEMENT[reponse.moyen_paiement] || reponse.moyen_paiement || tiret))}
-      ${ligneInfo("Date et heure", `${formaterDate(reponse.date)}${reponse.heure ? ` à ${echapperHtml(reponse.heure)}` : ""}`)}
-      ${ligneInfo("Caissier", echapperHtml(reponse.caissier || tiret))}
-      ${ligneInfo("Référence", `<span style="font-family: 'Courier New', monospace">${echapperHtml(reponse.reference || tiret)}</span>`)}
-    </table></div>
-  </div>
-
-  <div class="pied">
-    Document officiel LAKOLI · Certifié conforme aux normes guinéennes
-  </div>`;
+// "Payé" -> badge-paye, "En retard" -> badge-retard, etc. ; "À échoir" (et tout statut
+// inconnu) retombe sur le badge neutre par defaut.
+function classeBadgeStatut(statut) {
+  const s = normaliserTexte(statut);
+  if (s === "paye") return "badge-paye";
+  if (s === "partiel") return "badge-partiel";
+  if (s === "en retard") return "badge-retard";
+  return "badge-echoir";
 }
 
 // ---------------------------------------------------------------------------
@@ -308,65 +356,90 @@ export function genererRecuInscriptionHtml({ eleve, reponse, reinscription }) {
 // lignes : [{ libelle, montant, paye, statut, dernierPaiement }] ; etablissement : nom.
 export function genererReleveHtml({ etablissement, eleve, lignes }) {
   const tiret = "—";
-  const total = lignes.reduce((s, l) => s + l.montant, 0);
-  const paye = lignes.reduce((s, l) => s + l.paye, 0);
 
-  const corpsTableau = lignes
+  // Inscription puis Reinscription en tete, le reste (Trimestre 1, 2, 3...) dans l'ordre recu.
+  // Array#sort est stable (garanti depuis ES2019) : les egalites (toutes les lignes de
+  // scolarite, rang 2) conservent donc leur ordre d'origine.
+  const ORDRE_TETE = { inscription: 0, reinscription: 1 };
+  const lignesTriees = [...lignes].sort(
+    (a, b) => (ORDRE_TETE[normaliserTexte(a.libelle)] ?? 2) - (ORDRE_TETE[normaliserTexte(b.libelle)] ?? 2)
+  );
+
+  const total = lignesTriees.reduce((s, l) => s + l.montant, 0);
+  const paye = lignesTriees.reduce((s, l) => s + l.paye, 0);
+
+  const corpsTableau = lignesTriees
     .map(
       (l) => `<tr>
         <td>${echapperHtml(l.libelle)}</td>
         <td class="droite">${formaterMontant(l.montant)}</td>
         <td class="droite">${formaterMontant(l.paye)}</td>
         <td class="droite">${formaterMontant(Math.max(0, l.montant - l.paye))}</td>
-        <td>${echapperHtml(l.statut)}</td>
+        <td><span class="badge-statut ${classeBadgeStatut(l.statut)}">${echapperHtml(l.statut)}</span></td>
         <td>${l.dernierPaiement ? formaterDate(l.dernierPaiement) : tiret}</td>
       </tr>`
     )
     .join("");
 
   return `
-  ${enteteHtml({ titre: "RELEVÉ DE PAIEMENTS", sousLogo: etablissement || "Gestion Scolaire · Guinée" })}
+  <div class="doc-releve">
+    <div class="entete-premium">
+      <div class="logo">
+        ${LOGO_SVG_BLANC}
+        <div>
+          <div class="nom">LAKOLI</div>
+          ${etablissement ? `<span class="badge-etablissement">${echapperHtml(etablissement)}</span>` : ""}
+        </div>
+      </div>
+      <div class="titre">
+        <h1>RELEVÉ DE PAIEMENTS</h1>
+      </div>
+    </div>
 
-  <div class="bloc">
-    <h2>Élève</h2>
-    <div class="contenu"><table class="infos">
-      ${ligneInfo("Nom", echapperHtml(eleve.nom || tiret))}
-      ${ligneInfo("Prénom", echapperHtml(eleve.prenom || tiret))}
-      ${ligneInfo("Matricule", echapperHtml(eleve.matricule || tiret))}
-      ${ligneInfo("Classe", echapperHtml(eleve.classe || tiret))}
-      ${ligneInfo("Session scolaire", echapperHtml(eleve.session || tiret))}
-    </table></div>
-  </div>
+    <div class="bloc-eleve">
+      <h2>Élève</h2>
+      <table class="infos">
+        ${ligneInfo("Nom", echapperHtml(eleve.nom || tiret))}
+        ${ligneInfo("Prénom", echapperHtml(eleve.prenom || tiret))}
+        ${ligneInfo("Matricule", echapperHtml(eleve.matricule || tiret))}
+        ${ligneInfo("Classe", echapperHtml(eleve.classe || tiret))}
+        ${ligneInfo("Session scolaire", echapperHtml(eleve.session || tiret))}
+      </table>
+    </div>
 
-  <table class="tableau">
-    <thead>
-      <tr>
-        <th>Échéance</th>
-        <th class="droite">Montant dû (GNF)</th>
-        <th class="droite">Payé (GNF)</th>
-        <th class="droite">Reste (GNF)</th>
-        <th>Statut</th>
-        <th>Dernier paiement</th>
-      </tr>
-    </thead>
-    <tbody>
-      ${corpsTableau}
-      <tr class="total">
-        <td>TOTAL GÉNÉRAL</td>
-        <td class="droite">${formaterMontant(total)}</td>
-        <td class="droite">${formaterMontant(paye)}</td>
-        <td class="droite">${formaterMontant(Math.max(0, total - paye))}</td>
-        <td colspan="2"></td>
-      </tr>
-    </tbody>
-  </table>
+    <table class="tableau-premium">
+      <thead>
+        <tr>
+          <th>Échéance</th>
+          <th class="droite">Montant dû (GNF)</th>
+          <th class="droite">Payé (GNF)</th>
+          <th class="droite">Reste (GNF)</th>
+          <th>Statut</th>
+          <th>Dernier paiement</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${corpsTableau}
+        <tr class="total">
+          <td>TOTAL GÉNÉRAL</td>
+          <td class="droite">${formaterMontant(total)}</td>
+          <td class="droite">${formaterMontant(paye)}</td>
+          <td class="droite">${formaterMontant(Math.max(0, total - paye))}</td>
+          <td colspan="2"></td>
+        </tr>
+      </tbody>
+    </table>
 
-  <div class="signatures">
-    <div class="signature">Signature du caissier</div>
-  </div>
+    <div class="signature-zone">
+      <div class="cadre">
+        <div class="ligne"></div>
+        <div class="libelle">Signature et cachet du caissier</div>
+      </div>
+    </div>
 
-  <div class="pied">
-    Document officiel LAKOLI<br>
-    Imprimé le ${echapperHtml(dateImpression())}
+    <div class="pied-premium">
+      Document officiel LAKOLI · Certifié conforme aux normes scolaires de la République de Guinée<br>
+      Imprimé le ${echapperHtml(dateImpression())}
+    </div>
   </div>`;
 }
