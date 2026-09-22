@@ -103,7 +103,7 @@ export default function FraisScolarite({ permissions = [] }) {
   const [eleveSelectionne, setEleveSelectionne] = useState(null);
   const [eleveInfos, setEleveInfos] = useState(null);
   const [dernierRecu, setDernierRecu] = useState(null);
-  const [recuInscriptionVisible, setRecuInscriptionVisible] = useState(false);
+  const [recuVisible, setRecuVisible] = useState(false);
   const [inscriptionEnCours, setInscriptionEnCours] = useState(null);
   const [formInscription, setFormInscription] = useState(null);
   const [suivi, setSuivi] = useState(null);
@@ -253,52 +253,91 @@ export default function FraisScolarite({ permissions = [] }) {
     }
   };
 
-  // Clic sur "Inscrire" / "Réinscrire" : affiche le formulaire (montant pre-rempli avec la grille, modifiable).
+  const dateDuJour = () => new Date().toISOString().slice(0, 10);
+
+  // Clic sur "Inscrire" / "Réinscrire" : affiche le formulaire. Le montant d'inscription vient
+  // de la grille et n'est pas modifiable ; l'echeance de scolarite est un ajout optionnel.
   const ouvrirFormulaireInscription = (reinscription) => {
     const type = reinscription ? typeReinscription : typeInscription;
     if (!type) {
       setErreur(`Le type de frais « ${reinscription ? "Réinscription" : "Inscription"} » est introuvable.`);
       return;
     }
+    const montantInscription = montantGrille(type);
+    if (montantInscription == null) {
+      setErreur(`Aucune grille tarifaire « ${reinscription ? "Réinscription" : "Inscription"} » n'est configurée pour cette classe.`);
+      return;
+    }
     setErreur(""); setSucces("");
     setFormInscription({
       reinscription,
-      montant: String(montantGrille(type) ?? ""),
+      montantInscription,
+      echeanceId: "",
+      montantEcheance: "",
       moyen_paiement: "especes",
     });
   };
 
-  // Cree les frais, enregistre le paiement et ouvre le recu, en un seul appel.
+  // Selection d'une echeance de scolarite dans le formulaire d'inscription : pre-remplit son
+  // montant avec le solde restant du (modifiable ensuite).
+  const choisirEcheance = (echeanceId) => {
+    const ech = echeancesScolariteDisponibles.find((e) => String(e.id) === String(echeanceId));
+    setFormInscription({
+      ...formInscription,
+      echeanceId,
+      montantEcheance: ech ? String(ech.solde) : "",
+    });
+  };
+
+  // Cree les frais d'inscription/reinscription et, si une echeance de scolarite a ete choisie,
+  // enregistre aussi son paiement : deux appels API, un seul recu imprimable a l'ecran.
   const confirmerInscription = async (e) => {
     e.preventDefault();
-    const { reinscription, montant, moyen_paiement } = formInscription;
+    const { reinscription, montantInscription, echeanceId, montantEcheance, moyen_paiement } = formInscription;
     const type = reinscription ? typeReinscription : typeInscription;
     setErreur(""); setSucces("");
     setInscriptionEnCours(reinscription ? "reinscription" : "inscription");
     try {
-      const res = await api.post("/frais/appliquer-inscription", {
+      const resInscription = await api.post("/frais/appliquer-inscription", {
         eleve_id: eleveInfos.id,
         type_frais_id: type.id,
-        montant,
+        montant: montantInscription,
         moyen_paiement,
       });
+
+      let resEcheance = null;
+      if (echeanceId) {
+        resEcheance = await api.post("/frais/paiements", {
+          echeance_eleve_id: echeanceId,
+          montant: montantEcheance,
+          moyen_paiement,
+          date_paiement: dateDuJour(),
+        });
+      }
+
       await chargerSuivi(eleveInfos.id);
-      setSucces(res.data.message);
+      setSucces(resInscription.data.message);
       setFormInscription(null);
-      const recu = {
+
+      const lignes = [
+        { libelle: reinscription ? "Réinscription" : "Inscription", montant: Number(resInscription.data.montant_paye) },
+      ];
+      if (resEcheance) {
+        const libelleEcheance = echeancesScolariteDisponibles.find((ec) => String(ec.id) === String(echeanceId))?.libelle || "Scolarité";
+        lignes.push({ libelle: `Scolarité - ${libelleEcheance}`, montant: Number(resEcheance.data.montant) });
+      }
+
+      setDernierRecu({
         eleve: eleveInfos,
-        type: reinscription ? "Réinscription" : "Inscription",
-        montantPaye: Number(res.data.montant_paye),
-        complet: res.data.complet,
-        reste: Number(res.data.reste),
-        moyenPaiement: res.data.moyen_paiement,
-        date: res.data.date,
-        heure: res.data.heure,
-        reference: res.data.reference,
-        caissier: res.data.caissier || localStorage.getItem("user_name") || "",
-      };
-      setDernierRecu(recu);
-      setRecuInscriptionVisible(true);
+        lignes,
+        total: lignes.reduce((s, l) => s + l.montant, 0),
+        moyenPaiement: resInscription.data.moyen_paiement,
+        date: resInscription.data.date,
+        heure: resInscription.data.heure,
+        reference: resInscription.data.reference,
+        caissier: resInscription.data.caissier || localStorage.getItem("user_name") || "",
+      });
+      setRecuVisible(true);
     } catch (err) {
       setErreur(
         err.response?.status === 409
@@ -378,6 +417,16 @@ export default function FraisScolarite({ permissions = [] }) {
   const libelleMontant = (montant) => (montant != null ? ` (${formaterGNF(montant)})` : "");
   const typeInscriptionEleve = eleveInfos?.inscription_active?.type_inscription;
 
+  // Echeances de scolarite encore dues, proposees dans le formulaire d'inscription/reinscription.
+  const echeancesScolariteDisponibles = (suivi?.frais || [])
+    .filter((f) => normaliser(f.type_frais).startsWith("scolarit"))
+    .flatMap((f) => f.echeances)
+    .filter((ech) => ech.solde > 0);
+
+  const totalEncaisser = formInscription
+    ? Number(formInscription.montantInscription || 0) + (formInscription.echeanceId ? Number(formInscription.montantEcheance || 0) : 0)
+    : 0;
+
   return (
     <div className="space-y-6">
       <div className="relative overflow-hidden rounded-2xl p-5 sm:p-6 flex items-center gap-4" style={{ background: "linear-gradient(135deg, #0C447C, #1a5a9e)" }}>
@@ -434,7 +483,7 @@ export default function FraisScolarite({ permissions = [] }) {
         <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-50 border border-emerald-100 text-sm text-emerald-600 font-medium">
           <CheckCircle2 className="h-4 w-4 shrink-0" />
           {succes}
-          {peutImprimer && dernierRecu && (
+          {peutImprimer && dernierRecu?.type && (
             <button
               onClick={() => imprimerRecu(ouvrirFenetreVierge(), dernierRecu)}
               className="ml-auto px-3 py-1 rounded-lg border border-emerald-200 bg-white text-emerald-700 text-xs font-semibold hover:bg-emerald-100 transition-colors cursor-pointer"
@@ -445,7 +494,7 @@ export default function FraisScolarite({ permissions = [] }) {
         </div>
       )}
 
-      {onglet === "suivi" && recuInscriptionVisible && dernierRecu && (
+      {onglet === "suivi" && recuVisible && dernierRecu && (
         <div className="space-y-4">
           <style>{`
             @media print {
@@ -458,13 +507,13 @@ export default function FraisScolarite({ permissions = [] }) {
 
           <div className="flex justify-end gap-2 no-print">
             <Button variant="primary" onClick={() => window.print()}>🖨️ Imprimer</Button>
-            <Button variant="secondary" onClick={() => setRecuInscriptionVisible(false)}>Fermer</Button>
+            <Button variant="secondary" onClick={() => setRecuVisible(false)}>Fermer</Button>
           </div>
 
           <div className="recu-impression bg-white rounded-2xl overflow-hidden shadow-sm border border-slate-100 max-w-xl mx-auto">
             <div className="px-6 py-5 text-white" style={{ background: "#0C447C" }}>
               <p className="text-lg font-extrabold tracking-[0.2em] m-0">LAKOLI</p>
-              <p className="text-xs text-white/70 m-0 mt-0.5">Reçu de {dernierRecu.type}</p>
+              <p className="text-xs text-white/70 m-0 mt-0.5">Reçu de paiement</p>
             </div>
 
             <div className="p-6 space-y-5 text-sm text-slate-700">
@@ -476,11 +525,22 @@ export default function FraisScolarite({ permissions = [] }) {
                 </p>
               </div>
 
+              <table className="w-full text-sm border-collapse">
+                <tbody>
+                  {dernierRecu.lignes.map((l, i) => (
+                    <tr key={i} className="border-b border-slate-100">
+                      <td className="py-1.5">{l.libelle}</td>
+                      <td className="py-1.5 text-right font-semibold">{formaterGNF(l.montant)}</td>
+                    </tr>
+                  ))}
+                  <tr>
+                    <td className="py-2 font-bold text-slate-900">TOTAL ENCAISSÉ</td>
+                    <td className="py-2 text-right font-bold text-[#0C447C]">{formaterGNF(dernierRecu.total)}</td>
+                  </tr>
+                </tbody>
+              </table>
+
               <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider m-0 mb-1">Montant payé</p>
-                  <p className="m-0 font-bold text-[#0C447C] text-base">{formaterGNF(dernierRecu.montantPaye)}</p>
-                </div>
                 <div>
                   <p className="text-xs font-bold text-slate-400 uppercase tracking-wider m-0 mb-1">Moyen de paiement</p>
                   <p className="m-0 font-semibold">
@@ -491,7 +551,7 @@ export default function FraisScolarite({ permissions = [] }) {
                   <p className="text-xs font-bold text-slate-400 uppercase tracking-wider m-0 mb-1">Référence</p>
                   <p className="m-0 font-mono text-xs">{dernierRecu.reference || "—"}</p>
                 </div>
-                <div>
+                <div className="col-span-2">
                   <p className="text-xs font-bold text-slate-400 uppercase tracking-wider m-0 mb-1">Date et heure</p>
                   <p className="m-0 font-semibold">
                     {formaterDate(dernierRecu.date)}{dernierRecu.heure ? ` à ${dernierRecu.heure}` : ""}
@@ -509,7 +569,7 @@ export default function FraisScolarite({ permissions = [] }) {
         </div>
       )}
 
-      {onglet === "suivi" && !recuInscriptionVisible && (
+      {onglet === "suivi" && !recuVisible && (
         <div className="flex flex-col sm:flex-row sm:items-center gap-3">
           <Select
             value={classeId}
@@ -559,7 +619,7 @@ export default function FraisScolarite({ permissions = [] }) {
         </div>
       )}
 
-      {onglet === "suivi" && !recuInscriptionVisible && (
+      {onglet === "suivi" && !recuVisible && (
         <div className="flex flex-col lg:flex-row gap-4">
           <Card className="lg:w-72 shrink-0 max-h-[560px] overflow-y-auto p-0 overflow-hidden">
             <div className="flex items-center gap-2 px-4 py-3.5 border-b border-slate-100 bg-slate-50/60">
@@ -632,39 +692,88 @@ export default function FraisScolarite({ permissions = [] }) {
                 {formInscription && (
                   <form
                     onSubmit={confirmerInscription}
-                    className="flex flex-wrap items-end gap-3 px-5 py-4 border-t border-blue-100 bg-blue-50/40"
+                    className="flex flex-col gap-4 px-5 py-4 border-t border-blue-100 bg-blue-50/40"
                   >
-                    <p className="w-full text-xs font-bold text-slate-700 uppercase tracking-wider m-0">
-                      {formInscription.reinscription ? "Réinscription" : "Inscription"} · paiement immédiat
-                    </p>
                     <div>
-                      <label className="block text-xs font-semibold text-slate-500 mb-1">Montant à payer (GNF)</label>
-                      <Input
-                        type="number"
-                        min="1"
-                        value={formInscription.montant}
-                        onChange={(e) => setFormInscription({ ...formInscription, montant: e.target.value })}
-                        required
-                      />
+                      <p className="text-xs font-bold text-slate-700 uppercase tracking-wider m-0 mb-2">
+                        {formInscription.reinscription ? "Réinscription" : "Inscription"}
+                      </p>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-500 mb-1">Type</label>
+                          <Input type="text" value={formInscription.reinscription ? "Réinscription" : "Inscription"} disabled />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-500 mb-1">Montant (GNF)</label>
+                          <Input type="text" value={formaterGNF(formInscription.montantInscription)} disabled />
+                        </div>
+                      </div>
                     </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-500 mb-1">Moyen de paiement</label>
-                      <Select
-                        value={formInscription.moyen_paiement}
-                        onChange={(e) => setFormInscription({ ...formInscription, moyen_paiement: e.target.value })}
-                      >
-                        <option value="especes">Espèces</option>
-                        <option value="mobile_money">Mobile Money</option>
-                        <option value="virement">Virement</option>
-                        <option value="cheque">Chèque</option>
-                      </Select>
+
+                    <div className="border-t border-blue-100 pt-3">
+                      <p className="text-xs font-bold text-slate-700 uppercase tracking-wider m-0 mb-2">
+                        Paiement scolarité (optionnel)
+                      </p>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-500 mb-1">Échéance</label>
+                          <Select
+                            value={formInscription.echeanceId}
+                            onChange={(e) => choisirEcheance(e.target.value)}
+                          >
+                            <option value="">Aucune</option>
+                            {echeancesScolariteDisponibles.map((ech) => (
+                              <option key={ech.id} value={ech.id}>{ech.libelle}</option>
+                            ))}
+                          </Select>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-500 mb-1">Montant à payer (GNF)</label>
+                          <Input
+                            type="number"
+                            min="1"
+                            disabled={!formInscription.echeanceId}
+                            required={!!formInscription.echeanceId}
+                            value={formInscription.montantEcheance}
+                            onChange={(e) => setFormInscription({ ...formInscription, montantEcheance: e.target.value })}
+                          />
+                        </div>
+                      </div>
+                      {echeancesScolariteDisponibles.length === 0 && (
+                        <p className="text-xs text-slate-400 m-0 mt-2">Aucune échéance de scolarité en attente pour cet élève.</p>
+                      )}
                     </div>
-                    <Button type="submit" variant="primary" disabled={inscriptionEnCours !== null}>
-                      Confirmer et imprimer le reçu
-                    </Button>
-                    <Button type="button" variant="ghost" onClick={() => setFormInscription(null)}>
-                      Annuler
-                    </Button>
+
+                    <div className="border-t border-blue-100 pt-3">
+                      <p className="text-xs font-bold text-slate-700 uppercase tracking-wider m-0 mb-2">Règlement</p>
+                      <div className="grid grid-cols-2 gap-3 items-end">
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-500 mb-1">Montant total à encaisser</label>
+                          <p className="m-0 text-lg font-bold text-[#0C447C]">{formaterGNF(totalEncaisser)}</p>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-500 mb-1">Moyen de paiement</label>
+                          <Select
+                            value={formInscription.moyen_paiement}
+                            onChange={(e) => setFormInscription({ ...formInscription, moyen_paiement: e.target.value })}
+                          >
+                            <option value="especes">Espèces</option>
+                            <option value="mobile_money">Mobile Money</option>
+                            <option value="virement">Virement</option>
+                            <option value="cheque">Chèque</option>
+                          </Select>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-3">
+                      <Button type="submit" variant="primary" disabled={inscriptionEnCours !== null}>
+                        Enregistrer et imprimer le reçu
+                      </Button>
+                      <Button type="button" variant="ghost" onClick={() => setFormInscription(null)}>
+                        Annuler
+                      </Button>
+                    </div>
                   </form>
                 )}
               </Card>
