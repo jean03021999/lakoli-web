@@ -271,7 +271,7 @@ export default function FraisScolarite({ permissions = [] }) {
     setErreur(""); setSucces("");
     setFormInscription({
       reinscription,
-      montantInscription,
+      montantInscription: "",
       echeanceId: "",
       montantEcheance: "",
       moyen_paiement: "especes",
@@ -285,7 +285,7 @@ export default function FraisScolarite({ permissions = [] }) {
     setFormInscription({
       ...formInscription,
       echeanceId,
-      montantEcheance: ech ? String(ech.solde) : "",
+      montantEcheance: "",
     });
   };
 
@@ -708,8 +708,8 @@ export default function FraisScolarite({ permissions = [] }) {
                           <Input type="text" value={formInscription.reinscription ? "Réinscription" : "Inscription"} disabled />
                         </div>
                         <div>
-                          <label className="block text-xs font-semibold text-slate-500 mb-1">Montant (GNF)</label>
-                          <Input type="text" value={formaterGNF(formInscription.montantInscription)} disabled />
+                          <label className="block text-xs font-semibold text-slate-500 mb-1">Montant inscription (GNF)</label>
+                          <Input type="number" value={formInscription.montantInscription} onChange={(e) => setFormInscription({...formInscription, montantInscription: e.target.value})} placeholder="Saisir le montant" required />
                         </div>
                       </div>
                     </div>
