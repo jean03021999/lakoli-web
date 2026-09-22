@@ -551,11 +551,15 @@ export default function FraisScolarite({ permissions = [] }) {
                   <p className="text-xs font-bold text-slate-400 uppercase tracking-wider m-0 mb-1">Référence</p>
                   <p className="m-0 font-mono text-xs">{dernierRecu.reference || "—"}</p>
                 </div>
-                <div className="col-span-2">
+                <div>
                   <p className="text-xs font-bold text-slate-400 uppercase tracking-wider m-0 mb-1">Date et heure</p>
                   <p className="m-0 font-semibold">
                     {formaterDate(dernierRecu.date)}{dernierRecu.heure ? ` à ${dernierRecu.heure}` : ""}
                   </p>
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider m-0 mb-1">Caissier</p>
+                  <p className="m-0 font-semibold">{dernierRecu.caissier || "—"}</p>
                 </div>
               </div>
 
