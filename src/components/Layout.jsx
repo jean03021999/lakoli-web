@@ -28,6 +28,7 @@ import {
   ChevronDown,
   X,
   Shield,
+  DollarSign,
 } from "lucide-react";
 
 const COULEURS = {
@@ -50,6 +51,8 @@ const MODULES = [
   { nom: "Gestion des Classes", icone: School, chemin: "/classes", roles: ["DIRECTEUR", "PROVISEUR", "CENSEUR"] },
   { nom: "Gestion des Matières", icone: BookOpen, chemin: "/matieres", roles: ["COMPTABLE", "DIRECTEUR", "FONDATEUR"] },
   { nom: "Affectations", icone: Link2, chemin: "/affectations", roles: ["COMPTABLE", "DIRECTEUR", "FONDATEUR"] },
+  // Visibilite pilotee par la permission (et non par une liste de roles).
+  { nom: "Gestion des Salaires", icone: DollarSign, chemin: "/salaires", permission: "enseignants.salaires.voir" },
   { nom: "Emploi du Temps", icone: Calendar, chemin: "/emploi-du-temps", roles: ["COMPTABLE", "DIRECTEUR", "FONDATEUR", "PROVISEUR", "CENSEUR"] },
   { nom: "Gestion des Notes", icone: Award, chemin: "/notes", roles: ["DIRECTEUR", "PROVISEUR", "CENSEUR"] },
   { nom: "Bulletins", icone: FileSpreadsheet, chemin: "/bulletins", roles: ["DIRECTEUR", "FONDATEUR", "PROVISEUR", "CENSEUR"] },
@@ -91,14 +94,14 @@ function initiales(nom) {
 // Rôles ayant la permission notes.voir côté backend (RolePermissionSeeder)
 const ROLES_NOTES_VOIR = ["DIRECTEUR", "PROVISEUR", "CENSEUR"];
 
-export default function Layout({ children, role }) {
+export default function Layout({ children, role, permissions = [] }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [menuCompteOuvert, setMenuCompteOuvert] = useState(false);
   const [menuMobileOuvert, setMenuMobileOuvert] = useState(false);
   const [nbNotifications, setNbNotifications] = useState(0);
 
-  const modulesVisibles = MODULES.filter((m) => m.roles.includes(role));
+  const modulesVisibles = MODULES.filter((m) => (m.permission ? permissions.includes(m.permission) : m.roles.includes(role)));
 
   // Notifications réelles : élèves en retard (tous rôles ont eleves.voir) +
   // évaluations soumises en attente de validation (rôles avec notes.voir)

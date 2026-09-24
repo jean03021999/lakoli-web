@@ -486,7 +486,7 @@ export default function FraisScolarite({ permissions = [] }) {
 
   return (
     <div className="space-y-6">
-      <div className="relative overflow-hidden rounded-2xl p-5 sm:p-6 flex items-center gap-4" style={{ background: "linear-gradient(135deg, #0C447C, #1a5a9e)" }}>
+      <div className="relative overflow-hidden rounded-2xl p-5 sm:p-6 flex items-center justify-center gap-4" style={{ background: "linear-gradient(135deg, #0C447C, #1a5a9e)" }}>
         <div
           className="absolute -top-8 -right-8 h-32 w-32 rounded-full pointer-events-none"
           style={{ background: "rgba(255,255,255,0.08)" }}
@@ -501,9 +501,9 @@ export default function FraisScolarite({ permissions = [] }) {
         >
           <Wallet className="h-7 w-7 text-white" />
         </div>
-        <div className="relative z-10 min-w-0">
+        <div className="relative z-10 min-w-0 text-center">
           <h1 className="text-xl sm:text-2xl font-extrabold text-white tracking-tight">Frais de Scolarité & Facturation</h1>
-          <p className="text-xs sm:text-sm text-white/70 mt-1 max-w-2xl">
+          <p className="text-xs sm:text-sm text-white/70 mt-1 max-w-2xl mx-auto">
             Suivez les paiements des élèves et gérez les grilles tarifaires de l'établissement.
           </p>
         </div>

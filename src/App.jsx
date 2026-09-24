@@ -32,6 +32,7 @@ import Periodes from "./pages/modules/Periodes";
 import Utilisateurs from "./pages/modules/Utilisateurs";
 import PaiementsCaisse from "./pages/modules/PaiementsCaisse";
 import Abonnement from "./pages/modules/Abonnement";
+import Salaires from "./pages/modules/Salaires";
 
 const AUTH_PATHS = ["/", "/verification-otp", "/mot-de-passe-oublie", "/reinitialiser-mot-de-passe"];
 
@@ -103,7 +104,7 @@ function AppContent() {
   }
 
   return (
-    <Layout role={role}>
+    <Layout role={role} permissions={permissions}>
       <Routes>
         <Route path="/tableau-de-bord" element={<TableauDeBord role={role} />} />
         <Route path="/eleves" element={<Eleves permissions={permissions} />} />
@@ -136,6 +137,10 @@ function AppContent() {
         <Route path="/periodes" element={<Periodes />} />
         <Route path="/utilisateurs" element={<Utilisateurs />} />
         <Route path="/paiements" element={<PaiementsCaisse />} />
+        <Route
+          path="/salaires"
+          element={<RouteProtegee permissions={permissions} requiert="enseignants.salaires.voir"><Salaires permissions={permissions} /></RouteProtegee>}
+        />
         <Route path="/abonnement" element={<Abonnement />} />
         <Route path="/parametres" element={<Parametres />} />
         <Route path="*" element={<Navigate to="/tableau-de-bord" />} />
