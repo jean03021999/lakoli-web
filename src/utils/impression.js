@@ -239,99 +239,241 @@ export function imprimerDocument(titre, corps) {
   return true;
 }
 
-function enteteHtml({ titre, detail, sousLogo }) {
-  return `
-  <div class="entete">
-    <div class="logo">
-      ${LOGO_SVG}
-      <div>
-        <div class="nom">LAKOLI</div>
-        <div class="sous">${echapperHtml(sousLogo)}</div>
-      </div>
-    </div>
-    <div class="titre">
-      <h1>${echapperHtml(titre)}</h1>
-      ${detail ? `<div class="detail">${echapperHtml(detail)}</div>` : ""}
-    </div>
-  </div>`;
-}
-
 function ligneInfo(libelle, valeurHtml) {
   return `<tr><td class="lib">${echapperHtml(libelle)}</td><td>${valeurHtml}</td></tr>`;
 }
 
-const MOYENS_PAIEMENT = {
+export const MOYENS_PAIEMENT = {
   especes: "Espèces",
   mobile_money: "Mobile Money",
   virement: "Virement",
   cheque: "Chèque",
 };
 
-// ---------------------------------------------------------------------------
-// Recu de paiement — unique pour tous les types (scolarite, inscription, reinscription)
-// ---------------------------------------------------------------------------
-// eleve : { nom, prenom, matricule, classe } ;
-// type : libelle du paiement, ex. "Scolarité - Trimestre 1", "Inscription", "Réinscription" ;
-// montantPaye : montant de CETTE transaction (ce qui a ete physiquement recu aujourd'hui) ;
-// complet / reste : etat de l'echeance apres ce paiement (cumul de tous ses paiements, pas
-// seulement celui-ci) — determine la mention PAYÉ EN INTÉGRALITÉ / PAIEMENT PARTIEL ;
-// totaux : { total, paye } optionnel, resume annuel de la scolarite (omis pour une inscription) ;
-// reference : generee cote serveur pour l'inscription/reinscription, sinon voir referenceLocale().
-export function genererRecuHtml({ eleve, type, montantPaye, complet, reste, moyenPaiement, date, heure, reference, caissier, totaux }) {
-  const tiret = "—";
-  const nomComplet = `${eleve?.nom ?? ""} ${eleve?.prenom ?? ""}`.trim();
-  const statutHtml = complet
-    ? `<span class="statut-paye">PAYÉ EN INTÉGRALITÉ</span>`
-    : `<span class="statut-partiel">PAIEMENT PARTIEL <span class="reste">(reste ${formaterMontant(reste)} GNF)</span></span>`;
+// "Payé" -> "✓ Payé" ; les autres statuts (Partiel, À échoir, En retard) restent tels quels.
+function texteBadgeStatut(statut) {
+  return normaliserTexte(statut) === "paye" ? `✓ ${statut}` : statut;
+}
+
+// Section "Situation globale de l'élève" du recu : inscription (si presente) + chaque echeance
+// de scolarite + total restant du sur l'annee. Retourne une chaine vide si `situation` est
+// absent (le champ est optionnel sur `data`).
+function situationGlobaleHtml(situation) {
+  if (!situation) return "";
+
+  const ligneInscription = situation.inscription
+    ? `
+      <div class="ligne-situation">
+        <span>${echapperHtml(situation.inscription.libelle)}</span>
+        <span class="${classeBadgeStatut(situation.inscription.statut)}">${echapperHtml(texteBadgeStatut(situation.inscription.statut))}</span>
+        <span>${Number(situation.inscription.montant_paye).toLocaleString("fr-FR")} GNF</span>
+      </div>`
+    : "";
+
+  const lignesEcheances = (situation.echeances || [])
+    .map(
+      (ech) => `
+      <div class="ligne-situation">
+        <span>${echapperHtml(ech.libelle)}</span>
+        <span class="${classeBadgeStatut(ech.statut)}">${echapperHtml(texteBadgeStatut(ech.statut))}</span>
+        <span>${Number(ech.montant_paye).toLocaleString("fr-FR")} GNF / ${Number(ech.montant).toLocaleString("fr-FR")} GNF</span>
+      </div>`
+    )
+    .join("");
 
   return `
-  ${enteteHtml({ titre: "REÇU DE PAIEMENT", sousLogo: "Gestion Scolaire · Guinée" })}
+    <div class="section">
+      <div class="section-title">Situation globale de l'élève</div>
+      ${ligneInscription}
+      <div class="situation-header">Scolarité annuelle : ${Number(situation.totalScolarite).toLocaleString("fr-FR")} GNF</div>
+      ${lignesEcheances}
+      <div class="reste-box">
+        <span>RESTE À PAYER</span>
+        <span class="reste-montant">${Number(situation.resteGlobal).toLocaleString("fr-FR")} GNF</span>
+      </div>
+    </div>`;
+}
 
-  <div class="bloc">
-    <h2>Élève</h2>
-    <div class="contenu"><table class="infos">
-      ${ligneInfo("Nom complet", echapperHtml(nomComplet || tiret))}
-      ${ligneInfo("Matricule", echapperHtml(eleve?.matricule || tiret))}
-      ${ligneInfo("Classe", echapperHtml(eleve?.classe || tiret))}
-    </table></div>
+// ---------------------------------------------------------------------------
+// Recu de paiement — document HTML autonome (son propre <style>, pas de dependance a STYLES
+// ni a ecrireDocumentImpression) : unique pour tous les types (scolarite, inscription,
+// reinscription), une ou plusieurs lignes reglees en un seul geste (ex. inscription + trimestre).
+// ---------------------------------------------------------------------------
+// data.reference : numero du recu ;
+// data.eleve : { nom, prenom, matricule, classe } ;
+// data.session : libelle de la session scolaire active, ex. "2026-2027" ;
+// data.lignes : [{ libelle, montant }] — une ligne par frais regle dans cette transaction ;
+// data.total : somme des lignes (ce qui a ete physiquement encaisse) ;
+// data.estSolde : true si l'echeance concernee est desormais entierement payee ;
+// data.resteAPayer : solde restant si estSolde est false ;
+// data.moyen : moyen de paiement deja traduit en francais (ex. "Espèces") ;
+// data.date / data.heure : date et heure du paiement, deja formatees ;
+// data.caissier : nom du caissier ;
+// data.situationGlobale : optionnel — { totalScolarite, totalPaye, resteGlobal,
+// echeances: [{ libelle, montant, montant_paye, reste, statut }], inscription: { libelle,
+// montant, montant_paye, statut } | null } — vue d'ensemble affichee sous la section Règlement.
+//
+// Ouvre sa propre fenetre par defaut (utiliser tel quel pour un clic direct, ex. "Réimprimer
+// le reçu"), ou ecrit dans `fenetrePreouverte` si elle est fournie — a ouvrir des le clic
+// initial (avant tout appel reseau) pour ne pas se faire bloquer par le navigateur.
+// Retourne false si la fenetre est indisponible (bloquee par le navigateur).
+export function genererEtImprimerRecu(data, fenetrePreouverte) {
+  const fenetre = fenetrePreouverte || window.open("", "_blank");
+  if (!fenetre) return false;
+
+  const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Reçu de Paiement LAKOLI</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: Arial, sans-serif; color: #1e293b; }
+
+    .header { background: #0C447C; color: white; padding: 20px 24px; display: flex; justify-content: space-between; align-items: center; }
+    .header-left { display: flex; align-items: center; gap: 12px; }
+    .header-icon { width: 44px; height: 44px; background: rgba(255,255,255,0.15); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 22px; }
+    .header-title { font-size: 22px; font-weight: 700; }
+    .header-sub { font-size: 11px; opacity: 0.75; margin-top: 2px; }
+    .header-right { text-align: right; }
+    .recu-titre { font-size: 20px; font-weight: 700; letter-spacing: 1px; }
+    .recu-num { font-size: 12px; opacity: 0.85; margin-top: 4px; }
+
+    .body { padding: 24px; }
+
+    .section { margin-bottom: 20px; }
+    .section-title { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #64748b; margin-bottom: 10px; padding-bottom: 6px; border-bottom: 1px solid #e2e8f0; }
+
+    .eleve-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; background: #f8fafc; padding: 14px; border-radius: 8px; }
+    .eleve-item label { font-size: 10px; color: #94a3b8; display: block; margin-bottom: 2px; }
+    .eleve-item span { font-size: 13px; font-weight: 600; color: #1e293b; }
+
+    .ligne-paiement { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px dashed #e2e8f0; }
+    .ligne-paiement:last-child { border-bottom: none; }
+    .ligne-libelle { font-size: 13px; color: #334155; }
+    .ligne-montant { font-size: 14px; font-weight: 600; color: #1e293b; }
+
+    .total-box { background: #f0fdf4; border: 1px solid #86efac; border-radius: 8px; padding: 14px 16px; display: flex; justify-content: space-between; align-items: center; margin: 16px 0; }
+    .total-label { font-size: 12px; font-weight: 700; text-transform: uppercase; color: #15803d; }
+    .total-montant { font-size: 24px; font-weight: 700; color: #15803d; }
+
+    .statut-box { text-align: center; padding: 10px; border-radius: 8px; margin-bottom: 16px; font-weight: 700; font-size: 14px; }
+    .statut-paye { background: #dcfce7; color: #15803d; }
+    .statut-partiel { background: #fef9c3; color: #a16207; }
+
+    .reglement-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; background: #f8fafc; padding: 14px; border-radius: 8px; }
+    .reg-item label { font-size: 10px; color: #94a3b8; display: block; margin-bottom: 2px; }
+    .reg-item span { font-size: 13px; font-weight: 600; }
+
+    .ligne-situation { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #f1f5f9; font-size: 13px; }
+    .situation-header { background: #f8fafc; padding: 8px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; color: #475569; margin: 8px 0; }
+    .badge-paye { background: #dcfce7; color: #15803d; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+    .badge-partiel { background: #fef9c3; color: #a16207; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+    .badge-echoir { background: #f1f5f9; color: #64748b; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+    .badge-retard { background: #fee2e2; color: #dc2626; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+    .reste-box { display: flex; justify-content: space-between; background: #fff7ed; border: 1px solid #fed7aa; border-radius: 8px; padding: 12px 14px; margin-top: 10px; }
+    .reste-montant { font-size: 18px; font-weight: 700; color: #ea580c; }
+
+    .signature-box { margin-top: 30px; text-align: right; }
+    .signature-line { border-top: 1px dashed #94a3b8; width: 220px; margin-left: auto; padding-top: 6px; }
+    .signature-label { font-size: 11px; color: #64748b; }
+
+    .footer { margin-top: 24px; padding-top: 12px; border-top: 1px solid #e2e8f0; text-align: center; }
+    .footer p { font-size: 10px; color: #94a3b8; line-height: 1.6; }
+
+    .btn-group { display: flex; gap: 10px; justify-content: center; padding: 16px; background: #f8fafc; border-top: 1px solid #e2e8f0; }
+    .btn { padding: 8px 20px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; border: none; }
+    .btn-print { background: #0C447C; color: white; }
+    .btn-close { background: #e2e8f0; color: #475569; }
+
+    @media print {
+      .btn-group { display: none !important; }
+      body { margin: 0; }
+      @page { margin: 15mm; }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="header-left">
+      <div class="header-icon">🎓</div>
+      <div>
+        <div class="header-title">LAKOLI</div>
+        <div class="header-sub">Gestion Scolaire · Guinée</div>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="recu-titre">REÇU DE PAIEMENT</div>
+      <div class="recu-num">N° ${echapperHtml(data.reference)}</div>
+    </div>
   </div>
 
-  <div class="bloc">
-    <h2>Paiement</h2>
-    <div class="contenu"><table class="infos">
-      ${ligneInfo("Type", echapperHtml(type || tiret))}
-      ${ligneInfo("Montant payé", `<span class="montant">${formaterMontant(montantPaye)} GNF</span>`)}
-      ${ligneInfo("Statut", statutHtml)}
-      ${ligneInfo("Moyen de paiement", echapperHtml(MOYENS_PAIEMENT[moyenPaiement] || moyenPaiement || tiret))}
-    </table></div>
+  <div class="body">
+    <div class="section">
+      <div class="section-title">Élève</div>
+      <div class="eleve-grid">
+        <div class="eleve-item"><label>Nom complet</label><span>${echapperHtml(data.eleve?.nom)} ${echapperHtml(data.eleve?.prenom)}</span></div>
+        <div class="eleve-item"><label>Matricule</label><span>${echapperHtml(data.eleve?.matricule)}</span></div>
+        <div class="eleve-item"><label>Classe</label><span>${echapperHtml(data.eleve?.classe)}</span></div>
+        <div class="eleve-item"><label>Session scolaire</label><span>${echapperHtml(data.session)}</span></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Détail du paiement</div>
+      ${data.lignes.map((l) => `
+        <div class="ligne-paiement">
+          <span class="ligne-libelle">${echapperHtml(l.libelle)}</span>
+          <span class="ligne-montant">${Number(l.montant).toLocaleString("fr-FR")} GNF</span>
+        </div>
+      `).join("")}
+    </div>
+
+    <div class="total-box">
+      <span class="total-label">Total encaissé</span>
+      <span class="total-montant">${Number(data.total).toLocaleString("fr-FR")} GNF</span>
+    </div>
+
+    <div class="statut-box ${data.estSolde ? "statut-paye" : "statut-partiel"}">
+      ${data.estSolde ? "✓ PAYÉ EN INTÉGRALITÉ" : `PAIEMENT PARTIEL · Reste à payer : ${Number(data.resteAPayer).toLocaleString("fr-FR")} GNF`}
+    </div>
+
+    <div class="section">
+      <div class="section-title">Règlement</div>
+      <div class="reglement-grid">
+        <div class="reg-item"><label>Moyen de paiement</label><span>${echapperHtml(data.moyen)}</span></div>
+        <div class="reg-item"><label>Référence</label><span>${echapperHtml(data.reference)}</span></div>
+        <div class="reg-item"><label>Date et heure</label><span>${echapperHtml(data.date)} à ${echapperHtml(data.heure)}</span></div>
+        <div class="reg-item"><label>Caissier</label><span>${echapperHtml(data.caissier)}</span></div>
+      </div>
+    </div>
+
+    ${situationGlobaleHtml(data.situationGlobale)}
+
+    <div class="signature-box">
+      <div class="signature-line">
+        <div class="signature-label">Signature et cachet du caissier</div>
+      </div>
+    </div>
+
+    <div class="footer">
+      <p>Document officiel LAKOLI · Certifié conforme aux normes scolaires de la République de Guinée</p>
+      <p>Imprimé le ${new Date().toLocaleDateString("fr-FR")} à ${new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}</p>
+    </div>
   </div>
 
-  ${totaux ? `
-  <div class="bloc">
-    <h2>Résumé de la scolarité</h2>
-    <div class="contenu"><table class="infos">
-      ${ligneInfo("Total annuel", `${formaterMontant(totaux.total)} GNF`)}
-      ${ligneInfo("Total payé à ce jour", `${formaterMontant(totaux.paye)} GNF`)}
-      ${ligneInfo("Reste à payer", `<strong>${formaterMontant(Math.max(0, totaux.total - totaux.paye))} GNF</strong>`)}
-    </table></div>
-  </div>` : ""}
-
-  <div class="bloc">
-    <div class="contenu"><table class="infos">
-      ${ligneInfo("Référence", `<span style="font-family: 'Courier New', monospace">${echapperHtml(reference || tiret)}</span>`)}
-      ${ligneInfo("Date et heure", `${formaterDate(date)}${heure ? ` à ${echapperHtml(heure)}` : ""}`)}
-      ${ligneInfo("Caissier", echapperHtml(caissier || tiret))}
-    </table></div>
+  <div class="btn-group">
+    <button class="btn btn-print" onclick="window.print()">🖨️ Imprimer</button>
+    <button class="btn btn-close" onclick="window.close()">✕ Fermer</button>
   </div>
+</body>
+</html>`;
 
-  <div class="signatures">
-    <div class="signature">Signature du caissier</div>
-  </div>
-
-  <div class="pied">
-    Document officiel LAKOLI - Certifié conforme<br>
-    Imprimé le ${echapperHtml(dateImpression())}
-  </div>`;
+  fenetre.document.open();
+  fenetre.document.write(html);
+  fenetre.document.close();
+  fenetre.focus();
+  return true;
 }
 
 // Minuscules et sans accents : reconnait "Inscription"/"Réinscription" quel que soit le cas.

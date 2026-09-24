@@ -16,21 +16,7 @@ import {
 } from "lucide-react";
 import { Card, Button, Input, Select, Badge } from "../../components/ui/LakoliDesignSystem";
 import { calculerStatutEcheance, STATUTS_ECHEANCE } from "../../constants/statutEcheance";
-import {
-  ouvrirFenetreVierge,
-  ecrireDocumentImpression,
-  genererRecuHtml,
-  referenceLocale,
-  formaterHeure,
-  formaterDate,
-} from "../../utils/impression";
-
-const LIBELLES_MOYEN_PAIEMENT = {
-  especes: "Espèces",
-  mobile_money: "Mobile Money",
-  virement: "Virement",
-  cheque: "Chèque",
-};
+import { formaterDate, formaterHeure, referenceLocale, genererEtImprimerRecu, ouvrirFenetreVierge, MOYENS_PAIEMENT } from "../../utils/impression";
 
 function getInitiales(nom, prenom) {
   return `${nom?.[0] || ""}${prenom?.[0] || ""}`.toUpperCase();
@@ -45,40 +31,61 @@ function formaterGNF(montant) {
   return `${Number(montant).toLocaleString("fr-FR")} GNF`;
 }
 
-// Total annuel / total paye / reste de la SCOLARITE de l'eleve : les frais d'inscription et de
-// reinscription sont exclus (meme regle que le statut global cote backend : nom en "scolarit%").
-function totauxDepuisSuivi(suivi) {
+// Minuscules et sans accents, pour que "aminata" trouve "Aminata" et "helene" trouve "Hélène".
+function normaliser(texte) {
+  return (texte || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+}
+
+// Situation globale de l'eleve (inscription + toutes les echeances de scolarite), envoyee au
+// recu pour que le caissier voie d'un coup d'oeil ce qui reste du sur l'annee. `suivi` doit
+// etre le suivi rechargé APRES le paiement (chargerSuivi renvoie les donnees a jour).
+function situationGlobaleDepuisSuivi(suivi) {
   if (!suivi) return null;
-  const echeances = suivi.frais
+
+  const echeancesScolarite = (suivi.frais || [])
     .filter((f) => normaliser(f.type_frais).startsWith("scolarit"))
     .flatMap((f) => f.echeances);
+  const totalScolarite = echeancesScolarite.reduce((s, e) => s + Number(e.montant), 0);
+  const totalPaye = echeancesScolarite.reduce((s, e) => s + Number(e.montant_paye), 0);
+  const echeances = echeancesScolarite.map((e) => ({
+    libelle: e.libelle,
+    montant: Number(e.montant),
+    montant_paye: Number(e.montant_paye),
+    reste: Math.max(0, Number(e.montant) - Number(e.montant_paye)),
+    statut: STATUTS_ECHEANCE[calculerStatutEcheance(e)].libelle,
+  }));
+
+  const fraisInscription = (suivi.frais || []).find((f) => normaliser(f.type_frais).includes("inscription"));
+  const echInscription = fraisInscription?.echeances?.[0];
+  const inscription = fraisInscription
+    ? {
+        libelle: fraisInscription.type_frais,
+        montant: Number(echInscription?.montant || 0),
+        montant_paye: Number(echInscription?.montant_paye || 0),
+        statut:
+          Number(echInscription?.montant_paye || 0) > 0 && Number(echInscription?.montant_paye || 0) >= Number(echInscription?.montant || 0)
+            ? "Payé"
+            : "Non payé",
+      }
+    : null;
+
   return {
-    total: echeances.reduce((s, e) => s + Number(e.montant), 0),
-    paye: echeances.reduce((s, e) => s + Number(e.montant_paye), 0),
+    totalScolarite,
+    totalPaye,
+    resteGlobal: totalScolarite - totalPaye,
+    echeances,
+    inscription,
   };
 }
 
-// Minuscules et sans accents, pour que "aminata" trouve "Aminata" et "helene" trouve "Hélène".
-function normaliser(texte) {
-  return (texte || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-}
-
-// Retrouve, dans le suivi rechargé après un paiement, l'echeance payee et le type de frais de
-// son parent (Scolarité, Inscription, Réinscription...) : le POST /frais/paiements ne renvoie
-// que la ligne "paiements", pas ce contexte.
-function trouverEcheance(suivi, echeanceId) {
-  for (const f of suivi?.frais || []) {
-    const echeance = f.echeances.find((e) => e.id === echeanceId);
-    if (echeance) return { echeance, typeFrais: f.type_frais };
-  }
-  return null;
-}
-
-// "Scolarité - Trimestre 1" pour une echeance de scolarite ; le type seul (Inscription,
-// Réinscription) pour les autres, qui n'ont qu'une echeance unique sans decoupage par periode.
-function libelleTypePaiement(typeFrais, libelleEcheance) {
-  return normaliser(typeFrais).startsWith("scolarit") ? `${typeFrais} - ${libelleEcheance}` : typeFrais;
-}
+// Statut de paiement global de l'eleve (Eleve::statut_paiement cote backend), affiche en pastille
+// coloree dans la liste — memes couleurs que le badge d'echeance pour rester coherent.
+const STATUTS_PAIEMENT_ELEVE = {
+  a_jour: { libelle: "À jour", dot: "bg-emerald-500", texte: "text-emerald-600" },
+  partiel: { libelle: "Partiel", dot: "bg-orange-500", texte: "text-orange-600" },
+  a_echoir: { libelle: "À échoir", dot: "bg-slate-400", texte: "text-slate-500" },
+  en_retard: { libelle: "En retard", dot: "bg-rose-500", texte: "text-rose-600" },
+};
 
 // Memorise la classe choisie pour la retrouver au retour sur la page.
 const CLE_CLASSE_FILTRE = "frais_classe_filtre";
@@ -91,34 +98,45 @@ function lireClasseFiltre() {
   }
 }
 
+const MESSAGE_POPUP_BLOQUE =
+  "Le navigateur a bloqué la fenêtre du reçu. Autorisez les pop-ups pour ce site, puis cliquez sur « Réimprimer le reçu ».";
+
 export default function FraisScolarite({ permissions = [] }) {
+  const peutInscrire = permissions.includes("frais.creer");
   const peutImprimer = permissions.includes("frais.voir");
-  const peutInscrire = permissions.includes("frais.voir");
+
   const [onglet, setOnglet] = useState("suivi");
-  const [eleves, setEleves] = useState([]);
+
+  // Colonne gauche : classe + recherche + liste des eleves.
+  const [classes, setClasses] = useState([]);
   const [classeId, setClasseId] = useState(lireClasseFiltre);
+  const [eleves, setEleves] = useState([]);
   const [recherche, setRecherche] = useState("");
   const [afficherSuggestions, setAfficherSuggestions] = useState(false);
   const [chargementEleves, setChargementEleves] = useState(false);
   const [eleveSelectionne, setEleveSelectionne] = useState(null);
+
+  // Colonne droite : detail de l'eleve selectionne.
   const [eleveInfos, setEleveInfos] = useState(null);
-  const [dernierRecu, setDernierRecu] = useState(null);
-  const [recuVisible, setRecuVisible] = useState(false);
-  const [inscriptionEnCours, setInscriptionEnCours] = useState(null);
-  const [formInscription, setFormInscription] = useState(null);
   const [suivi, setSuivi] = useState(null);
-  const [classes, setClasses] = useState([]);
   const [typesFrais, setTypesFrais] = useState([]);
+  const [inscriptionEnCours, setInscriptionEnCours] = useState(null);
+  const [dernierRecu, setDernierRecu] = useState(null);
+
+  // Formulaire d'inscription / reinscription (bouton d'en-tete).
+  const [formInscription, setFormInscription] = useState(null);
+  // Formulaire de paiement d'une echeance de scolarite prise isolement (bouton "Payer").
+  const [paiement, setPaiement] = useState(null);
+
   const [erreur, setErreur] = useState("");
   const [succes, setSucces] = useState("");
 
+  // Onglet Grilles tarifaires : etat et logique conserves a l'identique.
   const [nouveauType, setNouveauType] = useState("");
   const [grille, setGrille] = useState({ classe_id: "", type_frais_id: "", montant: "" });
   const [echeances, setEcheances] = useState([{ libelle: "Trimestre 1", montant: "", date_limite: "" }]);
   const [grillesExistantes, setGrillesExistantes] = useState([]);
   const [synchronisationEnCours, setSynchronisationEnCours] = useState(null);
-
-  const [paiement, setPaiement] = useState({ echeance_eleve_id: "", montant: "", moyen_paiement: "especes", date_paiement: "" });
 
   useEffect(() => {
     api.get("/classes").then((res) => setClasses(res.data));
@@ -240,69 +258,52 @@ export default function FraisScolarite({ permissions = [] }) {
     }
   };
 
-  const MESSAGE_POPUP_BLOQUE =
-    "Le navigateur a bloqué la fenêtre du reçu. Autorisez les pop-ups pour ce site, puis cliquez sur « Réimprimer le reçu ».";
-
-  // Fonction unique, reutilisee pour tous les types de paiement (scolarite, inscription,
-  // reinscription) : un seul gabarit de reçu (genererRecuHtml) pour les trois.
-  const imprimerRecu = (fenetre, recu) => {
-    if (fenetre) {
-      ecrireDocumentImpression(fenetre, "Reçu de paiement", genererRecuHtml(recu));
-    } else {
-      setErreur(MESSAGE_POPUP_BLOQUE);
-    }
-  };
-
   const dateDuJour = () => new Date().toISOString().slice(0, 10);
 
-  // Clic sur "Inscrire" / "Réinscrire" : affiche le formulaire. Le montant d'inscription vient
-  // de la grille et n'est pas modifiable ; l'echeance de scolarite est un ajout optionnel.
+  // Clic sur "Inscrire" / "Réinscrire" : affiche le formulaire. Le montant d'inscription est
+  // saisi manuellement (le montant affiche sur le bouton n'est qu'une reference issue de la
+  // grille) ; l'echeance de scolarite est un ajout optionnel.
   const ouvrirFormulaireInscription = (reinscription) => {
     const type = reinscription ? typeReinscription : typeInscription;
     if (!type) {
       setErreur(`Le type de frais « ${reinscription ? "Réinscription" : "Inscription"} » est introuvable.`);
       return;
     }
-    const montantInscription = montantGrille(type);
-    if (montantInscription == null) {
-      setErreur(`Aucune grille tarifaire « ${reinscription ? "Réinscription" : "Inscription"} » n'est configurée pour cette classe.`);
-      return;
-    }
     setErreur(""); setSucces("");
+    setPaiement(null);
     setFormInscription({
       reinscription,
       montantInscription: "",
       echeanceId: "",
       montantEcheance: "",
-      moyen_paiement: "especes",
+      moyenPaiement: "especes",
     });
   };
 
-  // Selection d'une echeance de scolarite dans le formulaire d'inscription : pre-remplit son
-  // montant avec le solde restant du (modifiable ensuite).
-  const choisirEcheance = (echeanceId) => {
-    const ech = echeancesScolariteDisponibles.find((e) => String(e.id) === String(echeanceId));
-    setFormInscription({
-      ...formInscription,
-      echeanceId,
-      montantEcheance: "",
-    });
+  // Clic sur "Payer" sous une echeance de scolarite non soldee.
+  const ouvrirFormulairePaiement = (ech) => {
+    setErreur(""); setSucces("");
+    setFormInscription(null);
+    setPaiement({ echeanceId: ech.id, libelle: ech.libelle, montant: "", moyenPaiement: "especes" });
   };
 
   // Cree les frais d'inscription/reinscription et, si une echeance de scolarite a ete choisie,
-  // enregistre aussi son paiement : deux appels API, un seul recu imprimable a l'ecran.
+  // enregistre aussi son paiement : deux appels API, un seul recu imprime. La fenetre du recu
+  // est ouverte des le clic (synchrone) : un navigateur bloque toute fenetre ouverte apres un
+  // appel reseau.
   const confirmerInscription = async (e) => {
     e.preventDefault();
-    const { reinscription, montantInscription, echeanceId, montantEcheance, moyen_paiement } = formInscription;
+    const { reinscription, montantInscription, echeanceId, montantEcheance, moyenPaiement } = formInscription;
     const type = reinscription ? typeReinscription : typeInscription;
     setErreur(""); setSucces("");
     setInscriptionEnCours(reinscription ? "reinscription" : "inscription");
+    const fenetre = peutImprimer ? ouvrirFenetreVierge() : null;
     try {
       const resInscription = await api.post("/frais/appliquer-inscription", {
         eleve_id: eleveInfos.id,
         type_frais_id: type.id,
         montant: montantInscription,
-        moyen_paiement,
+        moyen_paiement: moyenPaiement,
       });
 
       let resEcheance = null;
@@ -310,35 +311,58 @@ export default function FraisScolarite({ permissions = [] }) {
         resEcheance = await api.post("/frais/paiements", {
           echeance_eleve_id: echeanceId,
           montant: montantEcheance,
-          moyen_paiement,
+          moyen_paiement: moyenPaiement,
           date_paiement: dateDuJour(),
         });
       }
 
-      await chargerSuivi(eleveInfos.id);
+      // Recharge le suivi pour rafraichir l'affichage (chargerSuivi efface aussi les messages,
+      // d'ou l'ordre : succes affiche juste apres). Le reste a payer sur l'echeance est calcule
+      // ci-dessous a partir de son etat AVANT ce paiement (echeancesScolariteDisponibles, tire
+      // du suivi tel qu'il etait au moment du clic) — pas du solde rechargé, pour ne jamais
+      // dependre d'un eventuel decalage entre la reponse du paiement et le suivi recharge.
+      const suiviMaj = await chargerSuivi(eleveInfos.id);
       setSucces(resInscription.data.message);
       setFormInscription(null);
 
       const lignes = [
         { libelle: reinscription ? "Réinscription" : "Inscription", montant: Number(resInscription.data.montant_paye) },
       ];
+      let estSolde = true;
+      let resteAPayer = 0;
       if (resEcheance) {
-        const libelleEcheance = echeancesScolariteDisponibles.find((ec) => String(ec.id) === String(echeanceId))?.libelle || "Scolarité";
+        const echeanceAvant = echeancesScolariteDisponibles.find((ec) => String(ec.id) === String(echeanceId));
+        const libelleEcheance = echeanceAvant?.libelle || "Scolarité";
         lignes.push({ libelle: `Scolarité - ${libelleEcheance}`, montant: Number(resEcheance.data.montant) });
+        if (echeanceAvant) {
+          const montantPayeAvant = Number(echeanceAvant.montant_paye);
+          const nouveauTotalPaye = montantPayeAvant + Number(resEcheance.data.montant);
+          const reste = Number(echeanceAvant.montant) - nouveauTotalPaye;
+          resteAPayer = Math.max(0, reste);
+          estSolde = reste <= 0;
+        }
       }
 
-      setDernierRecu({
+      const recu = {
+        reference: resInscription.data.reference,
         eleve: eleveInfos,
+        session: eleveInfos.inscription_active?.session_scolaire?.libelle || "—",
         lignes,
         total: lignes.reduce((s, l) => s + l.montant, 0),
-        moyenPaiement: resInscription.data.moyen_paiement,
-        date: resInscription.data.date,
+        estSolde,
+        resteAPayer,
+        moyen: MOYENS_PAIEMENT[resInscription.data.moyen_paiement] || resInscription.data.moyen_paiement,
+        date: formaterDate(resInscription.data.date),
         heure: resInscription.data.heure,
-        reference: resInscription.data.reference,
         caissier: resInscription.data.caissier || localStorage.getItem("user_name") || "",
-      });
-      setRecuVisible(true);
+        situationGlobale: situationGlobaleDepuisSuivi(suiviMaj),
+      };
+      setDernierRecu(recu);
+      if (peutImprimer && !genererEtImprimerRecu(recu, fenetre)) {
+        setErreur(MESSAGE_POPUP_BLOQUE);
+      }
     } catch (err) {
+      fenetre?.close();
       setErreur(
         err.response?.status === 409
           ? "Frais déjà appliqués"
@@ -349,48 +373,65 @@ export default function FraisScolarite({ permissions = [] }) {
     }
   };
 
+  // Paiement d'une echeance de scolarite prise isolement (Trimestre 2, 3...), en dehors du
+  // formulaire d'inscription. Un seul recu, meme gabarit, une seule ligne.
   const enregistrerPaiement = async (e) => {
     e.preventDefault();
     setErreur(""); setSucces("");
-    // Ouverte tout de suite, pendant le clic : les navigateurs bloquent une fenetre ouverte apres l'appel reseau.
-    const fenetreRecu = peutImprimer ? ouvrirFenetreVierge() : null;
+    const fenetre = peutImprimer ? ouvrirFenetreVierge() : null;
+    // Montant total du et deja paye sur CETTE echeance AVANT ce paiement, captures depuis le
+    // suivi tel qu'il etait au moment du clic (pas depuis un rechargement post-paiement).
+    const echeanceAvant = (suivi?.frais || [])
+      .flatMap((f) => f.echeances)
+      .find((ec) => String(ec.id) === String(paiement.echeanceId));
+    const libelleEcheance = paiement.libelle;
     try {
-      const res = await api.post("/frais/paiements", paiement);
-      // Recharge le suivi avant d'afficher le succes (chargerSuivi efface les messages) et
-      // pour que le recu contienne le total paye a jour, paiement inclus.
+      const res = await api.post("/frais/paiements", {
+        echeance_eleve_id: paiement.echeanceId,
+        montant: paiement.montant,
+        moyen_paiement: paiement.moyenPaiement,
+        date_paiement: dateDuJour(),
+      });
       const suiviMaj = await chargerSuivi(eleveSelectionne);
       setSucces("Paiement enregistré avec succès.");
-      setPaiement({ echeance_eleve_id: "", montant: "", moyen_paiement: "especes", date_paiement: "" });
+      setPaiement(null);
 
-      if (peutImprimer) {
-        // Le POST ne renvoie que la ligne "paiements" : on retrouve l'echeance (montant du,
-        // cumul deja paye dessus) et son type dans le suivi qu'on vient de recharger.
-        const info = trouverEcheance(suiviMaj, res.data.echeance_eleve_id);
-        const montantDu = info ? Number(info.echeance.montant) : null;
-        const cumule = info ? Number(info.echeance.montant_paye) : Number(res.data.montant);
-        const recu = {
-          eleve: eleveInfos,
-          type: info ? libelleTypePaiement(info.typeFrais, info.echeance.libelle) : `Scolarité - ${res.data.libelle || ""}`.trim(),
-          montantPaye: Number(res.data.montant),
-          complet: montantDu === null || cumule >= montantDu,
-          reste: montantDu === null ? 0 : Math.max(0, montantDu - cumule),
-          moyenPaiement: res.data.moyen_paiement,
-          date: res.data.date_paiement,
-          heure: formaterHeure(res.data.created_at),
-          reference: referenceLocale(res.data.id, res.data.date_paiement),
-          caissier: localStorage.getItem("user_name") || "",
-          totaux: totauxDepuisSuivi(suiviMaj),
-        };
-        setDernierRecu(recu);
-        imprimerRecu(fenetreRecu, recu);
+      let estSolde = true;
+      let resteAPayer = 0;
+      if (echeanceAvant) {
+        const montantPayeAvant = Number(echeanceAvant.montant_paye);
+        const nouveauTotalPaye = montantPayeAvant + Number(res.data.montant);
+        const reste = Number(echeanceAvant.montant) - nouveauTotalPaye;
+        resteAPayer = Math.max(0, reste);
+        estSolde = reste <= 0;
+      }
+
+      const recu = {
+        reference: referenceLocale(res.data.id, res.data.date_paiement),
+        eleve: eleveInfos,
+        session: eleveInfos.inscription_active?.session_scolaire?.libelle || "—",
+        lignes: [{ libelle: `Scolarité - ${libelleEcheance}`, montant: Number(res.data.montant) }],
+        total: Number(res.data.montant),
+        estSolde,
+        resteAPayer,
+        moyen: MOYENS_PAIEMENT[res.data.moyen_paiement] || res.data.moyen_paiement,
+        date: formaterDate(res.data.date_paiement),
+        heure: formaterHeure(res.data.created_at),
+        caissier: localStorage.getItem("user_name") || "",
+        situationGlobale: situationGlobaleDepuisSuivi(suiviMaj),
+      };
+      setDernierRecu(recu);
+      if (peutImprimer && !genererEtImprimerRecu(recu, fenetre)) {
+        setErreur(MESSAGE_POPUP_BLOQUE);
       }
     } catch (err) {
-      fenetreRecu?.close();
+      fenetre?.close();
       setErreur(err.response?.data?.message || "Erreur lors de l'enregistrement du paiement.");
     }
   };
 
-  // Chaque mot saisi doit se retrouver dans nom ou prenom (ordre libre).
+  // Chaque mot saisi doit se retrouver dans nom ou prenom (ordre libre) ; les suggestions
+  // apparaissent des la premiere lettre tapee.
   const termes = normaliser(recherche).split(/\s+/).filter(Boolean);
   const elevesFiltres = eleves.filter((e) => {
     const cible = normaliser(`${e.nom} ${e.prenom}`);
@@ -401,6 +442,13 @@ export default function FraisScolarite({ permissions = [] }) {
   const choisirSuggestion = (eleve) => {
     setRecherche(`${eleve.nom} ${eleve.prenom}`);
     setAfficherSuggestions(false);
+  };
+
+  const selectionnerEleve = (e) => {
+    setEleveInfos({ ...e, classe_id: classeId });
+    setFormInscription(null);
+    setPaiement(null);
+    chargerSuivi(e.id);
   };
 
   // Types "Inscription" / "Réinscription" retrouves par leur nom (les ids different d'un etablissement a l'autre)
@@ -415,7 +463,10 @@ export default function FraisScolarite({ permissions = [] }) {
     return g ? Number(g.montant) : null;
   };
   const libelleMontant = (montant) => (montant != null ? ` (${formaterGNF(montant)})` : "");
-  const typeInscriptionEleve = eleveInfos?.inscription_active?.type_inscription;
+
+  // Frais d'inscription/reinscription de l'eleve selectionne (au plus un, cree par
+  // appliquer-inscription), pour la carte "Frais d'inscription" de la colonne droite.
+  const fraisInscription = (suivi?.frais || []).find((f) => normaliser(f.type_frais).includes("inscription"));
 
   // Echeances de scolarite encore dues, proposees dans le formulaire d'inscription/reinscription.
   const echeancesScolariteDisponibles = (suivi?.frais || [])
@@ -426,6 +477,12 @@ export default function FraisScolarite({ permissions = [] }) {
   const totalEncaisser = formInscription
     ? Number(formInscription.montantInscription || 0) + (formInscription.echeanceId ? Number(formInscription.montantEcheance || 0) : 0)
     : 0;
+
+  // Inscription ou reinscription deja payee (au moins un versement) : les boutons Inscrire /
+  // Réinscrire n'ont plus lieu d'etre, tant qu'un paiement de scolarite se fait autrement.
+  const dejaInscrit = (suivi?.frais || []).some(
+    (f) => normaliser(f.type_frais).includes("inscription") && f.echeances.some((ech) => Number(ech.montant_paye) > 0)
+  );
 
   return (
     <div className="space-y-6">
@@ -483,9 +540,9 @@ export default function FraisScolarite({ permissions = [] }) {
         <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-50 border border-emerald-100 text-sm text-emerald-600 font-medium">
           <CheckCircle2 className="h-4 w-4 shrink-0" />
           {succes}
-          {peutImprimer && dernierRecu?.type && (
+          {peutImprimer && dernierRecu && (
             <button
-              onClick={() => imprimerRecu(ouvrirFenetreVierge(), dernierRecu)}
+              onClick={() => genererEtImprimerRecu(dernierRecu)}
               className="ml-auto px-3 py-1 rounded-lg border border-emerald-200 bg-white text-emerald-700 text-xs font-semibold hover:bg-emerald-100 transition-colors cursor-pointer"
             >
               Réimprimer le reçu
@@ -494,295 +551,110 @@ export default function FraisScolarite({ permissions = [] }) {
         </div>
       )}
 
-      {onglet === "suivi" && recuVisible && dernierRecu && (
-        <div className="space-y-4">
-          <style>{`
-            @media print {
-              body * { visibility: hidden; }
-              .recu-impression, .recu-impression * { visibility: visible; }
-              .recu-impression { position: absolute; left: 0; top: 0; width: 100%; }
-              .no-print { display: none !important; }
-            }
-          `}</style>
+      {onglet === "suivi" && (
+        <div className="flex flex-col lg:flex-row gap-4">
+          {/* Colonne gauche (~30%) */}
+          <div className="lg:w-[30%] shrink-0 space-y-3">
+            <Select
+              value={classeId}
+              onChange={(e) => {
+                setClasseId(e.target.value);
+                setRecherche("");
+              }}
+              aria-label="Filtrer par classe"
+              className="w-full"
+            >
+              <option value="">Filtrer par classe...</option>
+              {classes.map((c) => <option key={c.id} value={c.id}>{c.nom}</option>)}
+            </Select>
 
-          <div className="flex justify-end gap-2 no-print">
-            <Button variant="primary" onClick={() => window.print()}>🖨️ Imprimer</Button>
-            <Button variant="secondary" onClick={() => setRecuVisible(false)}>Fermer</Button>
-          </div>
-
-          <div className="recu-impression bg-white rounded-2xl overflow-hidden shadow-sm border border-slate-100 max-w-xl mx-auto">
-            <div className="px-6 py-5 text-white" style={{ background: "#0C447C" }}>
-              <p className="text-lg font-extrabold tracking-[0.2em] m-0">LAKOLI</p>
-              <p className="text-xs text-white/70 m-0 mt-0.5">Reçu de paiement</p>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <Input
+                type="text"
+                placeholder="Rechercher un élève par nom ou prénom..."
+                value={recherche}
+                disabled={!classeId}
+                onChange={(e) => {
+                  setRecherche(e.target.value);
+                  setAfficherSuggestions(true);
+                }}
+                onFocus={() => setAfficherSuggestions(true)}
+                // Delai pour laisser le clic sur une suggestion se faire avant de fermer la liste
+                onBlur={() => setTimeout(() => setAfficherSuggestions(false), 200)}
+                autoComplete="off"
+                className="pl-9 disabled:bg-slate-50 disabled:cursor-not-allowed"
+              />
+              {afficherSuggestions && suggestions.length > 0 && (
+                <ul className="absolute left-0 right-0 top-full mt-1 z-20 bg-white border border-slate-200 rounded-lg shadow-lg overflow-hidden">
+                  {suggestions.map((e) => (
+                    <li key={e.id}>
+                      <button
+                        type="button"
+                        onClick={() => choisirSuggestion(e)}
+                        className="w-full text-left px-3.5 py-2 text-sm text-slate-700 hover:bg-blue-50 transition-colors cursor-pointer"
+                      >
+                        {e.nom} {e.prenom}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
 
-            <div className="p-6 space-y-5 text-sm text-slate-700">
-              <div>
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider m-0 mb-1">Élève</p>
-                <p className="m-0 font-semibold text-slate-900">{dernierRecu.eleve?.nom} {dernierRecu.eleve?.prenom}</p>
-                <p className="m-0 text-xs text-slate-500 mt-0.5">
-                  <span className="font-mono">{dernierRecu.eleve?.matricule || "—"}</span> · {dernierRecu.eleve?.classe || "—"}
+            <Card className="p-0 overflow-hidden max-h-[520px] overflow-y-auto">
+              <div className="flex items-center gap-2 px-4 py-3.5 border-b border-slate-100 bg-slate-50/60">
+                <div className="h-7 w-7 rounded-lg bg-blue-50 text-[#2563EB] flex items-center justify-center shrink-0">
+                  <Users className="h-3.5 w-3.5" />
+                </div>
+                <p className="text-xs font-bold text-slate-700 uppercase tracking-wider m-0">
+                  Élèves{classeId ? ` (${elevesFiltres.length})` : ""}
                 </p>
               </div>
-
-              <table className="w-full text-sm border-collapse">
-                <tbody>
-                  {dernierRecu.lignes.map((l, i) => (
-                    <tr key={i} className="border-b border-slate-100">
-                      <td className="py-1.5">{l.libelle}</td>
-                      <td className="py-1.5 text-right font-semibold">{formaterGNF(l.montant)}</td>
-                    </tr>
-                  ))}
-                  <tr>
-                    <td className="py-2 font-bold text-slate-900">TOTAL ENCAISSÉ</td>
-                    <td className="py-2 text-right font-bold text-[#0C447C]">{formaterGNF(dernierRecu.total)}</td>
-                  </tr>
-                </tbody>
-              </table>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider m-0 mb-1">Moyen de paiement</p>
-                  <p className="m-0 font-semibold">
-                    {LIBELLES_MOYEN_PAIEMENT[dernierRecu.moyenPaiement] || dernierRecu.moyenPaiement || "—"}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider m-0 mb-1">Référence</p>
-                  <p className="m-0 font-mono text-xs">{dernierRecu.reference || "—"}</p>
-                </div>
-                <div>
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider m-0 mb-1">Date et heure</p>
-                  <p className="m-0 font-semibold">
-                    {formaterDate(dernierRecu.date)}{dernierRecu.heure ? ` à ${dernierRecu.heure}` : ""}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider m-0 mb-1">Caissier</p>
-                  <p className="m-0 font-semibold">{dernierRecu.caissier || "—"}</p>
-                </div>
-              </div>
-
-              <div className="flex justify-end pt-8">
-                <div className="text-center w-52 border-t border-slate-300 pt-1.5">
-                  <p className="m-0 text-xs text-slate-500">Signature du caissier</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {onglet === "suivi" && !recuVisible && (
-        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-          <Select
-            value={classeId}
-            onChange={(e) => {
-              setClasseId(e.target.value);
-              setRecherche("");
-            }}
-            aria-label="Filtrer par classe"
-          >
-            <option value="">Filtrer par classe...</option>
-            {classes.map((c) => <option key={c.id} value={c.id}>{c.nom}</option>)}
-          </Select>
-
-          <div className="relative flex-1 min-w-[300px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-            <Input
-              type="text"
-              placeholder="Rechercher un élève par nom ou prénom..."
-              value={recherche}
-              disabled={!classeId}
-              onChange={(e) => {
-                setRecherche(e.target.value);
-                setAfficherSuggestions(true);
-              }}
-              onFocus={() => setAfficherSuggestions(true)}
-              // Delai pour laisser le clic sur une suggestion se faire avant de fermer la liste
-              onBlur={() => setTimeout(() => setAfficherSuggestions(false), 200)}
-              autoComplete="off"
-              className="pl-9 disabled:bg-slate-50 disabled:cursor-not-allowed"
-            />
-            {afficherSuggestions && suggestions.length > 0 && (
-              <ul className="absolute left-0 right-0 top-full mt-1 z-20 bg-white border border-slate-200 rounded-lg shadow-lg overflow-hidden">
-                {suggestions.map((e) => (
-                  <li key={e.id}>
-                    <button
-                      type="button"
-                      onClick={() => choisirSuggestion(e)}
-                      className="w-full text-left px-3.5 py-2 text-sm text-slate-700 hover:bg-blue-50 transition-colors cursor-pointer"
-                    >
-                      {e.nom} {e.prenom}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        </div>
-      )}
-
-      {onglet === "suivi" && !recuVisible && (
-        <div className="flex flex-col lg:flex-row gap-4">
-          <Card className="lg:w-72 shrink-0 max-h-[560px] overflow-y-auto p-0 overflow-hidden">
-            <div className="flex items-center gap-2 px-4 py-3.5 border-b border-slate-100 bg-slate-50/60">
-              <div className="h-7 w-7 rounded-lg bg-blue-50 text-[#2563EB] flex items-center justify-center shrink-0">
-                <Users className="h-3.5 w-3.5" />
-              </div>
-              <p className="text-xs font-bold text-slate-700 uppercase tracking-wider m-0">
-                Élèves{classeId ? ` (${elevesFiltres.length})` : ""}
-              </p>
-            </div>
-            <div className="p-2">
-              {!classeId && (
-                <p className="text-sm text-slate-400 text-center px-3 py-8 m-0">Sélectionnez une classe pour voir les élèves</p>
-              )}
-              {classeId && chargementEleves && (
-                <p className="text-sm text-slate-400 text-center px-3 py-8 m-0">Chargement...</p>
-              )}
-              {classeId && !chargementEleves && elevesFiltres.length === 0 && (
-                <p className="text-sm text-slate-400 text-center px-3 py-8 m-0">Aucun élève trouvé</p>
-              )}
-              {classeId && !chargementEleves && elevesFiltres.map((e) => (
-                <div
-                  key={e.id}
-                  onClick={() => { setEleveInfos({ ...e, classe_id: classeId }); setFormInscription(null); chargerSuivi(e.id); }}
-                  className={`flex items-center gap-2.5 p-2.5 rounded-xl cursor-pointer mb-1 transition-colors ${
-                    eleveSelectionne === e.id ? "bg-blue-50" : "hover:bg-slate-50"
-                  }`}
-                >
-                  <div
-                    className={`h-8 w-8 rounded-full flex items-center justify-center font-bold text-[11px] shrink-0 ${
-                      eleveSelectionne === e.id ? "bg-[#2563EB] text-white" : "bg-slate-100 text-slate-500"
-                    }`}
-                  >
-                    {getInitiales(e.nom, e.prenom)}
-                  </div>
-                  <p className="text-sm font-semibold text-slate-800 m-0 truncate">{e.nom} {e.prenom}</p>
-                </div>
-              ))}
-            </div>
-          </Card>
-
-          <div className="flex-1 space-y-4">
-            {peutInscrire && eleveInfos && (
-              <Card className="p-0 overflow-hidden border-blue-100">
-                <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
-                  <div className="min-w-0">
-                    <p className="text-sm font-bold text-slate-900 m-0 truncate">{eleveInfos.nom} {eleveInfos.prenom}</p>
-                    <p className="text-xs text-slate-500 m-0 mt-0.5">
-                      <span className="font-mono">{eleveInfos.matricule}</span> · {eleveInfos.classe || "—"}
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <Button
-                      variant={typeInscriptionEleve === "nouvelle" ? "primary" : "secondary"}
-                      disabled={inscriptionEnCours !== null}
-                      onClick={() => ouvrirFormulaireInscription(false)}
-                    >
-                      📋 Inscrire{libelleMontant(montantGrille(typeInscription))}
-                    </Button>
-                    <Button
-                      variant={typeInscriptionEleve === "reinscription" ? "primary" : "secondary"}
-                      disabled={inscriptionEnCours !== null}
-                      onClick={() => ouvrirFormulaireInscription(true)}
-                    >
-                      🔄 Réinscrire{libelleMontant(montantGrille(typeReinscription))}
-                    </Button>
-                  </div>
-                </div>
-
-                {formInscription && (
-                  <form
-                    onSubmit={confirmerInscription}
-                    className="flex flex-col gap-4 px-5 py-4 border-t border-blue-100 bg-blue-50/40"
-                  >
-                    <div>
-                      <p className="text-xs font-bold text-slate-700 uppercase tracking-wider m-0 mb-2">
-                        {formInscription.reinscription ? "Réinscription" : "Inscription"}
-                      </p>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-xs font-semibold text-slate-500 mb-1">Type</label>
-                          <Input type="text" value={formInscription.reinscription ? "Réinscription" : "Inscription"} disabled />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-semibold text-slate-500 mb-1">Montant inscription (GNF)</label>
-                          <Input type="number" value={formInscription.montantInscription} onChange={(e) => setFormInscription({...formInscription, montantInscription: e.target.value})} placeholder="Saisir le montant" required />
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="border-t border-blue-100 pt-3">
-                      <p className="text-xs font-bold text-slate-700 uppercase tracking-wider m-0 mb-2">
-                        Paiement scolarité (optionnel)
-                      </p>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-xs font-semibold text-slate-500 mb-1">Échéance</label>
-                          <Select
-                            value={formInscription.echeanceId}
-                            onChange={(e) => choisirEcheance(e.target.value)}
-                          >
-                            <option value="">Aucune</option>
-                            {echeancesScolariteDisponibles.map((ech) => (
-                              <option key={ech.id} value={ech.id}>{ech.libelle}</option>
-                            ))}
-                          </Select>
-                        </div>
-                        <div>
-                          <label className="block text-xs font-semibold text-slate-500 mb-1">Montant à payer (GNF)</label>
-                          <Input
-                            type="number"
-                            min="1"
-                            disabled={!formInscription.echeanceId}
-                            required={!!formInscription.echeanceId}
-                            value={formInscription.montantEcheance}
-                            onChange={(e) => setFormInscription({ ...formInscription, montantEcheance: e.target.value })}
-                          />
-                        </div>
-                      </div>
-                      {echeancesScolariteDisponibles.length === 0 && (
-                        <p className="text-xs text-slate-400 m-0 mt-2">Aucune échéance de scolarité en attente pour cet élève.</p>
-                      )}
-                    </div>
-
-                    <div className="border-t border-blue-100 pt-3">
-                      <p className="text-xs font-bold text-slate-700 uppercase tracking-wider m-0 mb-2">Règlement</p>
-                      <div className="grid grid-cols-2 gap-3 items-end">
-                        <div>
-                          <label className="block text-xs font-semibold text-slate-500 mb-1">Montant total à encaisser</label>
-                          <p className="m-0 text-lg font-bold text-[#0C447C]">{formaterGNF(totalEncaisser)}</p>
-                        </div>
-                        <div>
-                          <label className="block text-xs font-semibold text-slate-500 mb-1">Moyen de paiement</label>
-                          <Select
-                            value={formInscription.moyen_paiement}
-                            onChange={(e) => setFormInscription({ ...formInscription, moyen_paiement: e.target.value })}
-                          >
-                            <option value="especes">Espèces</option>
-                            <option value="mobile_money">Mobile Money</option>
-                            <option value="virement">Virement</option>
-                            <option value="cheque">Chèque</option>
-                          </Select>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex gap-3">
-                      <Button type="submit" variant="primary" disabled={inscriptionEnCours !== null}>
-                        Enregistrer et imprimer le reçu
-                      </Button>
-                      <Button type="button" variant="ghost" onClick={() => setFormInscription(null)}>
-                        Annuler
-                      </Button>
-                    </div>
-                  </form>
+              <div className="p-2">
+                {!classeId && (
+                  <p className="text-sm text-slate-400 text-center px-3 py-8 m-0">Sélectionnez une classe pour voir les élèves</p>
                 )}
-              </Card>
-            )}
-            {!suivi && (
+                {classeId && chargementEleves && (
+                  <p className="text-sm text-slate-400 text-center px-3 py-8 m-0">Chargement...</p>
+                )}
+                {classeId && !chargementEleves && elevesFiltres.length === 0 && (
+                  <p className="text-sm text-slate-400 text-center px-3 py-8 m-0">Aucun élève trouvé</p>
+                )}
+                {classeId && !chargementEleves && elevesFiltres.map((e) => {
+                  const statut = STATUTS_PAIEMENT_ELEVE[e.statut_paiement] || STATUTS_PAIEMENT_ELEVE.a_echoir;
+                  return (
+                    <div
+                      key={e.id}
+                      onClick={() => selectionnerEleve(e)}
+                      className={`flex items-center gap-2.5 p-2.5 rounded-xl cursor-pointer mb-1 transition-colors ${
+                        eleveSelectionne === e.id ? "bg-blue-50" : "hover:bg-slate-50"
+                      }`}
+                    >
+                      <div className="relative shrink-0">
+                        <div
+                          className={`h-8 w-8 rounded-full flex items-center justify-center font-bold text-[11px] ${
+                            eleveSelectionne === e.id ? "bg-[#2563EB] text-white" : "bg-slate-100 text-slate-500"
+                          }`}
+                        >
+                          {getInitiales(e.nom, e.prenom)}
+                        </div>
+                        <span className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full ring-2 ring-white ${statut.dot}`} />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-slate-800 m-0 truncate">{e.nom} {e.prenom}</p>
+                        <p className={`text-[10px] font-bold uppercase tracking-wide m-0 ${statut.texte}`}>{statut.libelle}</p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </Card>
+          </div>
+
+          {/* Colonne droite (~70%) */}
+          <div className="flex-1 space-y-4">
+            {!eleveInfos && (
               <Card className="flex flex-col items-center justify-center text-center py-14 gap-3">
                 <div className="h-12 w-12 rounded-2xl bg-blue-50 text-[#2563EB] flex items-center justify-center">
                   <Receipt className="h-6 w-6" />
@@ -790,74 +662,240 @@ export default function FraisScolarite({ permissions = [] }) {
                 <p className="text-sm text-slate-400 m-0">Sélectionnez un élève pour voir son suivi de paiement.</p>
               </Card>
             )}
-            {suivi && suivi.frais.map((f) => (
-              <Card key={f.id} className="p-0 overflow-hidden">
-                <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 bg-slate-50/60">
-                  <div className="flex items-center gap-2.5">
-                    <div className="h-8 w-8 rounded-lg bg-[#0C447C]/10 text-[#0C447C] flex items-center justify-center shrink-0">
-                      <Wallet className="h-4 w-4" />
-                    </div>
-                    <p className="text-sm font-bold text-slate-900 m-0">{f.type_frais}</p>
-                  </div>
-                  <span className="text-xs font-bold text-[#0C447C] bg-blue-50 px-3 py-1.5 rounded-full">
-                    {formaterGNF(f.montant_total)}
-                  </span>
-                </div>
-                <div className="divide-y divide-slate-100 px-5">
-                  {f.echeances.map((ech) => (
-                    <div key={ech.id} className="flex items-center justify-between py-3.5">
-                      <div>
-                        <p className="text-sm font-semibold text-slate-800 m-0">{ech.libelle}</p>
-                        <p className="text-xs text-slate-400 m-0 mt-0.5">Échéance : {ech.date_limite}</p>
+
+            {eleveInfos && (
+              <>
+                {/* Section 1 — En-tete eleve */}
+                <Card className="p-0 overflow-hidden border-blue-100">
+                  <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="h-14 w-14 rounded-2xl bg-[#2563EB] text-white flex items-center justify-center font-bold text-lg shrink-0">
+                        {getInitiales(eleveInfos.nom, eleveInfos.prenom)}
                       </div>
-                      <div className="text-right space-y-1.5">
-                        {badgeStatutEcheance(ech)}
-                        <p className="text-xs text-slate-500 m-0 font-medium">{formaterGNF(ech.montant_paye)} / {formaterGNF(ech.montant)}</p>
-                        {ech.solde > 0 && (
-                          <button
-                            onClick={() => setPaiement({ ...paiement, echeance_eleve_id: ech.id })}
-                            className="px-2.5 py-1 rounded-lg border border-blue-200 text-[#2563EB] text-xs font-semibold hover:bg-blue-50 transition-colors cursor-pointer"
-                          >
-                            Enregistrer un paiement
-                          </button>
+                      <div className="min-w-0">
+                        <p className="text-base font-bold text-slate-900 m-0 truncate">{eleveInfos.nom} {eleveInfos.prenom}</p>
+                        <p className="text-xs text-slate-500 m-0 mt-0.5">
+                          <span className="font-mono">{eleveInfos.matricule}</span> · {eleveInfos.classe || "—"}
+                        </p>
+                      </div>
+                    </div>
+                    {peutInscrire && !dejaInscrit && (
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          variant="secondary"
+                          disabled={inscriptionEnCours !== null}
+                          onClick={() => ouvrirFormulaireInscription(false)}
+                        >
+                          📋 Inscrire{libelleMontant(montantGrille(typeInscription))}
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          disabled={inscriptionEnCours !== null}
+                          onClick={() => ouvrirFormulaireInscription(true)}
+                        >
+                          🔄 Réinscrire{libelleMontant(montantGrille(typeReinscription))}
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+
+                  {formInscription && (
+                    <form
+                      onSubmit={confirmerInscription}
+                      className="flex flex-col gap-4 px-5 py-4 border-t border-blue-100 bg-blue-50/40"
+                    >
+                      <div>
+                        <p className="text-xs font-bold text-slate-700 uppercase tracking-wider m-0 mb-2">
+                          {formInscription.reinscription ? "Réinscription" : "Inscription"}
+                        </p>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-500 mb-1">Type</label>
+                            <Input type="text" value={formInscription.reinscription ? "Réinscription" : "Inscription"} disabled />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-500 mb-1">Montant inscription (GNF)</label>
+                            <Input
+                              type="number"
+                              min="1"
+                              value={formInscription.montantInscription}
+                              onChange={(e) => setFormInscription({ ...formInscription, montantInscription: e.target.value })}
+                              placeholder="Saisir le montant"
+                              required
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="border-t border-blue-100 pt-3">
+                        <p className="text-xs font-bold text-slate-700 uppercase tracking-wider m-0 mb-2">
+                          Paiement scolarité (optionnel)
+                        </p>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-500 mb-1">Échéance</label>
+                            <Select
+                              value={formInscription.echeanceId}
+                              onChange={(e) => setFormInscription({ ...formInscription, echeanceId: e.target.value, montantEcheance: "" })}
+                            >
+                              <option value="">Aucune</option>
+                              {echeancesScolariteDisponibles.map((ech) => (
+                                <option key={ech.id} value={ech.id}>{ech.libelle}</option>
+                              ))}
+                            </Select>
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-500 mb-1">Montant scolarité (GNF)</label>
+                            <Input
+                              type="number"
+                              min="1"
+                              disabled={!formInscription.echeanceId}
+                              required={!!formInscription.echeanceId}
+                              value={formInscription.montantEcheance}
+                              onChange={(e) => setFormInscription({ ...formInscription, montantEcheance: e.target.value })}
+                            />
+                          </div>
+                        </div>
+                        {echeancesScolariteDisponibles.length === 0 && (
+                          <p className="text-xs text-slate-400 m-0 mt-2">Aucune échéance de scolarité en attente pour cet élève.</p>
                         )}
                       </div>
-                    </div>
-                  ))}
-                </div>
-                <div className="h-2" />
-              </Card>
-            ))}
 
-            {paiement.echeance_eleve_id && (
-              <Card className="p-0 overflow-hidden border-blue-100">
-                <div className="flex items-center gap-2.5 px-5 py-4 border-b border-blue-100 bg-blue-50/60">
-                  <div className="h-8 w-8 rounded-lg bg-[#2563EB] text-white flex items-center justify-center shrink-0">
-                    <CheckCircle2 className="h-4 w-4" />
-                  </div>
-                  <p className="text-sm font-bold text-slate-900 m-0">Enregistrer un paiement</p>
-                </div>
-                <form onSubmit={enregistrerPaiement} className="flex flex-wrap items-end gap-3 p-5">
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-500 mb-1">Montant (GNF)</label>
-                    <Input type="number" value={paiement.montant} onChange={(e) => setPaiement({ ...paiement, montant: e.target.value })} required />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-500 mb-1">Moyen</label>
-                    <Select value={paiement.moyen_paiement} onChange={(e) => setPaiement({ ...paiement, moyen_paiement: e.target.value })}>
-                      <option value="especes">Espèces</option>
-                      <option value="mobile_money">Mobile Money</option>
-                      <option value="virement">Virement</option>
-                      <option value="cheque">Chèque</option>
-                    </Select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-500 mb-1">Date</label>
-                    <Input type="date" value={paiement.date_paiement} onChange={(e) => setPaiement({ ...paiement, date_paiement: e.target.value })} required />
-                  </div>
-                  <Button type="submit" variant="primary">Confirmer</Button>
-                </form>
-              </Card>
+                      <div className="border-t border-blue-100 pt-3">
+                        <p className="text-xs font-bold text-slate-700 uppercase tracking-wider m-0 mb-2">Règlement</p>
+                        <div className="grid grid-cols-2 gap-3 items-end">
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-500 mb-1">Montant total à encaisser</label>
+                            <p className="m-0 text-lg font-bold text-[#0C447C]">{formaterGNF(totalEncaisser)}</p>
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-500 mb-1">Moyen de paiement</label>
+                            <Select
+                              value={formInscription.moyenPaiement}
+                              onChange={(e) => setFormInscription({ ...formInscription, moyenPaiement: e.target.value })}
+                            >
+                              <option value="especes">Espèces</option>
+                              <option value="mobile_money">Mobile Money</option>
+                              <option value="virement">Virement</option>
+                              <option value="cheque">Chèque</option>
+                            </Select>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex gap-3">
+                        <Button type="submit" variant="primary" disabled={inscriptionEnCours !== null}>
+                          Enregistrer et imprimer le reçu
+                        </Button>
+                        <Button type="button" variant="ghost" onClick={() => setFormInscription(null)}>
+                          Annuler
+                        </Button>
+                      </div>
+                    </form>
+                  )}
+                </Card>
+
+                {/* Section 2 — Frais d'inscription */}
+                {fraisInscription && (
+                  <Card className="p-0 overflow-hidden">
+                    <div className="flex items-center justify-between px-5 py-4">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="h-8 w-8 rounded-lg bg-[#0C447C]/10 text-[#0C447C] flex items-center justify-center shrink-0">
+                          <School className="h-4 w-4" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-bold text-slate-900 m-0">{fraisInscription.type_frais}</p>
+                          <p className="text-xs text-slate-500 m-0 mt-0.5">{formaterGNF(fraisInscription.montant_total)}</p>
+                        </div>
+                      </div>
+                      {fraisInscription.echeances[0] && badgeStatutEcheance(fraisInscription.echeances[0])}
+                    </div>
+                  </Card>
+                )}
+
+                {/* Section 3 — Scolarite */}
+                {suivi && suivi.frais
+                  .filter((f) => normaliser(f.type_frais).startsWith("scolarit"))
+                  .map((f) => (
+                    <Card key={f.id} className="p-0 overflow-hidden">
+                      <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 bg-slate-50/60">
+                        <div className="flex items-center gap-2.5">
+                          <div className="h-8 w-8 rounded-lg bg-[#0C447C]/10 text-[#0C447C] flex items-center justify-center shrink-0">
+                            <Wallet className="h-4 w-4" />
+                          </div>
+                          <p className="text-sm font-bold text-slate-900 m-0">{f.type_frais}</p>
+                        </div>
+                        <span className="text-xs font-bold text-[#0C447C] bg-blue-50 px-3 py-1.5 rounded-full">
+                          {formaterGNF(f.montant_total)}
+                        </span>
+                      </div>
+                      <div className="divide-y divide-slate-100 px-5">
+                        {f.echeances.map((ech) => (
+                          <div key={ech.id} className="flex items-center justify-between py-3.5">
+                            <div>
+                              <p className="text-sm font-semibold text-slate-800 m-0">{ech.libelle}</p>
+                              <p className="text-xs text-slate-400 m-0 mt-0.5">Échéance : {ech.date_limite}</p>
+                            </div>
+                            <div className="text-right space-y-1.5">
+                              {badgeStatutEcheance(ech)}
+                              <p className="text-xs text-slate-500 m-0 font-medium">{formaterGNF(ech.montant_paye)} / {formaterGNF(ech.montant)}</p>
+                              {peutInscrire && ech.solde > 0 && (
+                                <button
+                                  onClick={() => ouvrirFormulairePaiement(ech)}
+                                  className="px-2.5 py-1 rounded-lg border border-blue-200 text-[#2563EB] text-xs font-semibold hover:bg-blue-50 transition-colors cursor-pointer"
+                                >
+                                  Payer
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="h-2" />
+                    </Card>
+                  ))}
+
+                {/* Formulaire "Payer" une echeance de scolarite */}
+                {paiement && (
+                  <Card className="p-0 overflow-hidden border-blue-100">
+                    <div className="flex items-center gap-2.5 px-5 py-4 border-b border-blue-100 bg-blue-50/60">
+                      <div className="h-8 w-8 rounded-lg bg-[#2563EB] text-white flex items-center justify-center shrink-0">
+                        <CheckCircle2 className="h-4 w-4" />
+                      </div>
+                      <p className="text-sm font-bold text-slate-900 m-0">Enregistrer un paiement</p>
+                    </div>
+                    <form onSubmit={enregistrerPaiement} className="flex flex-wrap items-end gap-3 p-5">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-500 mb-1">Échéance</label>
+                        <Input type="text" value={paiement.libelle} disabled />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-500 mb-1">Montant (GNF)</label>
+                        <Input
+                          type="number"
+                          min="1"
+                          value={paiement.montant}
+                          onChange={(e) => setPaiement({ ...paiement, montant: e.target.value })}
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-500 mb-1">Moyen de paiement</label>
+                        <Select value={paiement.moyenPaiement} onChange={(e) => setPaiement({ ...paiement, moyenPaiement: e.target.value })}>
+                          <option value="especes">Espèces</option>
+                          <option value="mobile_money">Mobile Money</option>
+                          <option value="virement">Virement</option>
+                          <option value="cheque">Chèque</option>
+                        </Select>
+                      </div>
+                      <Button type="submit" variant="primary">Enregistrer et imprimer le reçu</Button>
+                      <Button type="button" variant="ghost" onClick={() => setPaiement(null)}>
+                        Annuler
+                      </Button>
+                    </form>
+                  </Card>
+                )}
+              </>
             )}
           </div>
         </div>
