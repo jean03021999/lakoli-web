@@ -44,24 +44,31 @@ const COULEURS = {
   texte: "#1F2937",
 };
 
+// Visibilite pilotee par les permissions reelles de l'utilisateur (GET /user) :
+// permission null = toujours visible, sinon visible seulement si l'utilisateur la possede.
 const MODULES = [
-  { nom: "Tableau de bord", icone: LayoutDashboard, chemin: "/tableau-de-bord", roles: ["COMPTABLE", "DIRECTEUR", "FONDATEUR", "PROVISEUR", "CENSEUR"] },
-  { nom: "Gestion des Élèves", icone: GraduationCap, chemin: "/eleves", roles: ["COMPTABLE", "DIRECTEUR", "FONDATEUR"] },
-  { nom: "Gestion des Enseignants", icone: Users, chemin: "/enseignants", roles: ["COMPTABLE", "DIRECTEUR", "FONDATEUR", "PROVISEUR", "CENSEUR"] },
-  { nom: "Gestion des Classes", icone: School, chemin: "/classes", roles: ["DIRECTEUR", "PROVISEUR", "CENSEUR"] },
-  { nom: "Gestion des Matières", icone: BookOpen, chemin: "/matieres", roles: ["COMPTABLE", "DIRECTEUR", "FONDATEUR"] },
-  { nom: "Affectations", icone: Link2, chemin: "/affectations", roles: ["COMPTABLE", "DIRECTEUR", "FONDATEUR"] },
-  // Visibilite pilotee par la permission (et non par une liste de roles).
+  { nom: "Tableau de bord", icone: LayoutDashboard, chemin: "/tableau-de-bord", permission: null },
+  { nom: "Gestion des Élèves", icone: GraduationCap, chemin: "/eleves", permission: "eleves.voir" },
+  { nom: "Gestion des Enseignants", icone: Users, chemin: "/enseignants", permission: "enseignants.voir" },
+  { nom: "Gestion des Classes", icone: School, chemin: "/classes", permission: "classes.gerer" },
+  { nom: "Gestion des Matières", icone: BookOpen, chemin: "/matieres", permission: "matieres.gerer" },
+  { nom: "Affectations", icone: Link2, chemin: "/affectations", permission: "affectations.gerer" },
+  { nom: "Emploi du Temps", icone: Calendar, chemin: "/emploi-du-temps", permission: "emploi_du_temps.voir" },
+  { nom: "Gestion des Notes", icone: Award, chemin: "/notes", permission: "notes.voir" },
+  { nom: "Bulletins", icone: FileSpreadsheet, chemin: "/bulletins", permission: "bulletins.voir" },
+  { nom: "Frais de Scolarité", icone: Wallet, chemin: "/frais-scolarite", permission: "frais.voir" },
   { nom: "Gestion des Salaires", icone: DollarSign, chemin: "/salaires", permission: "enseignants.salaires.voir" },
-  { nom: "Emploi du Temps", icone: Calendar, chemin: "/emploi-du-temps", roles: ["COMPTABLE", "DIRECTEUR", "FONDATEUR", "PROVISEUR", "CENSEUR"] },
-  { nom: "Gestion des Notes", icone: Award, chemin: "/notes", roles: ["DIRECTEUR", "PROVISEUR", "CENSEUR"] },
-  { nom: "Bulletins", icone: FileSpreadsheet, chemin: "/bulletins", roles: ["DIRECTEUR", "FONDATEUR", "PROVISEUR", "CENSEUR"] },
-  { nom: "Frais de Scolarité", icone: Wallet, chemin: "/frais-scolarite", roles: ["COMPTABLE", "FONDATEUR"] },
-  { nom: "Journal de Caisse", icone: CreditCard, chemin: "/paiements", roles: ["COMPTABLE", "PROVISEUR"] },
-  { nom: "Périodes Scolaires", icone: Clock, chemin: "/periodes", roles: ["DIRECTEUR", "PROVISEUR", "CENSEUR"] },
+  { nom: "Journal de Caisse", icone: CreditCard, chemin: "/paiements", permission: "frais.voir" },
+  { nom: "Périodes Scolaires", icone: Clock, chemin: "/periodes", permission: "periodes.gerer" },
+  // Pas de permission dediee cote backend pour les utilisateurs : on garde la liste de roles.
   { nom: "Utilisateurs", icone: UserCog, chemin: "/utilisateurs", roles: ["DIRECTEUR", "FONDATEUR", "PROVISEUR", "CENSEUR"] },
-  { nom: "Abonnement", icone: Sparkles, chemin: "/abonnement", roles: ["FONDATEUR"] },
+  { nom: "Abonnement", icone: Sparkles, chemin: "/abonnement", permission: "abonnement.voir" },
 ];
+
+function moduleVisible(module, permissions, role) {
+  if (module.roles) return module.roles.includes(role);
+  return module.permission === null || permissions.includes(module.permission);
+}
 
 const ICONES_ROLES = {
   COMPTABLE: Briefcase,
@@ -91,9 +98,6 @@ function initiales(nom) {
     .join("");
 }
 
-// Rôles ayant la permission notes.voir côté backend (RolePermissionSeeder)
-const ROLES_NOTES_VOIR = ["DIRECTEUR", "PROVISEUR", "CENSEUR"];
-
 export default function Layout({ children, role, permissions = [] }) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -101,29 +105,30 @@ export default function Layout({ children, role, permissions = [] }) {
   const [menuMobileOuvert, setMenuMobileOuvert] = useState(false);
   const [nbNotifications, setNbNotifications] = useState(0);
 
-  const modulesVisibles = MODULES.filter((m) => (m.permission ? permissions.includes(m.permission) : m.roles.includes(role)));
+  const modulesVisibles = MODULES.filter((m) => moduleVisible(m, permissions, role));
+  const peutVoirEleves = permissions.includes("eleves.voir");
+  const peutVoirNotes = permissions.includes("notes.voir");
 
-  // Notifications réelles : élèves en retard (tous rôles ont eleves.voir) +
-  // évaluations soumises en attente de validation (rôles avec notes.voir)
+  // Notifications réelles : élèves en retard (eleves.voir) + évaluations soumises en attente
+  // de validation (notes.voir), chacune seulement si l'utilisateur a la permission.
   useEffect(() => {
     async function chargerNotifications() {
-      const requetes = [api.get("/eleves")];
-      if (ROLES_NOTES_VOIR.includes(role)) {
-        requetes.push(api.get("/evaluations", { params: { vue: "direction" } }));
-      }
-      const resultats = await Promise.allSettled(requetes);
+      const [eleves, evaluations] = await Promise.allSettled([
+        peutVoirEleves ? api.get("/eleves") : Promise.reject(),
+        peutVoirNotes ? api.get("/evaluations", { params: { vue: "direction" } }) : Promise.reject(),
+      ]);
 
       let total = 0;
-      if (resultats[0].status === "fulfilled") {
-        total += resultats[0].value.data.stats.en_retard || 0;
+      if (eleves.status === "fulfilled") {
+        total += eleves.value.data.stats.en_retard || 0;
       }
-      if (resultats[1]?.status === "fulfilled") {
-        total += resultats[1].value.data.filter((ev) => ev.statut === "soumis").length;
+      if (evaluations.status === "fulfilled") {
+        total += evaluations.value.data.filter((ev) => ev.statut === "soumis").length;
       }
       setNbNotifications(total);
     }
     if (role) chargerNotifications();
-  }, [role]);
+  }, [role, peutVoirEleves, peutVoirNotes]);
 
   const allerA = (chemin) => {
     setMenuMobileOuvert(false);

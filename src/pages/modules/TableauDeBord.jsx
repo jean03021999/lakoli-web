@@ -10,14 +10,18 @@ import {
   AlertTriangle,
   CheckCircle2,
   CreditCard,
-  Calendar,
   MoreVertical,
   Plus,
   ChevronDown,
   Search,
+  Banknote,
+  ClipboardList,
+  RefreshCw,
+  TrendingUp,
+  TrendingDown,
 } from "lucide-react";
 import api from "../../services/api";
-import { StatCard, Card, Badge, Button, PageHeader } from "../../components/ui/LakoliDesignSystem";
+import { StatCard as StatCardSysteme, Card, Badge, Button, PageHeader } from "../../components/ui/LakoliDesignSystem";
 
 function formaterRole(role) {
   if (!role) return "";
@@ -25,7 +29,11 @@ function formaterRole(role) {
 }
 
 function formaterGNF(montant) {
-  return `${Number(montant).toLocaleString("fr-FR")} GNF`;
+  return `${formaterNombre(montant)} GNF`;
+}
+
+function formaterNombre(montant) {
+  return Number(montant).toLocaleString("fr-FR");
 }
 
 function getInitialesEleve(nom, prenom) {
@@ -83,6 +91,55 @@ function CarteStatistique({ titre, valeur, icone: Icon, degrade, badge, progress
         <div
           className="h-full rounded-full transition-all"
           style={{ width: `${Math.min(100, Math.max(0, progression))}%`, backgroundColor: "rgba(255,255,255,0.8)" }}
+        />
+      </div>
+    </div>
+  );
+}
+
+// Carte statistique (design Google AI Studio) : fond degrade, icone dans un cercle blanc
+// translucide, badge de tendance en haut a droite, grande valeur et barre de progression.
+// `tendance` : { sens: "hausse" | "baisse", texte } — le texte decrit la donnee reelle
+// (aucun historique n'existe pour calculer une variation).
+function StatCard({ label, valeur, unite, icone: Icon, gradient, tendance, progression = 0 }) {
+  const IconeTendance = tendance?.sens === "baisse" ? TrendingDown : TrendingUp;
+  return (
+    <div
+      className="relative isolate overflow-hidden p-5 text-white shadow-md transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl"
+      style={{ background: gradient, borderRadius: "18px" }}
+    >
+      {/* Cercles decoratifs flous, pour la profondeur */}
+      <div className="absolute -top-8 -right-8 h-28 w-28 rounded-full bg-white/10 blur-2xl pointer-events-none" />
+      <div className="absolute -bottom-10 -left-10 h-32 w-32 rounded-full bg-white/10 blur-2xl pointer-events-none" />
+
+      <div className="relative z-10 flex items-start justify-between gap-3 mb-5">
+        <div
+          className="rounded-full flex items-center justify-center shrink-0"
+          style={{ width: "48px", height: "48px", backgroundColor: "rgba(255,255,255,0.2)" }}
+        >
+          <Icon className="h-6 w-6 text-white" />
+        </div>
+        {tendance && (
+          <span
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold whitespace-nowrap"
+            style={{ backgroundColor: "rgba(255,255,255,0.2)" }}
+          >
+            <IconeTendance className="h-3.5 w-3.5" />
+            {tendance.texte}
+          </span>
+        )}
+      </div>
+
+      <p className="relative z-10 text-[11px] font-semibold uppercase tracking-widest text-white/80 mb-1.5">{label}</p>
+      <p className="relative z-10 font-extrabold leading-none mb-5 tabular-nums break-words" style={{ fontSize: "37px" }}>
+        {valeur}
+        {unite && valeur !== "—" && <span className="ml-1.5 text-base font-bold text-white/80">{unite}</span>}
+      </p>
+
+      <div className="relative z-10 h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: "rgba(255,255,255,0.2)" }}>
+        <div
+          className="h-full rounded-full transition-all duration-500"
+          style={{ width: `${Math.min(100, Math.max(0, progression))}%`, backgroundColor: "rgba(255,255,255,0.85)" }}
         />
       </div>
     </div>
@@ -278,79 +335,59 @@ function TableauDeBordComptable() {
         </h1>
       </div>
 
-      {/* 4 Cartes statistiques */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <CarteStatistique
-          titre="Élèves Inscrits"
+      {/* 6 cartes statistiques */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
+        <StatCard
+          label="Élèves inscrits"
           valeur={stats.totalEleves}
           icone={Users}
-          degrade="linear-gradient(135deg, #1d4ed8, #3b82f6)"
-          badge={nombreClasses > 0 ? `${nombreClasses} classe${nombreClasses > 1 ? "s" : ""}` : "—"}
+          gradient="linear-gradient(135deg, #1d4ed8, #3b82f6)"
+          tendance={nombreClasses > 0 ? { sens: "hausse", texte: `${nombreClasses} classe${nombreClasses > 1 ? "s" : ""}` } : null}
           progression={pctCouvertureFrais}
         />
-        <CarteStatistique
-          titre="Paiements Aujourd'hui"
+        <StatCard
+          label="Paiements aujourd'hui"
           valeur={paiementsDisponibles ? paiementsAujourdHui : "—"}
-          icone={Calendar}
-          degrade="linear-gradient(135deg, #059669, #10b981)"
-          badge={`${tousPaiements.length} au total`}
+          icone={CheckCircle2}
+          gradient="linear-gradient(135deg, #059669, #10b981)"
+          tendance={{ sens: "hausse", texte: `${tousPaiements.length} au total` }}
           progression={tousPaiements.length > 0 ? Math.round((paiementsAujourdHui / tousPaiements.length) * 100) : 0}
         />
-        <CarteStatistique
-          titre="Paiements en Retard"
+        <StatCard
+          label="Paiements en retard"
           valeur={stats.enRetard}
           icone={AlertTriangle}
-          degrade="linear-gradient(135deg, #d97706, #f59e0b)"
-          badge={enRetard > 0 ? `${enRetard} à relancer` : "Aucun retard"}
-          progression={enRetard > 0 ? Math.max(15, 100 - enRetard * 10) : 100}
+          gradient="linear-gradient(135deg, #dc2626, #ef4444)"
+          tendance={enRetard > 0 ? { sens: "baisse", texte: `${enRetard} à relancer` } : { sens: "hausse", texte: "Aucun retard" }}
+          progression={totalEleves > 0 ? Math.round((enRetard / totalEleves) * 100) : 0}
         />
-        <CarteStatistique
-          titre="Total Encaissé"
-          valeur={totalEncaisse !== null ? formaterGNF(totalEncaisse) : "—"}
-          icone={Wallet}
-          degrade="linear-gradient(135deg, #7c3aed, #a78bfa)"
-          badge={statsClasseDisponibles ? `${pctEncaisseGlobal}% du dû` : "—"}
+        <StatCard
+          label="Total encaissé"
+          valeur={totalEncaisse !== null ? formaterNombre(totalEncaisse) : "—"}
+          unite="GNF"
+          icone={Banknote}
+          gradient="linear-gradient(135deg, #7c3aed, #a78bfa)"
+          tendance={statsClasseDisponibles ? { sens: "hausse", texte: `${pctEncaisseGlobal}% du dû` } : null}
           progression={pctEncaisseGlobal}
         />
-      </div>
-
-      {/* Répartition financière */}
-      <div className="space-y-3">
-        <h3 className="text-sm font-bold text-slate-900">Répartition financière</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <CarteStatistique
-            titre="Inscriptions"
-            valeur={financesDisponibles ? formaterGNF(finances.inscriptions) : "—"}
-            icone={FileText}
-            degrade="linear-gradient(135deg, #1d4ed8, #3b82f6)"
-            badge={financesDisponibles ? `${pctFinance(finances.inscriptions)}% du total` : "—"}
-            progression={financesDisponibles ? pctFinance(finances.inscriptions) : 0}
-          />
-          <CarteStatistique
-            titre="Réinscriptions"
-            valeur={financesDisponibles ? formaterGNF(finances.reinscriptions) : "—"}
-            icone={Activity}
-            degrade="linear-gradient(135deg, #059669, #10b981)"
-            badge={financesDisponibles ? `${pctFinance(finances.reinscriptions)}% du total` : "—"}
-            progression={financesDisponibles ? pctFinance(finances.reinscriptions) : 0}
-          />
-          <CarteStatistique
-            titre="Scolarité"
-            valeur={financesDisponibles ? formaterGNF(finances.scolarite) : "—"}
-            icone={GraduationCap}
-            degrade="linear-gradient(135deg, #d97706, #f59e0b)"
-            badge={financesDisponibles ? `${pctFinance(finances.scolarite)}% du total` : "—"}
-            progression={financesDisponibles ? pctFinance(finances.scolarite) : 0}
-          />
-          <CarteStatistique
-            titre="Autres frais"
-            valeur={financesDisponibles ? formaterGNF(finances.autres) : "—"}
-            icone={Wallet}
-            degrade="linear-gradient(135deg, #7c3aed, #a78bfa)"
-            badge={financesDisponibles ? `${pctFinance(finances.autres)}% du total` : "—"}
-            progression={financesDisponibles ? pctFinance(finances.autres) : 0}
-          />
-        </div>
+        <StatCard
+          label="Inscriptions"
+          valeur={financesDisponibles ? formaterNombre(finances.inscriptions) : "—"}
+          unite="GNF"
+          icone={ClipboardList}
+          gradient="linear-gradient(135deg, #d97706, #f59e0b)"
+          tendance={financesDisponibles ? { sens: "hausse", texte: `${pctFinance(finances.inscriptions)}% du total` } : null}
+          progression={financesDisponibles ? pctFinance(finances.inscriptions) : 0}
+        />
+        <StatCard
+          label="Réinscriptions"
+          valeur={financesDisponibles ? formaterNombre(finances.reinscriptions) : "—"}
+          unite="GNF"
+          icone={RefreshCw}
+          gradient="linear-gradient(135deg, #4f46e5, #818cf8)"
+          tendance={financesDisponibles ? { sens: "hausse", texte: `${pctFinance(finances.reinscriptions)}% du total` } : null}
+          progression={financesDisponibles ? pctFinance(finances.reinscriptions) : 0}
+        />
       </div>
 
       {/* Situation des inscriptions */}
@@ -864,28 +901,28 @@ function TableauDeBordGenerique({ role }) {
 
       {/* 4 Cartes statistiques */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard
+        <StatCardSysteme
           title="Élèves Inscrits"
           value={stats.totalEleves}
           subtitle="Sessions scolaires actives : 2025-2026"
           icon={GraduationCap}
           onClick={() => navigate("/eleves")}
         />
-        <StatCard
+        <StatCardSysteme
           title="Corps Enseignant"
           value={stats.enseignantsActifs}
           subtitle="Contrats actifs vérifiés"
           icon={Users}
           onClick={() => navigate("/enseignants")}
         />
-        <StatCard
+        <StatCardSysteme
           title="Évaluations"
           value={stats.totalEvaluations}
           subtitle={`${stats.evaluationsAValider} en attente de validation`}
           icon={Award}
           onClick={() => navigate("/notes")}
         />
-        <StatCard
+        <StatCardSysteme
           title="Recouvrement"
           value={stats.tauxRecouvrement !== "—" ? `${stats.tauxRecouvrement}%` : "—"}
           subtitle={`Total recouvré : ${stats.totalRecouvre} GNF`}
