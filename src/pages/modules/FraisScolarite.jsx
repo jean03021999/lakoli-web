@@ -78,6 +78,26 @@ function situationGlobaleDepuisSuivi(suivi) {
   };
 }
 
+// Reste a payer sur l'ensemble du frais (toutes tranches) auquel appartient l'echeance : c'est le
+// plafond d'un versement, le surplus au-dela de l'echeance etant reporte sur les tranches suivantes.
+function resteTotalDuFrais(suivi, echeanceId) {
+  const frais = (suivi?.frais || []).find((f) => f.echeances.some((e) => String(e.id) === String(echeanceId)));
+  return (frais?.echeances || []).reduce((s, e) => s + Math.max(0, Number(e.solde)), 0);
+}
+
+// Lignes du recu (une par tranche touchee) et reste a payer sur ces tranches, a partir du detail
+// renvoye par POST /frais/paiements et de l'etat des echeances AVANT le paiement (suivi au clic).
+function detailPaiementScolarite(resPaiement, suiviAvant) {
+  const echeancesAvant = (suiviAvant?.frais || []).flatMap((f) => f.echeances);
+  const details = resPaiement.paiements || [];
+  const lignes = details.map((p) => ({ libelle: `Scolarité - ${p.libelle}`, montant: Number(p.montant) }));
+  const resteAPayer = details.reduce((s, p) => {
+    const avant = echeancesAvant.find((e) => String(e.id) === String(p.echeance_eleve_id));
+    return s + (avant ? Math.max(0, Number(avant.montant) - Number(avant.montant_paye) - Number(p.montant)) : 0);
+  }, 0);
+  return { lignes, resteAPayer, estSolde: resteAPayer <= 0 };
+}
+
 // Statut de paiement global de l'eleve (Eleve::statut_paiement cote backend), affiche en pastille
 // coloree dans la liste — memes couleurs que le badge d'echeance pour rester coherent.
 const STATUTS_PAIEMENT_ELEVE = {
@@ -306,23 +326,33 @@ export default function FraisScolarite({ permissions = [] }) {
         moyen_paiement: moyenPaiement,
       });
 
+      // L'inscription est deja encaissee a ce stade : un echec du paiement de scolarite ne doit
+      // pas empecher d'imprimer son recu (il est signale a part, apres rechargement du suivi).
+      const suiviAvant = suivi;
       let resEcheance = null;
+      let erreurEcheance = "";
       if (echeanceId) {
-        resEcheance = await api.post("/frais/paiements", {
-          echeance_eleve_id: echeanceId,
-          montant: montantEcheance,
-          moyen_paiement: moyenPaiement,
-          date_paiement: dateDuJour(),
-        });
+        try {
+          resEcheance = await api.post("/frais/paiements", {
+            echeance_eleve_id: echeanceId,
+            montant: montantEcheance,
+            moyen_paiement: moyenPaiement,
+            date_paiement: dateDuJour(),
+          });
+        } catch (err) {
+          erreurEcheance = err.response?.data?.message || "Erreur lors du paiement de la scolarité.";
+        }
       }
 
       // Recharge le suivi pour rafraichir l'affichage (chargerSuivi efface aussi les messages,
-      // d'ou l'ordre : succes affiche juste apres). Le reste a payer sur l'echeance est calcule
-      // ci-dessous a partir de son etat AVANT ce paiement (echeancesScolariteDisponibles, tire
-      // du suivi tel qu'il etait au moment du clic) — pas du solde rechargé, pour ne jamais
-      // dependre d'un eventuel decalage entre la reponse du paiement et le suivi recharge.
+      // d'ou l'ordre : succes affiche juste apres). Le reste a payer est calcule a partir de
+      // l'etat des echeances AVANT ce paiement (suivi tel qu'il etait au moment du clic) — pas
+      // du solde rechargé, pour ne jamais dependre d'un decalage avec le suivi recharge.
       const suiviMaj = await chargerSuivi(eleveInfos.id);
       setSucces(resInscription.data.message);
+      if (erreurEcheance) {
+        setErreur(`${reinscription ? "Réinscription" : "Inscription"} enregistrée, mais le paiement de scolarité a échoué : ${erreurEcheance}`);
+      }
       setFormInscription(null);
 
       const lignes = [
@@ -331,16 +361,10 @@ export default function FraisScolarite({ permissions = [] }) {
       let estSolde = true;
       let resteAPayer = 0;
       if (resEcheance) {
-        const echeanceAvant = echeancesScolariteDisponibles.find((ec) => String(ec.id) === String(echeanceId));
-        const libelleEcheance = echeanceAvant?.libelle || "Scolarité";
-        lignes.push({ libelle: `Scolarité - ${libelleEcheance}`, montant: Number(resEcheance.data.montant) });
-        if (echeanceAvant) {
-          const montantPayeAvant = Number(echeanceAvant.montant_paye);
-          const nouveauTotalPaye = montantPayeAvant + Number(resEcheance.data.montant);
-          const reste = Number(echeanceAvant.montant) - nouveauTotalPaye;
-          resteAPayer = Math.max(0, reste);
-          estSolde = reste <= 0;
-        }
+        const detail = detailPaiementScolarite(resEcheance.data, suiviAvant);
+        lignes.push(...detail.lignes);
+        resteAPayer = detail.resteAPayer;
+        estSolde = detail.estSolde;
       }
 
       const recu = {
@@ -359,7 +383,7 @@ export default function FraisScolarite({ permissions = [] }) {
       };
       setDernierRecu(recu);
       if (peutImprimer && !genererEtImprimerRecu(recu, fenetre)) {
-        setErreur(MESSAGE_POPUP_BLOQUE);
+        setErreur(erreurEcheance ? `${erreurEcheance} ${MESSAGE_POPUP_BLOQUE}` : MESSAGE_POPUP_BLOQUE);
       }
     } catch (err) {
       fenetre?.close();
@@ -379,12 +403,9 @@ export default function FraisScolarite({ permissions = [] }) {
     e.preventDefault();
     setErreur(""); setSucces("");
     const fenetre = peutImprimer ? ouvrirFenetreVierge() : null;
-    // Montant total du et deja paye sur CETTE echeance AVANT ce paiement, captures depuis le
-    // suivi tel qu'il etait au moment du clic (pas depuis un rechargement post-paiement).
-    const echeanceAvant = (suivi?.frais || [])
-      .flatMap((f) => f.echeances)
-      .find((ec) => String(ec.id) === String(paiement.echeanceId));
-    const libelleEcheance = paiement.libelle;
+    // Etat des echeances AVANT ce paiement, capture depuis le suivi tel qu'il etait au moment
+    // du clic (pas depuis un rechargement post-paiement).
+    const suiviAvant = suivi;
     try {
       const res = await api.post("/frais/paiements", {
         echeance_eleve_id: paiement.echeanceId,
@@ -396,21 +417,13 @@ export default function FraisScolarite({ permissions = [] }) {
       setSucces("Paiement enregistré avec succès.");
       setPaiement(null);
 
-      let estSolde = true;
-      let resteAPayer = 0;
-      if (echeanceAvant) {
-        const montantPayeAvant = Number(echeanceAvant.montant_paye);
-        const nouveauTotalPaye = montantPayeAvant + Number(res.data.montant);
-        const reste = Number(echeanceAvant.montant) - nouveauTotalPaye;
-        resteAPayer = Math.max(0, reste);
-        estSolde = reste <= 0;
-      }
+      const { lignes, resteAPayer, estSolde } = detailPaiementScolarite(res.data, suiviAvant);
 
       const recu = {
-        reference: referenceLocale(res.data.id, res.data.date_paiement),
+        reference: res.data.reference || referenceLocale(res.data.id, res.data.date_paiement),
         eleve: eleveInfos,
         session: eleveInfos.inscription_active?.session_scolaire?.libelle || "—",
-        lignes: [{ libelle: `Scolarité - ${libelleEcheance}`, montant: Number(res.data.montant) }],
+        lignes,
         total: Number(res.data.montant),
         estSolde,
         resteAPayer,
@@ -749,6 +762,7 @@ export default function FraisScolarite({ permissions = [] }) {
                             <Input
                               type="number"
                               min="1"
+                              max={formInscription.echeanceId ? resteTotalDuFrais(suivi, formInscription.echeanceId) : undefined}
                               disabled={!formInscription.echeanceId}
                               required={!!formInscription.echeanceId}
                               value={formInscription.montantEcheance}
@@ -756,6 +770,11 @@ export default function FraisScolarite({ permissions = [] }) {
                             />
                           </div>
                         </div>
+                        {formInscription.echeanceId && (
+                          <p className="text-xs text-slate-400 m-0 mt-2">
+                            Un montant supérieur à l'échéance est reporté sur les tranches suivantes (jusqu'à {formaterGNF(resteTotalDuFrais(suivi, formInscription.echeanceId))}).
+                          </p>
+                        )}
                         {echeancesScolariteDisponibles.length === 0 && (
                           <p className="text-xs text-slate-400 m-0 mt-2">Aucune échéance de scolarité en attente pour cet élève.</p>
                         )}
@@ -874,11 +893,15 @@ export default function FraisScolarite({ permissions = [] }) {
                         <Input
                           type="number"
                           min="1"
+                          max={resteTotalDuFrais(suivi, paiement.echeanceId)}
                           value={paiement.montant}
                           onChange={(e) => setPaiement({ ...paiement, montant: e.target.value })}
                           required
                         />
                       </div>
+                      <p className="basis-full order-last text-xs text-slate-400 m-0">
+                        Un montant supérieur à l'échéance est reporté sur les tranches suivantes (jusqu'à {formaterGNF(resteTotalDuFrais(suivi, paiement.echeanceId))}, soit toute la scolarité restante).
+                      </p>
                       <div>
                         <label className="block text-xs font-semibold text-slate-500 mb-1">Moyen de paiement</label>
                         <Select value={paiement.moyenPaiement} onChange={(e) => setPaiement({ ...paiement, moyenPaiement: e.target.value })}>

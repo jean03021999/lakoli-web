@@ -1,6 +1,8 @@
 // Documents imprimables (recu de paiement, releve) : HTML complet injecte dans une fenetre
 // ouverte avec window.open(), style noir et blanc optimise pour @media print.
 
+import QRCode from "qrcode";
+
 export function echapperHtml(valeur) {
   return String(valeur ?? "")
     .replace(/&/g, "&amp;")
@@ -8,6 +10,26 @@ export function echapperHtml(valeur) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
+}
+
+// QR code en SVG inline : genere localement (aucun service externe), s'imprime net a toute taille.
+// Le texte est encode en UTF-8, lisible par l'appareil photo de n'importe quel telephone.
+function qrCodeSvg(texte, taille) {
+  const { modules } = QRCode.create(texte, { errorCorrectionLevel: "M" });
+  const marge = 2;
+  const cote = modules.size + marge * 2;
+  let chemin = "";
+  for (let y = 0; y < modules.size; y++) {
+    for (let x = 0; x < modules.size; x++) {
+      if (modules.get(y, x)) chemin += `M${x + marge} ${y + marge}h1v1h-1z`;
+    }
+  }
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${cote} ${cote}" width="${taille}" height="${taille}" shape-rendering="crispEdges"><rect width="100%" height="100%" fill="#fff"/><path d="${chemin}" fill="#000"/></svg>`;
+}
+
+// Montant en texte brut pour le QR code (espaces simples, pas d'entites HTML).
+function montantTexte(montant) {
+  return String(Math.round(Number(montant) || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, " ");
 }
 
 // Retourne du HTML sur (chiffres et espaces insecables uniquement) : ne pas l'echapper une 2e fois.
@@ -188,6 +210,16 @@ const STYLES = `
   .doc-releve .signature-zone .cadre { width: 260px; text-align: center; }
   .doc-releve .signature-zone .ligne { height: 40px; border-top: 1px dashed #64748b; margin-bottom: 6px; }
   .doc-releve .signature-zone .libelle { font-size: 11px; color: #475569; }
+
+  /* Liste des eleves par classe : une page par classe, nom de la classe en grand dans l'en-tete. */
+  .doc-releve .entete-premium .titre { text-align: right; }
+  .doc-releve .entete-premium .titre .classe { margin-top: 6px; font-size: 26px; font-weight: 800; color: #fff; }
+  .doc-releve .entete-premium .titre .session { margin-top: 2px; font-size: 12px; color: rgba(255, 255, 255, 0.8); }
+  .doc-releve.liste-classe + .doc-releve.liste-classe { break-before: page; page-break-before: always; }
+  .doc-releve .resume-classe { display: flex; gap: 24px; font-size: 12px; color: #475569; margin: 14px 0; }
+  .doc-releve .resume-classe strong { color: #0C447C; font-size: 14px; }
+  table.tableau-premium td.num { width: 36px; text-align: center; color: #64748b; }
+  table.tableau-premium td.mono { font-family: "Courier New", monospace; font-size: 12px; }
 
   .doc-releve .pied-premium {
     margin-top: 24px; padding-top: 12px; border-top: 1px solid #e2e8f0;
@@ -403,8 +435,9 @@ export function genererEtImprimerRecu(data, fenetrePreouverte) {
 
     /* PIED DE PAGE */
     .footer { background: #f8fafc; padding: 10px 20px; display: flex; align-items: center; gap: 12px; border-top: 1px solid #e2e8f0; margin-top: 14px; }
-    .qr-placeholder { width: 40px; height: 40px; flex-shrink: 0; border: 1.5px dashed #cbd5e1; border-radius: 4px; background: white; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: #94a3b8; letter-spacing: 1px; }
-    .footer-texte { flex: 1; text-align: center; padding-right: 52px; }
+    .qr-code { width: 80px; height: 80px; flex-shrink: 0; }
+    .qr-code svg { display: block; }
+    .footer-texte { flex: 1; text-align: center; padding-right: 92px; }
     .footer p { font-size: 10px; color: #94a3b8; line-height: 1.6; }
 
     /* BOUTONS */
@@ -495,7 +528,14 @@ export function genererEtImprimerRecu(data, fenetrePreouverte) {
     </div>
 
     <div class="footer">
-      <div class="qr-placeholder">QR</div>
+      <div class="qr-code">${qrCodeSvg([
+        "LAKOLI - Reçu de paiement",
+        `Réf : ${data.reference}`,
+        `Élève : ${data.eleve?.nom ?? ""} ${data.eleve?.prenom ?? ""}${data.eleve?.matricule ? ` (${data.eleve.matricule})` : ""}`,
+        `Montant : ${montantTexte(data.total)} GNF`,
+        `Date : ${data.date} ${data.heure}`,
+        `Statut : ${data.estSolde ? "Soldé" : `Partiel, reste ${montantTexte(data.resteAPayer)} GNF`}`,
+      ].join("\n"), 80)}</div>
       <div class="footer-texte">
         <p>Document officiel LAKOLI · Certifié conforme aux normes scolaires de la République de Guinée</p>
         <p>Imprimé le ${new Date().toLocaleDateString("fr-FR")} à ${new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}</p>
@@ -628,6 +668,104 @@ export function genererReleveHtml({ etablissement, eleve, lignes }) {
 }
 
 // ---------------------------------------------------------------------------
+// Liste des eleves par classe — une page par classe (saut de page entre deux classes), le nom
+// de la classe en grand dans l'en-tete. `classes` : [{ nom, eleves: [{ nom, prenom, matricule,
+// date_naissance, lieu_naissance, statut_paiement }] }], deja dans l'ordre voulu.
+// `filtreStatut` (optionnel) : libelle du filtre de paiement applique (ex. "En retard") — affiche
+// dans l'en-tete, et ajoute une colonne Statut. A passer a imprimerDocument().
+// ---------------------------------------------------------------------------
+const STATUTS_PAIEMENT_ELEVE = {
+  a_jour: { libelle: "À jour", classe: "badge-paye" },
+  partiel: { libelle: "Partiel", classe: "badge-partiel" },
+  a_echoir: { libelle: "À échoir", classe: "badge-echoir" },
+  en_retard: { libelle: "En retard", classe: "badge-retard" },
+};
+
+export function genererListeElevesHtml({ etablissement, session, classes, filtreStatut }) {
+  const tiret = "—";
+  const collator = new Intl.Collator("fr", { sensitivity: "base" });
+  const celluleStatut = (statut) => {
+    const s = STATUTS_PAIEMENT_ELEVE[statut];
+    return s ? `<span class="badge-statut ${s.classe}">${s.libelle}</span>` : `<span class="badge-statut badge-echoir">Aucun frais</span>`;
+  };
+
+  return classes
+    .map(({ nom, eleves }) => {
+      const tries = [...eleves].sort(
+        (a, b) => collator.compare(a.nom || "", b.nom || "") || collator.compare(a.prenom || "", b.prenom || "")
+      );
+      const lignes = tries
+        .map(
+          (e, i) => `<tr>
+          <td class="num">${i + 1}</td>
+          <td class="mono">${echapperHtml(e.matricule || tiret)}</td>
+          <td><strong>${echapperHtml((e.nom || "").toUpperCase())}</strong></td>
+          <td>${echapperHtml(e.prenom || tiret)}</td>
+          <td>${e.date_naissance ? formaterDate(e.date_naissance) : tiret}</td>
+          <td>${echapperHtml(e.lieu_naissance || tiret)}</td>
+          ${filtreStatut ? `<td>${celluleStatut(e.statut_paiement)}</td>` : ""}
+        </tr>`
+        )
+        .join("");
+
+      return `
+  <div class="doc-releve liste-classe">
+    <div class="entete-premium">
+      <div class="logo">
+        ${LOGO_SVG_BLANC}
+        <div>
+          <div class="nom">LAKOLI</div>
+          ${etablissement ? `<span class="badge-etablissement">${echapperHtml(etablissement)}</span>` : ""}
+        </div>
+      </div>
+      <div class="titre">
+        <h1>LISTE DES ÉLÈVES</h1>
+        <div class="classe">${echapperHtml(nom)}</div>
+        ${filtreStatut ? `<div class="session">Paiement : ${echapperHtml(filtreStatut)}</div>` : ""}
+        ${session ? `<div class="session">Année scolaire ${echapperHtml(session)}</div>` : ""}
+      </div>
+    </div>
+
+    <div class="resume-classe">
+      <span>Classe : <strong>${echapperHtml(nom)}</strong></span>
+      ${filtreStatut ? `<span>Statut de paiement : <strong>${echapperHtml(filtreStatut)}</strong></span>` : ""}
+      <span>Effectif : <strong>${tries.length}</strong> élève${tries.length > 1 ? "s" : ""}</span>
+    </div>
+
+    <table class="tableau-premium">
+      <thead>
+        <tr>
+          <th>N°</th>
+          <th>Matricule</th>
+          <th>Nom</th>
+          <th>Prénom(s)</th>
+          <th>Date de naissance</th>
+          <th>Lieu de naissance</th>
+          ${filtreStatut ? "<th>Statut</th>" : ""}
+        </tr>
+      </thead>
+      <tbody>${lignes}</tbody>
+    </table>
+
+    <div class="signature-zone">
+      <div class="cadre">
+        <div class="ligne"></div>
+        <div class="libelle">Signature et cachet du directeur</div>
+      </div>
+    </div>
+
+    <div class="pied-premium">
+      Document officiel LAKOLI · Liste arrêtée à ${tries.length} élève${tries.length > 1 ? "s" : ""}${
+        filtreStatut ? ` (paiement : ${echapperHtml(filtreStatut)})` : ""
+      }<br>
+      Imprimé le ${echapperHtml(dateImpression())}
+    </div>
+  </div>`;
+    })
+    .join("");
+}
+
+// ---------------------------------------------------------------------------
 // Fiche de paie enseignant — document HTML autonome, meme principe que le recu.
 // ---------------------------------------------------------------------------
 export const MOIS = [
@@ -707,7 +845,10 @@ export function genererEtImprimerFichePaie(salaire, fenetrePreouverte) {
     .signature-zone { display: flex; justify-content: space-between; gap: 20px; padding: 12px 20px 0; }
     .signature-box { text-align: center; padding-top: 36px; }
     .signature-line { border-top: 1.5px dashed #94a3b8; width: 200px; padding-top: 4px; font-size: 10px; color: #64748b; }
-    .footer { background: #f8fafc; padding: 10px 20px; text-align: center; border-top: 1px solid #e2e8f0; margin-top: 16px; }
+    .footer { background: #f8fafc; padding: 10px 20px; display: flex; align-items: center; gap: 12px; border-top: 1px solid #e2e8f0; margin-top: 16px; }
+    .qr-code { width: 80px; height: 80px; flex-shrink: 0; }
+    .qr-code svg { display: block; }
+    .footer-texte { flex: 1; text-align: center; padding-right: 92px; }
     .footer p { font-size: 10px; color: #94a3b8; line-height: 1.6; }
     .btn-group { display: flex; gap: 10px; justify-content: center; padding: 11px; border-top: 1px solid #e2e8f0; }
     .btn { padding: 6px 15px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; border: none; }
@@ -779,8 +920,18 @@ export function genererEtImprimerFichePaie(salaire, fenetrePreouverte) {
   </div>
 
   <div class="footer">
-    <p>Document officiel LAKOLI · Certifié conforme aux normes scolaires de la République de Guinée</p>
-    <p>Imprimé le ${echapperHtml(dateImpression())}</p>
+    <div class="qr-code">${qrCodeSvg([
+      "LAKOLI - Fiche de paie",
+      `Réf : ${salaire.reference}`,
+      `Enseignant : ${ens.nom ?? ""} ${ens.prenom ?? ""}${ens.matricule ? ` (${ens.matricule})` : ""}`,
+      `Période : ${periode}`,
+      `Net à payer : ${montantTexte(salaire.montant_net)} GNF`,
+      `Statut : ${estPaye ? `Payé le ${formaterDate(salaire.date_paiement)}` : "En attente"}`,
+    ].join("\n"), 80)}</div>
+    <div class="footer-texte">
+      <p>Document officiel LAKOLI · Certifié conforme aux normes scolaires de la République de Guinée</p>
+      <p>Imprimé le ${echapperHtml(dateImpression())}</p>
+    </div>
   </div>
 
   <div class="btn-group">

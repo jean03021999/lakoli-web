@@ -11,8 +11,10 @@ import {
   CheckCircle2,
   AlertTriangle,
   Clock,
+  Printer,
 } from "lucide-react";
 import { PageHeader, Button } from "../../components/ui/LakoliDesignSystem";
+import { imprimerDocument, genererListeElevesHtml } from "../../utils/impression";
 
 function badgeStatut(statut) {
   if (statut === "a_jour") {
@@ -54,6 +56,22 @@ function badgeStatut(statut) {
   );
 }
 
+// Filtre de statut de paiement : un statut precis, ou "non_a_jour" qui regroupe tous les eleves
+// qui ne sont pas a jour (partiel, en retard, a echoir, et aussi ceux sans aucun frais).
+const LIBELLES_FILTRE_STATUT = {
+  a_jour: "À jour",
+  non_a_jour: "Pas encore à jour",
+  partiel: "Partiel",
+  a_echoir: "À échoir",
+  en_retard: "En retard",
+};
+
+function correspondStatut(statutEleve, filtre) {
+  if (filtre === "all") return true;
+  if (filtre === "non_a_jour") return statutEleve !== "a_jour";
+  return statutEleve === filtre;
+}
+
 function getInitials(nom, prenom) {
   return `${nom?.[0] || ""}${prenom?.[0] || ""}`.toUpperCase();
 }
@@ -89,6 +107,7 @@ export default function Eleves({ permissions = [] }) {
   const [afficherSuggestions, setAfficherSuggestions] = useState(false);
   const [chargement, setChargement] = useState(true);
   const [erreur, setErreur] = useState("");
+  const [etablissement, setEtablissement] = useState("");
   const navigate = useNavigate();
 
   const chargerEleves = async () => {
@@ -100,6 +119,7 @@ export default function Eleves({ permissions = [] }) {
       const response = await api.get("/eleves");
       setEleves(response.data.eleves);
       setStats(response.data.stats);
+      setEtablissement(response.data.etablissement || "");
     } catch (err) {
       setErreur(err.response?.data?.message || "Impossible de charger les élèves.");
     } finally {
@@ -144,11 +164,43 @@ export default function Eleves({ permissions = [] }) {
   const termes = normaliser(recherche).split(/\s+/).filter(Boolean);
   const elevesFiltres = eleves.filter((e) => {
     const matchClasse = classeFiltre === "all" || e.classe === classeFiltre;
-    const matchStatut = statutFiltre === "all" || e.statut_paiement === statutFiltre;
+    const matchStatut = correspondStatut(e.statut_paiement, statutFiltre);
     const cible = normaliser(`${e.nom} ${e.prenom} ${e.matricule}`);
     const matchRecherche = termes.every((t) => cible.includes(t));
     return matchClasse && matchStatut && matchRecherche;
   });
+
+  // Liste imprimable : la classe choisie, ou toutes les classes (une page chacune) si aucun filtre.
+  // Les filtres de classe et de statut de paiement s'appliquent ; la recherche par nom, non (elle
+  // sert a retrouver un eleve, pas a composer une liste).
+  const imprimerListe = () => {
+    const nomsClasses = classeFiltre === "all" ? classesDisponibles : [classeFiltre];
+    const classes = nomsClasses
+      .map((nom) => ({
+        nom,
+        eleves: eleves.filter((e) => e.classe === nom && correspondStatut(e.statut_paiement, statutFiltre)),
+      }))
+      .filter((c) => c.eleves.length > 0);
+    if (classes.length === 0) {
+      setErreur(
+        statutFiltre === "all"
+          ? "Aucun élève à imprimer pour cette classe."
+          : `Aucun élève « ${LIBELLES_FILTRE_STATUT[statutFiltre]} » à imprimer pour cette sélection.`
+      );
+      return;
+    }
+    setErreur("");
+    const session = classes[0].eleves[0].inscription_active?.session_scolaire?.libelle;
+    const filtreStatut = statutFiltre === "all" ? null : LIBELLES_FILTRE_STATUT[statutFiltre];
+    const titre = [
+      "Liste des élèves",
+      classes.length === 1 ? classes[0].nom : "par classe",
+      filtreStatut,
+    ].filter(Boolean).join(" - ");
+    if (!imprimerDocument(titre, genererListeElevesHtml({ etablissement, session, classes, filtreStatut }))) {
+      setErreur("Le navigateur a bloqué la fenêtre d'impression. Autorisez les pop-ups pour ce site.");
+    }
+  };
 
   // Propose seulement des eleves qui donneront un resultat avec la classe et le statut choisis.
   const suggestions = termes.length > 0 ? elevesFiltres.slice(0, 6) : [];
@@ -161,82 +213,105 @@ export default function Eleves({ permissions = [] }) {
       />
 
       {/* Barre de recherche et filtres */}
-      <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <form onSubmit={handleRecherche} className="relative flex-1 min-w-[300px] flex gap-2">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Rechercher par nom, prénom ou matricule..."
-              value={recherche}
-              onChange={(e) => {
-                setRecherche(e.target.value);
-                setAfficherSuggestions(true);
-              }}
-              onFocus={() => setAfficherSuggestions(true)}
-              // Delai pour laisser le clic sur une suggestion se faire avant de fermer la liste
-              onBlur={() => setTimeout(() => setAfficherSuggestions(false), 200)}
-              autoComplete="off"
-              className="w-full pl-9 pr-4 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2563EB] focus:border-[#2563EB] transition-colors"
-            />
-            {afficherSuggestions && suggestions.length > 0 && (
-              <ul className="absolute left-0 right-0 top-full mt-1 z-20 bg-white border border-slate-200 rounded-lg shadow-lg overflow-hidden">
-                {suggestions.map((e) => (
-                  <li key={e.id}>
-                    <button
-                      type="button"
-                      onClick={() => choisirSuggestion(e)}
-                      className="w-full text-left px-3.5 py-2 text-sm text-slate-700 hover:bg-blue-50 transition-colors"
-                    >
-                      {e.nom} {e.prenom}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-          <Button type="submit" variant="primary" size="md">
-            Rechercher
-          </Button>
-        </form>
+      <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs flex flex-col lg:flex-row lg:items-start justify-between gap-4">
+        {/* Recherche, et en dessous a gauche les actions de gestion (import, ajout) */}
+        <div className="flex-1 sm:min-w-[300px] flex flex-col gap-2.5">
+          <form onSubmit={handleRecherche} className="relative flex gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Rechercher par nom, prénom ou matricule..."
+                value={recherche}
+                onChange={(e) => {
+                  setRecherche(e.target.value);
+                  setAfficherSuggestions(true);
+                }}
+                onFocus={() => setAfficherSuggestions(true)}
+                // Delai pour laisser le clic sur une suggestion se faire avant de fermer la liste
+                onBlur={() => setTimeout(() => setAfficherSuggestions(false), 200)}
+                autoComplete="off"
+                className="w-full h-10 pl-9 pr-4 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2563EB] focus:border-[#2563EB] transition-colors"
+              />
+              {afficherSuggestions && suggestions.length > 0 && (
+                <ul className="absolute left-0 right-0 top-full mt-1 z-20 bg-white border border-slate-200 rounded-lg shadow-lg overflow-hidden">
+                  {suggestions.map((e) => (
+                    <li key={e.id}>
+                      <button
+                        type="button"
+                        onClick={() => choisirSuggestion(e)}
+                        className="w-full text-left px-3.5 py-2 text-sm text-slate-700 hover:bg-blue-50 transition-colors"
+                      >
+                        {e.nom} {e.prenom}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            <Button type="submit" variant="primary" size="md" className="h-10">
+              Rechercher
+            </Button>
+          </form>
 
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-1.5">
-            <Filter className="h-3.5 w-3.5 text-slate-400" />
+          {(peutImporter || peutCreer) && (
+            <div className="flex flex-wrap items-center gap-2.5">
+              {peutImporter && (
+                <Button variant="secondary" icon={Upload} onClick={() => navigate("/eleves-importer")}>
+                  Importer Excel
+                </Button>
+              )}
+              {peutCreer && (
+                <Button variant="primary" icon={Plus} onClick={() => navigate("/eleves-ajouter")}>
+                  Ajouter un élève
+                </Button>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Filtres, et en dessous a droite l'impression qui en depend */}
+        <div className="flex flex-col items-end gap-2.5">
+          <div className="flex flex-wrap items-center justify-end gap-2.5">
+            <div className="flex items-center gap-1.5">
+              <Filter className="h-4 w-4 text-slate-400" />
+              <select
+                value={classeFiltre}
+                onChange={(e) => setClasseFiltre(e.target.value)}
+                className="bg-white border border-slate-200 h-10 text-sm rounded-lg px-3 focus:outline-none focus:ring-1 focus:ring-[#2563EB]"
+              >
+                <option value="all">Toutes les classes</option>
+                {classesDisponibles.map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+            </div>
+
             <select
-              value={classeFiltre}
-              onChange={(e) => setClasseFiltre(e.target.value)}
-              className="bg-white border border-slate-200 text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#2563EB]"
+              value={statutFiltre}
+              onChange={(e) => setStatutFiltre(e.target.value)}
+              className="bg-white border border-slate-200 h-10 text-sm rounded-lg px-3 focus:outline-none focus:ring-1 focus:ring-[#2563EB]"
             >
-              <option value="all">Toutes les classes</option>
-              {classesDisponibles.map((c) => (
-                <option key={c} value={c}>{c}</option>
-              ))}
+              <option value="all">Tous les statuts de paiement</option>
+              <option value="a_jour">À jour</option>
+              <option value="non_a_jour">Pas encore à jour (tous sauf « À jour »)</option>
+              <option value="partiel">Partiel</option>
+              <option value="a_echoir">À échoir</option>
+              <option value="en_retard">En retard</option>
             </select>
           </div>
 
-          <select
-            value={statutFiltre}
-            onChange={(e) => setStatutFiltre(e.target.value)}
-            className="bg-white border border-slate-200 text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#2563EB]"
+          <Button
+            variant="secondary"
+            icon={Printer}
+            onClick={imprimerListe}
+            disabled={chargement || classesDisponibles.length === 0}
+            title={`${classeFiltre === "all" ? "Imprime une page par classe" : `Imprime la liste de la classe ${classeFiltre}`}${
+              statutFiltre === "all" ? "" : ` (élèves « ${LIBELLES_FILTRE_STATUT[statutFiltre]} » uniquement)`
+            }`}
           >
-            <option value="all">Tous les statuts de paiement</option>
-            <option value="a_jour">À jour</option>
-            <option value="partiel">Partiel</option>
-            <option value="a_echoir">À échoir</option>
-            <option value="en_retard">En retard</option>
-          </select>
-
-          {peutImporter && (
-            <Button variant="secondary" icon={Upload} onClick={() => navigate("/eleves-importer")}>
-              Importer Excel
-            </Button>
-          )}
-          {peutCreer && (
-            <Button variant="primary" icon={Plus} onClick={() => navigate("/eleves-ajouter")}>
-              Ajouter un élève
-            </Button>
-          )}
+            {classeFiltre === "all" ? "Imprimer les listes" : "Imprimer la liste"}
+          </Button>
         </div>
       </div>
 
