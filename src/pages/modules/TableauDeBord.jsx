@@ -531,8 +531,9 @@ function TableauDeBordComptable({ role }) {
         <div className="absolute -bottom-20 left-1/3 h-48 w-48 rounded-full bg-white/5 pointer-events-none" />
         <div className="absolute -bottom-10 -left-10 h-32 w-32 rounded-full bg-white/10 pointer-events-none" />
 
-        <div className="relative z-10 flex flex-col lg:flex-row lg:items-end justify-between gap-6">
-          <div className="space-y-3 min-w-0">
+        <div className="relative z-10 space-y-5">
+          {/* Ligne du haut : espace de travail a gauche, mise a jour + actualisation a droite */}
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <span className="inline-flex flex-wrap items-center gap-2 px-3 py-1.5 rounded-full bg-white/15 text-xs font-semibold backdrop-blur-sm">
               <span className="relative flex h-2 w-2">
                 <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75 animate-ping" />
@@ -542,13 +543,6 @@ function TableauDeBordComptable({ role }) {
               <span className="text-white/60">·</span>
               <span className="text-white/80">Session Ouverte</span>
             </span>
-            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight">Tableau de bord Comptable</h1>
-            <p className="text-sm sm:text-base text-white/70 max-w-xl">
-              Suivi des encaissements, des retards de paiement et des inscriptions de l'établissement.
-            </p>
-          </div>
-
-          <div className="flex flex-col items-start lg:items-end gap-3 shrink-0">
             <div className="flex items-center gap-2">
               <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/15 text-xs font-medium">
                 <Clock className="h-3.5 w-3.5" />
@@ -566,23 +560,33 @@ function TableauDeBordComptable({ role }) {
                 <RefreshCw className={`h-4 w-4 ${enChargement ? "animate-spin" : ""}`} />
               </button>
             </div>
-            <div className="flex flex-wrap gap-2.5">
-              <button
-                onClick={exporterRapport}
-                disabled={enChargement}
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-white/40 text-sm font-semibold text-white hover:bg-white/10 transition-colors cursor-pointer disabled:opacity-60"
-              >
-                <FileDown className="h-4 w-4" />
-                Imprimer le rapport
-              </button>
-              <button
-                onClick={() => navigate("/frais-scolarite")}
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white text-sm font-bold text-[#0C447C] hover:bg-blue-50 shadow-sm transition-colors cursor-pointer"
-              >
-                <PlusCircle className="h-4 w-4" />
-                Enregistrer un paiement
-              </button>
-            </div>
+          </div>
+
+          {/* Titre et sous-titre centres */}
+          <div className="text-center space-y-2">
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight">Tableau de bord Comptable</h1>
+            <p className="text-sm sm:text-base text-white/70 max-w-2xl mx-auto">
+              Suivi des encaissements, des retards de paiement et des inscriptions de l'établissement.
+            </p>
+          </div>
+
+          {/* Actions centrees */}
+          <div className="flex flex-wrap justify-center gap-2.5">
+            <button
+              onClick={exporterRapport}
+              disabled={enChargement}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-white/40 text-sm font-semibold text-white hover:bg-white/10 transition-colors cursor-pointer disabled:opacity-60"
+            >
+              <FileDown className="h-4 w-4" />
+              Imprimer le rapport
+            </button>
+            <button
+              onClick={() => navigate("/frais-scolarite")}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white text-sm font-bold text-[#0C447C] hover:bg-blue-50 shadow-sm transition-colors cursor-pointer"
+            >
+              <PlusCircle className="h-4 w-4" />
+              Enregistrer un paiement
+            </button>
           </div>
         </div>
       </div>
