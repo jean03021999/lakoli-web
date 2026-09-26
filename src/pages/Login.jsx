@@ -35,9 +35,9 @@ export default function LoginPage() {
   // Selected Role key - Default COMPTABLE as requested
   const [selectedRoleKey, setSelectedRoleKey] = useState('COMPTABLE');
 
-  // Form states - Default to Comptable credentials
-  const [identifier, setIdentifier] = useState('comptable@lakoli.edu');
-  const [password, setPassword] = useState('Comptable2026!');
+  // Identifiants saisis par l'utilisateur (aucune valeur de demonstration preremplie)
+  const [identifier, setIdentifier] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
 
@@ -82,8 +82,6 @@ export default function LoginPage() {
       description: 'Vision stratégique & bilans',
       icon: Crown,
       iconColor: 'text-[#f59e0b]',
-      mappedRole: 'FONDATEUR',
-      defaultEmail: 'fondateur@lakoli.com'
     },
     {
       key: 'DIRECTEUR',
@@ -93,8 +91,6 @@ export default function LoginPage() {
       description: 'Direction administrative',
       icon: Building2,
       iconColor: 'text-[#38bdf8]',
-      mappedRole: 'DIRECTEUR',
-      defaultEmail: 'directeur.matoto@lakoli.edu'
     },
     {
       key: 'PROVISEUR',
@@ -104,8 +100,6 @@ export default function LoginPage() {
       description: 'Direction pédagogique',
       icon: Shield,
       iconColor: 'text-[#10b981]',
-      mappedRole: 'DIRECTEUR',
-      defaultEmail: 'proviseur@lakoli.edu'
     },
     {
       key: 'CENSEUR',
@@ -115,8 +109,6 @@ export default function LoginPage() {
       description: 'Coordination études',
       icon: BookOpen,
       iconColor: 'text-[#60a5fa]',
-      mappedRole: 'DIRECTEUR',
-      defaultEmail: 'censeur@lakoli.com'
     },
     {
       key: 'COMPTABLE',
@@ -126,8 +118,6 @@ export default function LoginPage() {
       description: 'Recouvrement & paie',
       icon: Wallet,
       iconColor: 'text-[#10b981]',
-      mappedRole: 'COMPTABLE',
-      defaultEmail: 'comptable@lakoli.edu'
     }
   ];
 
@@ -138,8 +128,6 @@ export default function LoginPage() {
   const handleSelectRole = (card) => {
     setError(null);
     setSelectedRoleKey(card.key);
-    setIdentifier(card.defaultEmail);
-    setPassword(`${card.label}2026!`);
   };
 
   // Validate form fields
@@ -169,25 +157,48 @@ export default function LoginPage() {
     setIsLoading(true);
     try {
       const response = await api.post("/auth/login", {
-        identifiant: identifier,
-        mot_de_passe: password
+        identifiant: identifier.trim(),
+        mot_de_passe: password,
+        // Le serveur refuse la connexion si le compte n'a pas ce profil.
+        profil: selectedRoleKey.toLowerCase(),
       });
       if (response.data.otp_requis) {
-        navigate("/verification-otp", { state: { identifiant: identifier } });
+        // "Se souvenir 30 jours" = faire confiance a cet appareil lors de la verification du code.
+        navigate("/verification-otp", { state: { identifiant: identifier.trim(), confiance: rememberMe } });
       } else {
         localStorage.setItem("auth_token", response.data.token);
         navigate("/tableau-de-bord");
       }
     } catch (err) {
-      setError(err.response?.data?.message || "Identifiants incorrects. Vérifiez vos informations.");
+      const erreurs = err.response?.data?.errors;
+      setError(
+        erreurs?.profil?.[0] ||
+        erreurs?.identifiant?.[0] ||
+        err.response?.data?.message ||
+        "Connexion impossible. Vérifiez votre connexion au serveur."
+      );
       setIsLoading(false);
     }
   };
 
-  const handleForgotSubmit = (e) => {
+  // Envoie un code de reinitialisation (POST /auth/mot-de-passe-oublie) puis ouvre l'ecran de saisie
+  // du code et du nouveau mot de passe.
+  const [forgotChargement, setForgotChargement] = useState(false);
+  const [forgotErreur, setForgotErreur] = useState('');
+  const handleForgotSubmit = async (e) => {
     e.preventDefault();
-    if (!forgotEmail) return;
-    setForgotSuccess(true);
+    const valeur = forgotEmail.trim();
+    if (!valeur) return;
+    setForgotChargement(true);
+    setForgotErreur('');
+    try {
+      await api.post('/auth/mot-de-passe-oublie', { identifiant: valeur });
+      setForgotSuccess(true);
+    } catch (err) {
+      setForgotErreur(err.response?.data?.message || "Impossible d'envoyer le code. Réessayez.");
+    } finally {
+      setForgotChargement(false);
+    }
   };
 
   const activeCardConfig = profileCards.find(c => c.key === selectedRoleKey) || profileCards[4];
@@ -580,7 +591,7 @@ export default function LoginPage() {
                 </div>
                 <div>
                   <h3 className="text-base font-extrabold text-[#f1f5f9]">Réinitialisation du mot de passe</h3>
-                  <p className="text-[11px] text-[#94a3b8]">Entrez votre adresse email de connexion.</p>
+                  <p className="text-[11px] text-[#94a3b8]">Entrez l'email ou le téléphone de votre compte.</p>
                 </div>
               </div>
               <button
@@ -598,36 +609,35 @@ export default function LoginPage() {
               <div className="p-4 bg-[#0f172a] border border-[#10b981] rounded-xl text-xs space-y-2 text-[#10b981]">
                 <div className="flex items-center gap-2 font-bold text-[#f1f5f9]">
                   <CheckCircle2 className="h-5 w-5 text-[#10b981]" />
-                  <span>Lien de réinitialisation envoyé !</span>
+                  <span>Demande envoyée</span>
                 </div>
                 <p className="text-[11px] leading-relaxed text-[#94a3b8]">
-                  Un email d'instructions a été transmis à l'adresse <strong className="text-[#f1f5f9]">{forgotEmail}</strong>. Veuillez vérifier votre boîte de réception.
+                  Si un compte correspond à <strong className="text-[#f1f5f9]">{forgotEmail}</strong>, un code de réinitialisation vient de lui être envoyé.
                 </p>
                 <button
-                  onClick={() => {
-                    setShowForgotModal(false);
-                    setForgotSuccess(false);
-                  }}
+                  onClick={() => navigate('/reinitialiser-mot-de-passe', { state: { identifiant: forgotEmail.trim() } })}
                   className="w-full mt-2 py-2 bg-[#0C447C] hover:bg-[#1a5a9e] text-[#f1f5f9] font-bold rounded-xl text-xs transition-colors cursor-pointer"
                 >
-                  Retour à la connexion
+                  Saisir le code et un nouveau mot de passe
                 </button>
               </div>
             ) : (
               <form onSubmit={handleForgotSubmit} className="space-y-4">
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-[#f1f5f9] block">
-                    Adresse email enregistrée
+                    Email ou téléphone du compte
                   </label>
                   <input
-                    type="email"
+                    type="text"
                     required
                     value={forgotEmail}
                     onChange={(e) => setForgotEmail(e.target.value)}
-                    placeholder="comptable@lakoli.edu"
+                    placeholder="nom@ecole.com ou +224 6.."
                     className="w-full px-3.5 py-2.5 bg-[#0f172a] border border-[#334155] rounded-xl text-xs font-medium focus:ring-2 focus:ring-[#0C447C] outline-none text-[#f1f5f9] placeholder:text-[#64748b]"
                   />
                 </div>
+
+                {forgotErreur && <p className="text-[11px] text-[#f59e0b] font-bold">{forgotErreur}</p>}
 
                 <div className="flex gap-2 pt-2">
                   <button
@@ -639,9 +649,10 @@ export default function LoginPage() {
                   </button>
                   <button
                     type="submit"
-                    className="w-1/2 py-2.5 bg-[#0C447C] hover:bg-[#1a5a9e] text-[#f1f5f9] font-bold rounded-xl text-xs transition-colors cursor-pointer"
+                    disabled={forgotChargement}
+                    className="w-1/2 py-2.5 bg-[#0C447C] hover:bg-[#1a5a9e] text-[#f1f5f9] font-bold rounded-xl text-xs transition-colors cursor-pointer disabled:opacity-60"
                   >
-                    Envoyer le lien
+                    {forgotChargement ? 'Envoi…' : 'Envoyer le code'}
                   </button>
                 </div>
               </form>
@@ -678,18 +689,18 @@ export default function LoginPage() {
 
             <div className="space-y-3 text-xs text-[#94a3b8]">
               <div className="p-3 bg-[#0f172a] rounded-xl border border-[#334155] space-y-1">
-                <p className="font-bold text-[#f1f5f9]">1. Authentification Stateless JWT</p>
-                <p className="text-[11px]">Tokens cryptographiques signés HMAC-SHA256 avec rotation des clés et déconnexion automatique en cas d'inactivité prolongée.</p>
+                <p className="font-bold text-[#f1f5f9]">1. Jetons d'accès sécurisés</p>
+                <p className="text-[11px]">Chaque session utilise un jeton d'accès personnel (Laravel Sanctum) ; les mots de passe sont stockés hachés, jamais en clair.</p>
               </div>
 
               <div className="p-3 bg-[#0f172a] rounded-xl border border-[#334155] space-y-1">
-                <p className="font-bold text-[#f1f5f9]">2. Chiffrement de bout en bout TLS 1.3</p>
-                <p className="text-[11px]">Toutes les transactions financières et notes des élèves sont acheminées via un tunnel chiffré HTTPS conforme aux standards internationaux.</p>
+                <p className="font-bold text-[#f1f5f9]">2. Vérification par code (OTP)</p>
+                <p className="text-[11px]">À la connexion depuis un nouvel appareil, un code à usage unique est demandé ; un appareil peut être marqué « de confiance » pendant 30 jours.</p>
               </div>
 
               <div className="p-3 bg-[#0f172a] rounded-xl border border-[#334155] space-y-1">
-                <p className="font-bold text-[#f1f5f9]">3. Contrôle d'accès basé sur les rôles (RBAC)</p>
-                <p className="text-[11px]">Cloisonnement strict : un enseignant n'a jamais accès aux soldes comptables, et le comptable ne peut modifier les appréciations pédagogiques.</p>
+                <p className="font-bold text-[#f1f5f9]">3. Profils et permissions (RBAC)</p>
+                <p className="text-[11px]">Le profil choisi est vérifié à la connexion, puis chaque écran et chaque action de l'API contrôle les permissions du rôle, établissement par établissement.</p>
               </div>
             </div>
 

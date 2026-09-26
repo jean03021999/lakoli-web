@@ -4,12 +4,13 @@ import { GraduationCap, ShieldCheck } from "lucide-react";
 import api from "../services/api";
 
 export default function VerificationOtp() {
-  const [code, setCode] = useState("");
-  const [confiance, setConfiance] = useState(true);
-  const [erreur, setErreur] = useState("");
-  const [chargement, setChargement] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
+  const [code, setCode] = useState("");
+  // Pre-coche selon "Se souvenir 30 jours" de l'ecran de connexion (coche par defaut sinon).
+  const [confiance, setConfiance] = useState(location.state?.confiance ?? true);
+  const [erreur, setErreur] = useState("");
+  const [chargement, setChargement] = useState(false);
   const identifiant = location.state?.identifiant;
 
   useEffect(() => {
