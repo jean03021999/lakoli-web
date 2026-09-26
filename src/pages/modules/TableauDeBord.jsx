@@ -26,6 +26,7 @@ import {
 import api from "../../services/api";
 import { imprimerDocument, genererRapportComptableHtml } from "../../utils/impression";
 import { regrouperVersements } from "../../utils/versements";
+import GraphiquesComptables from "../../components/graphiques/GraphiquesComptables";
 import { StatCard as StatCardSysteme, Card, Badge, Button, PageHeader } from "../../components/ui/LakoliDesignSystem";
 
 function formaterRole(role) {
@@ -739,6 +740,16 @@ function TableauDeBordComptable({ role }) {
           )}
         </div>
       )}
+
+      {/* Graphiques (donnees reelles : paiements, repartition des frais, stats par classe) */}
+      <GraphiquesComptables
+        paiements={tousPaiements}
+        paiementsDisponibles={paiementsDisponibles}
+        finances={finances}
+        financesDisponibles={financesDisponibles}
+        classes={statsParClasse}
+        classesDisponibles={statsClasseDisponibles}
+      />
 
       {/* Versements (3/5) et situation des inscriptions (2/5) */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-5 items-stretch">
