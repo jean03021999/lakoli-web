@@ -42,6 +42,23 @@ function Stepper({ etapeActive }) {
   );
 }
 
+// Type d'inscription detecte : colonne du fichier, ou eleve deja connu de LAKOLI (reinscription).
+function badgeInscription(ligne) {
+  if (ligne.statut !== "ok" || !ligne.type_inscription) return <span className="text-xs text-slate-300">—</span>;
+  const reinscription = ligne.type_inscription === "reinscription";
+  return (
+    <span
+      className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold whitespace-nowrap ${
+        reinscription ? "bg-indigo-50 text-indigo-700" : "bg-blue-50 text-blue-700"
+      }`}
+      title={ligne.eleve_existant_id ? "Ancien élève déjà enregistré dans LAKOLI" : undefined}
+    >
+      {reinscription ? "Réinscription" : "Inscription"}
+      {ligne.eleve_existant_id ? " ★" : ""}
+    </span>
+  );
+}
+
 function badgeStatut(statut) {
   if (statut === "ok") return <Badge variant="blue" icon={CheckCircle2}>Valide</Badge>;
   if (statut === "doublon") return <Badge variant="outline">Doublon</Badge>;
@@ -125,7 +142,7 @@ export default function ImporterExcel() {
     setImportEnCours(true);
     try {
       const response = await api.post("/eleves/import/executer", { lignes: lignesValides });
-      setTermine(response.data.importes);
+      setTermine(response.data);
     } catch (err) {
       setErreur(err.response?.data?.message || "Erreur lors de l'import.");
     } finally {
@@ -155,7 +172,21 @@ export default function ImporterExcel() {
             <CheckCircle2 className="h-8 w-8" />
           </div>
           <h2 className="text-xl font-bold text-slate-900 mb-1">Import terminé</h2>
-          <p className="text-base font-bold text-emerald-600 mb-1">{termine} élève(s) importé(s) avec succès</p>
+          <p className="text-base font-bold text-emerald-600 mb-1">
+            {termine.importes} nouvel(le)(s) élève(s) importé(s)
+            {termine.reinscrits > 0 && ` · ${termine.reinscrits} ancien(s) élève(s) réinscrit(s)`}
+          </p>
+          {termine.frais_enregistres > 0 && (
+            <p className="text-sm text-slate-500 mb-1">{termine.frais_enregistres} paiement(s) de frais d'inscription enregistré(s)</p>
+          )}
+          {termine.erreurs?.length > 0 && (
+            <div className="max-w-lg mx-auto mt-3 mb-2 text-left p-3 rounded-xl bg-rose-50 border border-rose-100">
+              <p className="text-xs font-bold text-rose-700 mb-1">{termine.erreurs.length} ligne(s) non importée(s) :</p>
+              <ul className="text-xs text-rose-600 space-y-0.5">
+                {termine.erreurs.map((e, i) => <li key={i}>{e.nom} — {e.message}</li>)}
+              </ul>
+            </div>
+          )}
           {resultat && (resultat.stats.doublons > 0 || resultat.stats.erreurs > 0) && (
             <p className="text-sm text-slate-400 mb-6">
               {resultat.stats.doublons > 0 && `${resultat.stats.doublons} doublon(s) ignoré(s)`}
@@ -190,7 +221,10 @@ export default function ImporterExcel() {
         <Card className="space-y-4">
           <div className="flex items-start justify-between gap-4">
             <p className="text-sm text-slate-500">
-              Colonnes reconnues automatiquement : Nom, Prénom, Matricule, Classe, Date de naissance, Lieu de naissance, filiation. La photo n'est pas importée depuis Excel.
+              Colonnes reconnues automatiquement : Nom, Prénom, Matricule, Classe, Date de naissance, Lieu de naissance, filiation,
+              <strong className="text-slate-700"> Type d'inscription</strong> (Inscription / Réinscription, ou N / R) et
+              <strong className="text-slate-700"> Frais d'inscription payés</strong> (montant déjà encaissé, facultatif).
+              Un élève déjà enregistré dans LAKOLI est réinscrit automatiquement. La photo n'est pas importée depuis Excel.
             </p>
             <Button variant="secondary" size="sm" icon={Download} onClick={telechargerModele} className="whitespace-nowrap">
               Modèle Excel
@@ -289,6 +323,27 @@ export default function ImporterExcel() {
             </button>
           </div>
 
+          {resultat.stats.valides > 0 && (
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <span className="px-3 py-1.5 rounded-full bg-blue-50 text-blue-700 font-bold">
+                {resultat.stats.inscriptions ?? 0} nouvelle(s) inscription(s)
+              </span>
+              <span className="px-3 py-1.5 rounded-full bg-indigo-50 text-indigo-700 font-bold">
+                {resultat.stats.reinscriptions ?? 0} réinscription(s)
+                {resultat.stats.anciens_lakoli > 0 && ` · dont ${resultat.stats.anciens_lakoli} ancien(s) élève(s) LAKOLI ★`}
+              </span>
+              <span className="px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-700 font-bold">
+                {resultat.stats.frais_payes ?? 0} frais d'inscription payé(s)
+                {resultat.stats.montant_frais_payes > 0 && ` · ${Number(resultat.stats.montant_frais_payes).toLocaleString("fr-FR")} GNF`}
+              </span>
+              {!resultat.colonnes_detectees.includes("type_inscription") && (
+                <span className="text-slate-400">
+                  Colonne « Type d'inscription » absente : les nouveaux élèves sont enregistrés comme inscriptions.
+                </span>
+              )}
+            </div>
+          )}
+
           <Card className="p-0 overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
@@ -298,6 +353,8 @@ export default function ImporterExcel() {
                     <th className="py-3 px-5">Nom</th>
                     <th className="py-3 px-5">Prénom</th>
                     <th className="py-3 px-5">Classe</th>
+                    <th className="py-3 px-5">Type</th>
+                    <th className="py-3 px-5 text-right">Frais payés</th>
                     <th className="py-3 px-5">Détail</th>
                   </tr>
                 </thead>
@@ -308,11 +365,15 @@ export default function ImporterExcel() {
                       <td className="py-3 px-5 text-slate-800">{ligne.nom}</td>
                       <td className="py-3 px-5 text-slate-800">{ligne.prenom}</td>
                       <td className="py-3 px-5 text-slate-800">{ligne.classe_nom}</td>
+                      <td className="py-3 px-5">{badgeInscription(ligne)}</td>
+                      <td className="py-3 px-5 text-right text-slate-700 tabular-nums whitespace-nowrap">
+                        {ligne.frais_inscription ? `${Number(ligne.frais_inscription).toLocaleString("fr-FR")} GNF` : "—"}
+                      </td>
                       <td className="py-3 px-5 text-xs text-slate-400">{ligne.message}</td>
                     </tr>
                   ))}
                   {lignesPage.length === 0 && (
-                    <tr><td colSpan="5" className="py-8 text-center text-sm text-slate-400">Aucune ligne dans cette catégorie.</td></tr>
+                    <tr><td colSpan="7" className="py-8 text-center text-sm text-slate-400">Aucune ligne dans cette catégorie.</td></tr>
                   )}
                 </tbody>
               </table>
