@@ -221,6 +221,21 @@ const STYLES = `
   table.tableau-premium td.num { width: 36px; text-align: center; color: #64748b; }
   table.tableau-premium td.mono { font-family: "Courier New", monospace; font-size: 12px; }
 
+  /* Rapport comptable : titres de section, tuiles d'indicateurs, tableaux compacts. */
+  .doc-releve.rapport h2.section {
+    margin: 22px 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: #0C447C;
+    border-bottom: 2px solid #0C447C; padding-bottom: 4px; break-after: avoid;
+  }
+  .doc-releve.rapport .tuiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .doc-releve.rapport .tuile { border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 12px; background: #f8fafc; break-inside: avoid; }
+  .doc-releve.rapport .tuile .lib { font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: #64748b; }
+  .doc-releve.rapport .tuile .val { margin-top: 4px; font-size: 17px; font-weight: bold; color: #0C447C; }
+  .doc-releve.rapport table.tableau-premium.compact th, .doc-releve.rapport table.tableau-premium.compact td { padding: 6px 8px; font-size: 11.5px; }
+  .doc-releve.rapport .indisponible { padding: 10px 12px; border: 1px dashed #f59e0b; border-radius: 8px; background: #fffbeb; color: #b45309; font-size: 12px; }
+  .doc-releve.rapport .vide { color: #64748b; font-style: italic; font-size: 12px; }
+  .doc-releve.rapport .note { margin: 6px 0 0; color: #64748b; font-size: 11px; }
+  .doc-releve.rapport .gris { color: #64748b; font-size: 11px; }
+
   .doc-releve .pied-premium {
     margin-top: 24px; padding-top: 12px; border-top: 1px solid #e2e8f0;
     text-align: center; font-size: 11px; color: #475569;
@@ -763,6 +778,216 @@ export function genererListeElevesHtml({ etablissement, session, classes, filtre
   </div>`;
     })
     .join("");
+}
+
+// ---------------------------------------------------------------------------
+// Rapport comptable — synthese imprimable (ou enregistrable en PDF) du tableau de bord comptable,
+// avec les donnees reelles. Une section dont la source n'a pas pu etre chargee est signalee
+// « indisponible » plutot que remplie de zeros. A passer a imprimerDocument().
+//   indicateurs : { totalEleves, paiementsAujourdhui, enRetard, totalEncaisse } (null = indisponible)
+//   finances    : { inscriptions, reinscriptions, scolarite, autres } | null
+//   classes     : [{ classe, niveau, nombre_eleves, montant_total, montant_encaisse, nombre_soldes, nombre_en_retard }] | null
+//   inscriptions: { nouveaux, reinscrits, aReinscrire, total } | null
+//   elevesEnRetard : [{ nom, prenom, matricule, classe }] | null
+//   paiements   : [{ date_paiement, heure, eleve: { nom_complet, classe }, type_frais, libelle, montant, moyen_paiement }] | null
+// ---------------------------------------------------------------------------
+const NB_DERNIERS_ENCAISSEMENTS = 20;
+
+export function genererRapportComptableHtml({
+  etablissement, session, dateDonnees, indicateurs, finances, classes, inscriptions, elevesEnRetard, paiements,
+}) {
+  const tiret = "—";
+  const indisponible = (quoi) => `<p class="indisponible">Données ${quoi} indisponibles au moment de l'édition.</p>`;
+  const nombre = (v) => (v === null || v === undefined ? tiret : echapperHtml(String(v)));
+  // Une decimale sous 10 % : un taux reel de 0,4 % ne doit pas s'afficher "0 %".
+  const pct = (part, tout) => {
+    if (!(tout > 0)) return tiret;
+    const v = (part / tout) * 100;
+    return `${v > 0 && v < 10 ? v.toFixed(1).replace(".", ",") : Math.round(v)} %`;
+  };
+
+  const totalDu = classes ? classes.reduce((s, c) => s + Number(c.montant_total || 0), 0) : null;
+  const totalEncaisseClasses = classes ? classes.reduce((s, c) => s + Number(c.montant_encaisse || 0), 0) : null;
+
+  const tuiles = [
+    ["Élèves inscrits", nombre(indicateurs.totalEleves)],
+    ["Paiements aujourd'hui", nombre(indicateurs.paiementsAujourdhui)],
+    ["Élèves en retard", nombre(indicateurs.enRetard)],
+    ["Total encaissé", indicateurs.totalEncaisse === null ? tiret : `${formaterMontant(indicateurs.totalEncaisse)} GNF`],
+    ["Scolarité due", totalDu === null ? tiret : `${formaterMontant(totalDu)} GNF`],
+    ["Taux de recouvrement", totalDu === null ? tiret : pct(totalEncaisseClasses, totalDu)],
+  ]
+    .map(([libelle, valeur]) => `<div class="tuile"><div class="lib">${libelle}</div><div class="val">${valeur}</div></div>`)
+    .join("");
+
+  // Repartition des encaissements par type de frais
+  let sectionFinances = indisponible("des encaissements");
+  if (finances) {
+    const totalFin = finances.inscriptions + finances.reinscriptions + finances.scolarite + finances.autres;
+    const lignesFin = [
+      ["Inscriptions", finances.inscriptions],
+      ["Réinscriptions", finances.reinscriptions],
+      ["Scolarité", finances.scolarite],
+      ["Autres frais", finances.autres],
+    ]
+      .map(([lib, m]) => `<tr><td>${lib}</td><td class="droite">${formaterMontant(m)}</td><td class="droite">${pct(m, totalFin)}</td></tr>`)
+      .join("");
+    sectionFinances = `<table class="tableau-premium">
+      <thead><tr><th>Type de frais</th><th class="droite">Encaissé (GNF)</th><th class="droite">Part</th></tr></thead>
+      <tbody>${lignesFin}
+        <tr class="total"><td>TOTAL</td><td class="droite">${formaterMontant(totalFin)}</td><td class="droite">${totalFin > 0 ? "100 %" : tiret}</td></tr>
+      </tbody>
+    </table>`;
+  }
+
+  // Scolarite par classe
+  let sectionClasses = indisponible("de scolarité par classe");
+  if (classes) {
+    const lignesClasses = classes
+      .map((c) => {
+        const du = Number(c.montant_total || 0);
+        const enc = Number(c.montant_encaisse || 0);
+        return `<tr>
+          <td><strong>${echapperHtml(c.classe)}</strong></td>
+          <td class="droite">${nombre(c.nombre_eleves)}</td>
+          <td class="droite">${formaterMontant(du)}</td>
+          <td class="droite">${formaterMontant(enc)}</td>
+          <td class="droite">${pct(enc, du)}</td>
+          <td class="droite">${formaterMontant(Math.max(0, du - enc))}</td>
+          <td class="droite">${nombre(c.nombre_soldes)}</td>
+          <td class="droite">${c.nombre_en_retard > 0 ? `<span class="badge-statut badge-retard">${c.nombre_en_retard}</span>` : "0"}</td>
+        </tr>`;
+      })
+      .join("");
+    const totEleves = classes.reduce((s, c) => s + Number(c.nombre_eleves || 0), 0);
+    const totSoldes = classes.reduce((s, c) => s + Number(c.nombre_soldes || 0), 0);
+    const totRetard = classes.reduce((s, c) => s + Number(c.nombre_en_retard || 0), 0);
+    sectionClasses = `<table class="tableau-premium compact">
+      <thead><tr>
+        <th>Classe</th><th class="droite">Élèves</th><th class="droite">Dû (GNF)</th><th class="droite">Encaissé (GNF)</th>
+        <th class="droite">Taux</th><th class="droite">Reste (GNF)</th><th class="droite">Soldés</th><th class="droite">Retard</th>
+      </tr></thead>
+      <tbody>${lignesClasses}
+        <tr class="total">
+          <td>TOTAL</td><td class="droite">${totEleves}</td><td class="droite">${formaterMontant(totalDu)}</td>
+          <td class="droite">${formaterMontant(totalEncaisseClasses)}</td><td class="droite">${pct(totalEncaisseClasses, totalDu)}</td>
+          <td class="droite">${formaterMontant(Math.max(0, totalDu - totalEncaisseClasses))}</td>
+          <td class="droite">${totSoldes}</td><td class="droite">${totRetard}</td>
+        </tr>
+      </tbody>
+    </table>`;
+  }
+
+  // Situation des inscriptions
+  let sectionInscriptions = indisponible("d'inscription");
+  if (inscriptions) {
+    const { nouveaux, reinscrits, aReinscrire, total } = inscriptions;
+    sectionInscriptions = `<table class="tableau-premium">
+      <thead><tr><th>Situation</th><th class="droite">Élèves</th><th class="droite">Part</th></tr></thead>
+      <tbody>
+        <tr><td>Nouveaux inscrits</td><td class="droite">${nouveaux}</td><td class="droite">${pct(nouveaux, total)}</td></tr>
+        <tr><td>Réinscrits</td><td class="droite">${reinscrits}</td><td class="droite">${pct(reinscrits, total)}</td></tr>
+        <tr><td>À réinscrire</td><td class="droite">${aReinscrire}</td><td class="droite">${pct(aReinscrire, total)}</td></tr>
+        <tr class="total"><td>TOTAL</td><td class="droite">${total}</td><td class="droite">${total > 0 ? "100 %" : tiret}</td></tr>
+      </tbody>
+    </table>`;
+  }
+
+  // Eleves en retard de paiement
+  let sectionRetards = indisponible("des élèves en retard");
+  if (elevesEnRetard) {
+    const collator = new Intl.Collator("fr", { sensitivity: "base" });
+    const tries = [...elevesEnRetard].sort(
+      (a, b) => collator.compare(a.classe || "", b.classe || "") || collator.compare(a.nom || "", b.nom || "")
+    );
+    sectionRetards = tries.length === 0
+      ? `<p class="vide">Aucun élève en retard de paiement.</p>`
+      : `<table class="tableau-premium compact">
+          <thead><tr><th>N°</th><th>Matricule</th><th>Nom et prénom(s)</th><th>Classe</th></tr></thead>
+          <tbody>${tries
+            .map((e, i) => `<tr>
+              <td class="num">${i + 1}</td>
+              <td class="mono">${echapperHtml(e.matricule || tiret)}</td>
+              <td><strong>${echapperHtml((e.nom || "").toUpperCase())}</strong> ${echapperHtml(e.prenom || "")}</td>
+              <td>${echapperHtml(e.classe || tiret)}</td>
+            </tr>`)
+            .join("")}</tbody>
+        </table>`;
+  }
+
+  // Derniers encaissements
+  let sectionPaiements = indisponible("des paiements");
+  if (paiements) {
+    const derniers = paiements.slice(0, NB_DERNIERS_ENCAISSEMENTS);
+    sectionPaiements = derniers.length === 0
+      ? `<p class="vide">Aucun paiement enregistré.</p>`
+      : `<table class="tableau-premium compact">
+          <thead><tr><th>Date</th><th>Élève</th><th>Classe</th><th>Objet</th><th>Moyen</th><th class="droite">Montant (GNF)</th></tr></thead>
+          <tbody>${derniers
+            .map((p) => `<tr>
+              <td>${p.date_paiement ? formaterDate(p.date_paiement) : tiret}${p.heure ? ` <span class="gris">${echapperHtml(p.heure)}</span>` : ""}</td>
+              <td>${echapperHtml(p.eleve?.nom_complet || tiret)}</td>
+              <td>${echapperHtml(p.eleve?.classe || tiret)}</td>
+              <td>${echapperHtml([p.type_frais, p.libelle].filter(Boolean).join(" · ") || tiret)}</td>
+              <td>${echapperHtml(MOYENS_PAIEMENT[p.moyen_paiement] || p.moyen_paiement || tiret)}</td>
+              <td class="droite"><strong>${formaterMontant(p.montant)}</strong></td>
+            </tr>`)
+            .join("")}</tbody>
+        </table>
+        ${paiements.length > derniers.length ? `<p class="note">${derniers.length} derniers sur ${paiements.length} paiements enregistrés.</p>` : ""}`;
+  }
+
+  const dateTexte = dateDonnees
+    ? `${dateDonnees.toLocaleDateString("fr-FR")} à ${dateDonnees.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}`
+    : tiret;
+
+  return `
+  <div class="doc-releve rapport">
+    <div class="entete-premium">
+      <div class="logo">
+        ${LOGO_SVG_BLANC}
+        <div>
+          <div class="nom">LAKOLI</div>
+          ${etablissement ? `<span class="badge-etablissement">${echapperHtml(etablissement)}</span>` : ""}
+        </div>
+      </div>
+      <div class="titre">
+        <h1>RAPPORT COMPTABLE</h1>
+        ${session ? `<div class="session">Année scolaire ${echapperHtml(session)}</div>` : ""}
+        <div class="session">Données du ${echapperHtml(dateTexte)}</div>
+      </div>
+    </div>
+
+    <h2 class="section">Indicateurs clés</h2>
+    <div class="tuiles">${tuiles}</div>
+
+    <h2 class="section">Répartition des encaissements</h2>
+    ${sectionFinances}
+
+    <h2 class="section">Scolarité par classe</h2>
+    ${sectionClasses}
+
+    <h2 class="section">Situation des inscriptions</h2>
+    ${sectionInscriptions}
+
+    <h2 class="section">Élèves en retard de paiement${elevesEnRetard ? ` (${elevesEnRetard.length})` : ""}</h2>
+    ${sectionRetards}
+
+    <h2 class="section">Derniers encaissements</h2>
+    ${sectionPaiements}
+
+    <div class="signature-zone">
+      <div class="cadre">
+        <div class="ligne"></div>
+        <div class="libelle">Signature et cachet du comptable</div>
+      </div>
+    </div>
+
+    <div class="pied-premium">
+      Document officiel LAKOLI · Rapport établi à partir des données enregistrées dans l'application<br>
+      Imprimé le ${echapperHtml(dateImpression())}
+    </div>
+  </div>`;
 }
 
 // ---------------------------------------------------------------------------

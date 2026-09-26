@@ -23,6 +23,7 @@ import {
   ArrowRight,
 } from "lucide-react";
 import api from "../../services/api";
+import { imprimerDocument, genererRapportComptableHtml } from "../../utils/impression";
 import { StatCard as StatCardSysteme, Card, Badge, Button, PageHeader } from "../../components/ui/LakoliDesignSystem";
 
 function formaterRole(role) {
@@ -65,21 +66,6 @@ function couleurAvatar(nom) {
 
 function initialesNomComplet(nomComplet) {
   return (nomComplet || "?").trim().split(/\s+/).slice(0, 2).map((s) => s[0]).join("").toUpperCase();
-}
-
-// Telecharge un CSV (separateur ";" et BOM UTF-8 : s'ouvre correctement dans Excel en francais).
-function telechargerCsv(nomFichier, lignes) {
-  const echapper = (v) => {
-    const t = String(v ?? "");
-    return /[";\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t;
-  };
-  const contenu = "﻿" + lignes.map((l) => l.map(echapper).join(";")).join("\r\n");
-  const url = URL.createObjectURL(new Blob([contenu], { type: "text/csv;charset=utf-8" }));
-  const lien = document.createElement("a");
-  lien.href = url;
-  lien.download = nomFichier;
-  lien.click();
-  URL.revokeObjectURL(url);
 }
 
 function getInitialesEleve(nom, prenom) {
@@ -317,6 +303,9 @@ function TableauDeBordComptable({ role }) {
   const [dateMaj, setDateMaj] = useState(null);
   const [rafraichissement, setRafraichissement] = useState(0);
   const [enChargement, setEnChargement] = useState(true);
+  const [etablissement, setEtablissement] = useState("");
+  const [elevesSession, setElevesSession] = useState("");
+  const [erreurRapport, setErreurRapport] = useState("");
   const [rechercheRetard, setRechercheRetard] = useState("");
   const [suggestionsRetardOuvertes, setSuggestionsRetardOuvertes] = useState(false);
   const [statsParClasse, setStatsParClasse] = useState([]);
@@ -346,6 +335,11 @@ function TableauDeBordComptable({ role }) {
       }
 
       if (eleves.status === "fulfilled") {
+        setEtablissement(eleves.value.data.etablissement || "");
+        setElevesSession(
+          eleves.value.data.eleves.find((e) => e.inscription_active?.session_scolaire?.libelle)
+            ?.inscription_active.session_scolaire.libelle || ""
+        );
         setStats({
           totalEleves: eleves.value.data.stats.total,
           enRetard: eleves.value.data.stats.en_retard,
@@ -362,8 +356,9 @@ function TableauDeBordComptable({ role }) {
         setTousPaiements(liste);
         setPaiementsDisponibles(true);
       } else {
-        setTousPaiements(PAIEMENTS_EXEMPLE);
-        setPaiementsDisponibles(true);
+        setTousPaiements([]);
+        setTotalEncaisse(null);
+        setPaiementsDisponibles(false);
       }
 
       if (parClasse.status === "fulfilled") {
@@ -453,23 +448,29 @@ function TableauDeBordComptable({ role }) {
   const totalFinances = finances.inscriptions + finances.reinscriptions + finances.scolarite + finances.autres;
   const pctFinance = (valeur) => (totalFinances > 0 ? Math.round((valeur / totalFinances) * 100) : 0);
 
+  // Rapport imprimable (ou PDF via "Enregistrer au format PDF") avec les donnees reelles chargees ;
+  // une source en echec apparait "indisponible" dans le rapport, jamais remplacee par des exemples.
   const exporterRapport = () => {
-    telechargerCsv(`rapport-comptable-${new Date().toISOString().slice(0, 10)}.csv`, [
-      ["Rapport comptable LAKOLI", dateMaj ? `${dateMaj.toLocaleDateString("fr-FR")} ${dateMaj.toLocaleTimeString("fr-FR")}` : ""],
-      [],
-      ["Indicateur", "Valeur"],
-      ["Élèves inscrits", totalEleves],
-      ["Paiements aujourd'hui", paiementsAujourdHui],
-      ["Élèves en retard", enRetard],
-      ["Total encaissé (GNF)", totalEncaisse ?? 0],
-      ["Inscriptions (GNF)", finances.inscriptions],
-      ["Réinscriptions (GNF)", finances.reinscriptions],
-      ["Scolarité (GNF)", finances.scolarite],
-      ["Autres frais (GNF)", finances.autres],
-      [],
-      ["Classe", "Élèves", "Montant total (GNF)", "Encaissé (GNF)", "Soldés", "En retard"],
-      ...statsParClasse.map((c) => [c.classe, c.nombre_eleves, c.montant_total, c.montant_encaisse, c.nombre_soldes, c.nombre_en_retard]),
-    ]);
+    setErreurRapport("");
+    const html = genererRapportComptableHtml({
+      etablissement,
+      session: elevesSession,
+      dateDonnees: dateMaj,
+      indicateurs: {
+        totalEleves: typeof stats.totalEleves === "number" ? stats.totalEleves : null,
+        paiementsAujourdhui: paiementsDisponibles ? paiementsAujourdHui : null,
+        enRetard: typeof stats.enRetard === "number" ? stats.enRetard : null,
+        totalEncaisse: paiementsDisponibles ? totalEncaisse : null,
+      },
+      finances: financesDisponibles ? finances : null,
+      classes: statsClasseDisponibles ? statsParClasse : null,
+      inscriptions: inscriptionsDisponibles ? situationInscriptions : null,
+      elevesEnRetard: typeof stats.enRetard === "number" ? elevesEnRetard : null,
+      paiements: paiementsDisponibles ? tousPaiements : null,
+    });
+    if (!imprimerDocument(`Rapport comptable - ${new Date().toLocaleDateString("fr-FR")}`, html)) {
+      setErreurRapport("Le navigateur a bloqué la fenêtre du rapport. Autorisez les pop-ups pour ce site.");
+    }
   };
 
   return (
@@ -531,7 +532,7 @@ function TableauDeBordComptable({ role }) {
                 className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-white/40 text-sm font-semibold text-white hover:bg-white/10 transition-colors cursor-pointer disabled:opacity-60"
               >
                 <FileDown className="h-4 w-4" />
-                Exporter le rapport
+                Imprimer le rapport
               </button>
               <button
                 onClick={() => navigate("/frais-scolarite")}
@@ -544,6 +545,10 @@ function TableauDeBordComptable({ role }) {
           </div>
         </div>
       </div>
+
+      {erreurRapport && (
+        <div className="px-4 py-3 rounded-xl bg-rose-50 border border-rose-200 text-sm text-rose-700">{erreurRapport}</div>
+      )}
 
       {/* 6 cartes statistiques */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
@@ -656,9 +661,25 @@ function TableauDeBordComptable({ role }) {
                             </span>
                           )}
                           <span className="text-[11px] text-slate-400 truncate">
-                            {[p.type_frais, p.periode].filter(Boolean).join(" · ") || "Paiement"}
+                            {p.details?.length > 1
+                              ? p.type_frais || "Paiement"
+                              : [p.type_frais, p.periode].filter(Boolean).join(" · ") || "Paiement"}
                           </span>
                         </div>
+                        {/* Versement regroupant plusieurs frais (ex. inscription + scolarité) : détail par frais */}
+                        {p.details?.length > 1 && (
+                          <div className="flex flex-wrap gap-1 mt-1.5">
+                            {p.details.map((d) => (
+                              <span
+                                key={d.id}
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 text-[10px] font-semibold whitespace-nowrap"
+                              >
+                                {d.libelle || d.type_frais}
+                                <span className="text-blue-500 font-bold tabular-nums">{formaterNombre(d.montant)}</span>
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </div>
                     <div className="text-right shrink-0">
