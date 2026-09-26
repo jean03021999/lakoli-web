@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import api from "../../services/api";
 import { imprimerDocument, genererRapportComptableHtml } from "../../utils/impression";
+import { regrouperVersements } from "../../utils/versements";
 import { StatCard as StatCardSysteme, Card, Badge, Button, PageHeader } from "../../components/ui/LakoliDesignSystem";
 
 function formaterRole(role) {
@@ -414,8 +415,10 @@ function TableauDeBordComptable({ role }) {
 
   // Paiements réellement encaissés aujourd'hui
   const aujourdHui = new Date().toISOString().slice(0, 10);
-  const paiementsAujourdHui = tousPaiements.filter(
-    (p) => (p.date_paiement || "").slice(0, 10) === aujourdHui
+  // Versements (passages en caisse) : inscription + scolarite payees ensemble comptent pour un.
+  const versements = regrouperVersements(tousPaiements);
+  const paiementsAujourdHui = versements.filter(
+    (v) => (v.date_paiement || "").slice(0, 10) === aujourdHui
   ).length;
 
   // Taux d'encaissement réel = montant encaissé / montant total dû sur l'ensemble des classes
@@ -466,7 +469,7 @@ function TableauDeBordComptable({ role }) {
       classes: statsClasseDisponibles ? statsParClasse : null,
       inscriptions: inscriptionsDisponibles ? situationInscriptions : null,
       elevesEnRetard: typeof stats.enRetard === "number" ? elevesEnRetard : null,
-      paiements: paiementsDisponibles ? tousPaiements : null,
+      paiements: paiementsDisponibles ? versements : null,
     });
     if (!imprimerDocument(`Rapport comptable - ${new Date().toLocaleDateString("fr-FR")}`, html)) {
       setErreurRapport("Le navigateur a bloqué la fenêtre du rapport. Autorisez les pop-ups pour ce site.");
@@ -565,8 +568,8 @@ function TableauDeBordComptable({ role }) {
           valeur={paiementsDisponibles ? paiementsAujourdHui : "—"}
           icone={CheckCircle2}
           gradient="linear-gradient(135deg, #059669, #10b981)"
-          tendance={{ sens: "hausse", texte: `${tousPaiements.length} au total` }}
-          progression={tousPaiements.length > 0 ? Math.round((paiementsAujourdHui / tousPaiements.length) * 100) : 0}
+          tendance={{ sens: "hausse", texte: `${versements.length} au total` }}
+          progression={versements.length > 0 ? Math.round((paiementsAujourdHui / versements.length) * 100) : 0}
         />
         <StatCard
           label="Paiements en retard"
@@ -705,7 +708,7 @@ function TableauDeBordComptable({ role }) {
             <span>Tous les reçus sont générés avec référence fiscale interne</span>
             <span className="font-semibold text-slate-500 whitespace-nowrap">
               {versementsRecents.length} affiché{versementsRecents.length > 1 ? "s" : ""}
-              {!versementsDemo && tousPaiements.length > 0 ? ` sur ${tousPaiements.length}` : ""}
+              {!versementsDemo && versements.length > 0 ? ` sur ${versements.length}` : ""}
             </span>
           </div>
         </div>

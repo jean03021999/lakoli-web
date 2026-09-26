@@ -789,7 +789,7 @@ export function genererListeElevesHtml({ etablissement, session, classes, filtre
 //   classes     : [{ classe, niveau, nombre_eleves, montant_total, montant_encaisse, nombre_soldes, nombre_en_retard }] | null
 //   inscriptions: { nouveaux, reinscrits, aReinscrire, total } | null
 //   elevesEnRetard : [{ nom, prenom, matricule, classe }] | null
-//   paiements   : [{ date_paiement, heure, eleve: { nom_complet, classe }, type_frais, libelle, montant, moyen_paiement }] | null
+//   paiements   : versements (utils/versements.js) [{ date_paiement, heure, eleve: { nom_complet, classe }, objet, montant, moyen_paiement }] | null
 // ---------------------------------------------------------------------------
 const NB_DERNIERS_ENCAISSEMENTS = 20;
 
@@ -920,7 +920,7 @@ export function genererRapportComptableHtml({
   if (paiements) {
     const derniers = paiements.slice(0, NB_DERNIERS_ENCAISSEMENTS);
     sectionPaiements = derniers.length === 0
-      ? `<p class="vide">Aucun paiement enregistré.</p>`
+      ? `<p class="vide">Aucun versement enregistré.</p>`
       : `<table class="tableau-premium compact">
           <thead><tr><th>Date</th><th>Élève</th><th>Classe</th><th>Objet</th><th>Moyen</th><th class="droite">Montant (GNF)</th></tr></thead>
           <tbody>${derniers
@@ -928,13 +928,13 @@ export function genererRapportComptableHtml({
               <td>${p.date_paiement ? formaterDate(p.date_paiement) : tiret}${p.heure ? ` <span class="gris">${echapperHtml(p.heure)}</span>` : ""}</td>
               <td>${echapperHtml(p.eleve?.nom_complet || tiret)}</td>
               <td>${echapperHtml(p.eleve?.classe || tiret)}</td>
-              <td>${echapperHtml([p.type_frais, p.libelle].filter(Boolean).join(" · ") || tiret)}</td>
+              <td>${echapperHtml(p.objet || [p.type_frais, p.libelle].filter(Boolean).join(" · ") || tiret)}</td>
               <td>${echapperHtml(MOYENS_PAIEMENT[p.moyen_paiement] || p.moyen_paiement || tiret)}</td>
               <td class="droite"><strong>${formaterMontant(p.montant)}</strong></td>
             </tr>`)
             .join("")}</tbody>
         </table>
-        ${paiements.length > derniers.length ? `<p class="note">${derniers.length} derniers sur ${paiements.length} paiements enregistrés.</p>` : ""}`;
+        ${paiements.length > derniers.length ? `<p class="note">${derniers.length} derniers sur ${paiements.length} versements enregistrés.</p>` : ""}`;
   }
 
   const dateTexte = dateDonnees
