@@ -11,10 +11,6 @@ import {
   FileSpreadsheet,
   Wallet,
   LayoutDashboard,
-  Briefcase,
-  Building2,
-  Crown,
-  ShieldCheck,
   ClipboardCheck,
   Settings,
   LogOut,
@@ -73,14 +69,6 @@ function moduleVisible(module, permissions, role) {
   return module.permission === null || permissions.includes(module.permission);
 }
 
-const ICONES_ROLES = {
-  COMPTABLE: Briefcase,
-  DIRECTEUR: Building2,
-  FONDATEUR: Crown,
-  PROVISEUR: ShieldCheck,
-  CENSEUR: ClipboardCheck,
-};
-
 const LABELS_ROLES = {
   COMPTABLE: "Comptable",
   DIRECTEUR: "Directeur",
@@ -99,6 +87,98 @@ function initiales(nom) {
     .slice(0, 2)
     .map((p) => p[0]?.toUpperCase() || "")
     .join("");
+}
+
+// Contenu de la barre laterale (design Google AI Studio), commun au bureau et au tiroir mobile :
+// logo + drapeau guineen, etablissement/session reels, modules visibles selon les permissions,
+// carte utilisateur et deconnexion.
+function ContenuSidebar({ modules, estActif, onNaviguer, etablissement, session, nomUtilisateur, libelleRole, enLigne, onDeconnexion }) {
+  return (
+    <div className="h-full flex flex-col">
+      {/* Logo LAKOLI + mini drapeau guineen */}
+      <div className="flex items-center gap-3 px-4 pt-5 pb-4 shrink-0">
+        <span className="h-10 w-10 rounded-xl bg-white/15 flex items-center justify-center shrink-0">
+          <GraduationCap className="h-5 w-5 text-white" />
+        </span>
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="text-lg font-extrabold tracking-[2px] text-white leading-none">LAKOLI</span>
+            <span className="flex h-3 w-[18px] rounded-[2px] overflow-hidden ring-1 ring-white/30 shrink-0" title="Guinée">
+              <span className="flex-1" style={{ backgroundColor: "#CE1126" }} />
+              <span className="flex-1" style={{ backgroundColor: "#FCD116" }} />
+              <span className="flex-1" style={{ backgroundColor: "#009460" }} />
+            </span>
+          </div>
+          <p className="text-[10px] text-white/60 mt-1">Gestion scolaire · Guinée</p>
+        </div>
+      </div>
+
+      {/* Etablissement et session active */}
+      {(etablissement?.nom || session) && (
+        <div className="mx-3 mb-3 px-3 py-2.5 rounded-xl bg-white/10 border border-white/10 shrink-0">
+          {etablissement?.nom && (
+            <p className="flex items-center gap-1.5 text-xs font-semibold text-white truncate">
+              <Building className="h-3.5 w-3.5 text-white/70 shrink-0" />
+              <span className="truncate">{etablissement.nom}</span>
+            </p>
+          )}
+          {(etablissement?.ville || session) && (
+            <p className="mt-1 text-[11px] text-white/60 truncate">
+              {[etablissement?.ville, session && `Session ${session}`].filter(Boolean).join(" · ")}
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Navigation */}
+      <nav className="flex-1 overflow-y-auto px-3 space-y-1">
+        {modules.map((m) => {
+          const actif = estActif(m.chemin);
+          return (
+            <button
+              key={m.chemin}
+              onClick={() => onNaviguer(m.chemin)}
+              className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold transition-colors cursor-pointer ${
+                actif ? "bg-white text-[#0C447C] shadow-sm" : "text-white/80 hover:text-white hover:bg-white/10"
+              }`}
+            >
+              <m.icone className="h-4 w-4 shrink-0" />
+              <span className="truncate">{m.nom}</span>
+            </button>
+          );
+        })}
+      </nav>
+
+      {/* Carte utilisateur + deconnexion */}
+      <div className="p-3 border-t border-white/10 space-y-2 shrink-0">
+        <div className="flex items-center gap-3 px-2 py-2 rounded-xl bg-white/10">
+          <span className="relative shrink-0">
+            <span
+              className="h-9 w-9 rounded-full flex items-center justify-center text-white text-xs font-bold"
+              style={{ background: "linear-gradient(135deg, #f59e0b 0%, #f97316 100%)" }}
+            >
+              {initiales(nomUtilisateur)}
+            </span>
+            <span
+              className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full ring-2 ring-[#0b3a6b] ${enLigne ? "bg-emerald-400" : "bg-slate-400"}`}
+              title={enLigne ? "En ligne" : "Hors ligne"}
+            />
+          </span>
+          <div className="min-w-0">
+            <p className="text-xs font-semibold text-white truncate">{nomUtilisateur}</p>
+            <p className="text-[11px] text-white/60 truncate">{libelleRole}</p>
+          </div>
+        </div>
+        <button
+          onClick={onDeconnexion}
+          className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold text-white/80 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+        >
+          <LogOut className="h-4 w-4" />
+          Déconnexion
+        </button>
+      </div>
+    </div>
+  );
 }
 
 export default function Layout({ children, role, permissions = [], etablissement = null, session = null }) {
@@ -208,7 +288,7 @@ export default function Layout({ children, role, permissions = [], etablissement
             {/* Logo LAKOLI (retour au tableau de bord) */}
             <button
               onClick={() => navigate("/tableau-de-bord")}
-              className="flex items-center gap-2.5 cursor-pointer select-none shrink-0"
+              className="md:hidden flex items-center gap-2.5 cursor-pointer select-none shrink-0"
               title="Tableau de bord"
             >
               <span
@@ -353,35 +433,20 @@ export default function Layout({ children, role, permissions = [], etablissement
       <div className="flex flex-1 min-h-0 w-full max-w-7xl mx-auto">
         {/* Sidebar (fixe, ne défile pas) */}
         <aside
-          className="w-52 shrink-0 hidden md:block h-full overflow-y-auto"
-          style={{ background: "linear-gradient(to bottom, #0C447C, #0a2d5a)" }}
+          className="w-60 shrink-0 hidden md:block h-full"
+          style={{ background: "linear-gradient(180deg, #0C447C 0%, #0a2d5a 100%)" }}
         >
-          <div className="p-3 space-y-1">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '9px', padding: '10px 12px 16px' }}>
-              <div style={{ width: '4px', height: '20px', background: 'linear-gradient(180deg, #60a5fa, #2980d9)', borderRadius: '2px', flexShrink: 0 }} />
-              <span style={{ fontSize: '13.5px', fontWeight: '800', letterSpacing: '1.2px', textTransform: 'uppercase', lineHeight: '1' }}>
-                <span style={{ color: 'rgba(255,255,255,0.85)' }}>Menu </span>
-                <span style={{ color: '#60a5fa' }}>LAKOLI</span>
-              </span>
-            </div>
-            {modulesVisibles.map((m) => {
-              const active = estActif(m.chemin);
-              return (
-                <button
-                  key={m.chemin}
-                  onClick={() => navigate(m.chemin)}
-                  className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                    active
-                      ? "bg-white/15 text-white shadow-sm"
-                      : "text-white/75 hover:text-white hover:bg-white/10"
-                  }`}
-                >
-                  <m.icone className={`h-4 w-4 ${active ? "text-white" : "text-white/75"}`} />
-                  <span>{m.nom}</span>
-                </button>
-              );
-            })}
-          </div>
+          <ContenuSidebar
+            modules={modulesVisibles}
+            estActif={estActif}
+            etablissement={etablissement}
+            session={session}
+            nomUtilisateur={nomUtilisateur}
+            libelleRole={LABELS_ROLES[role] || role}
+            enLigne={enLigne}
+            onDeconnexion={handleDeconnexion}
+            onNaviguer={navigate}
+          />
         </aside>
 
         {/* Contenu principal (seule zone qui défile) */}
@@ -419,49 +484,27 @@ export default function Layout({ children, role, permissions = [], etablissement
             onClick={() => setMenuMobileOuvert(false)}
           />
           <div
-            className="absolute inset-y-0 left-0 w-72 max-w-[80%] shadow-2xl flex flex-col"
-            style={{ background: "linear-gradient(to bottom, #0C447C, #0a2d5a)" }}
+            className="absolute inset-y-0 left-0 w-72 max-w-[80%] shadow-2xl"
+            style={{ background: "linear-gradient(180deg, #0C447C 0%, #0a2d5a 100%)" }}
           >
-            <div className="flex items-center justify-between px-4 h-16 border-b border-white/10 shrink-0">
-              <span className="text-lg font-bold text-white">Menu LAKOLI</span>
-              <button
-                onClick={() => setMenuMobileOuvert(false)}
-                className="p-2 rounded-xl text-white/70 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
-                aria-label="Fermer le menu"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-3 space-y-1">
-              {modulesVisibles.map((m) => {
-                const active = estActif(m.chemin);
-                return (
-                  <button
-                    key={m.chemin}
-                    onClick={() => allerA(m.chemin)}
-                    className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold transition-colors cursor-pointer ${
-                      active
-                        ? "bg-white/15 text-white shadow-sm"
-                        : "text-white/75 hover:text-white hover:bg-white/10"
-                    }`}
-                  >
-                    <m.icone className={`h-4 w-4 ${active ? "text-white" : "text-white/75"}`} />
-                    <span>{m.nom}</span>
-                  </button>
-                );
-              })}
-            </div>
-
-            <div className="p-3 border-t border-white/10 shrink-0">
-              <button
-                onClick={handleDeconnexion}
-                className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold text-white/75 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
-              >
-                <LogOut className="h-4 w-4" />
-                Déconnexion
-              </button>
-            </div>
+            <button
+              onClick={() => setMenuMobileOuvert(false)}
+              className="absolute top-4 right-3 z-10 p-2 rounded-xl text-white/70 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+              aria-label="Fermer le menu"
+            >
+              <X className="h-5 w-5" />
+            </button>
+            <ContenuSidebar
+              modules={modulesVisibles}
+              estActif={estActif}
+              etablissement={etablissement}
+              session={session}
+              nomUtilisateur={nomUtilisateur}
+              libelleRole={LABELS_ROLES[role] || role}
+              enLigne={enLigne}
+              onDeconnexion={handleDeconnexion}
+              onNaviguer={allerA}
+            />
           </div>
         </div>
       )}

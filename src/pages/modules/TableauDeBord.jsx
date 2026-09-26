@@ -192,6 +192,95 @@ function StatCard({ label, valeur, unite, icone: Icon, gradient, tendance, progr
   );
 }
 
+// Situation des inscriptions (design Google AI Studio) : 3 barres epaisses rapportees a l'effectif
+// total, badge du taux global d'inscription (nouveaux + reinscrits) et total en pied de carte.
+function SectionInscriptions({ situation, disponible }) {
+  const { nouveaux, reinscrits, aReinscrire, total } = situation;
+  const pct = (n) => (total > 0 ? Math.round((n / total) * 100) : 0);
+  const lignes = [
+    {
+      libelle: "Nouveaux inscrits",
+      valeur: nouveaux,
+      couleur: "#3b82f6",
+      fond: "bg-blue-50 text-blue-600",
+      icone: CheckCircle2,
+      detail: `${pct(nouveaux)} % de l'effectif · première inscription`,
+    },
+    {
+      libelle: "Réinscrits",
+      valeur: reinscrits,
+      couleur: "#10b981",
+      fond: "bg-emerald-50 text-emerald-600",
+      icone: TrendingUp,
+      detail: `${pct(reinscrits)} % de l'effectif · anciens élèves reconduits`,
+    },
+    {
+      libelle: "À réinscrire",
+      valeur: aReinscrire,
+      couleur: "#f59e0b",
+      fond: "bg-amber-50 text-amber-600",
+      icone: Clock,
+      detail: aReinscrire > 0 ? "Sans inscription active sur la session en cours" : "Tous les élèves sont inscrits",
+    },
+  ];
+
+  return (
+    <div
+      className="bg-white overflow-hidden border border-slate-100 h-full flex flex-col"
+      style={{ borderRadius: "16px", boxShadow: "0 4px 24px rgba(0,0,0,0.06)" }}
+    >
+      <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-slate-100">
+        <div className="flex items-center gap-3 min-w-0">
+          <span className="h-10 w-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+            <Users className="h-5 w-5" />
+          </span>
+          <div className="min-w-0">
+            <h3 className="text-sm font-bold text-slate-900">Situation des inscriptions</h3>
+            <p className="text-xs text-slate-400">Session scolaire en cours</p>
+          </div>
+        </div>
+        {disponible && (
+          <span className="px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 text-[11px] font-bold whitespace-nowrap shrink-0">
+            {pct(nouveaux + reinscrits)}% Global
+          </span>
+        )}
+      </div>
+
+      {!disponible ? (
+        <div className="flex-1 py-10 text-center text-slate-400 text-xs">Impossible de charger la situation des inscriptions.</div>
+      ) : (
+        <div className="flex-1 px-5 py-5 space-y-5">
+          {lignes.map((l) => (
+            <div key={l.libelle}>
+              <div className="flex items-center justify-between gap-3 mb-2">
+                <span className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                  <span className={`h-7 w-7 rounded-lg flex items-center justify-center ${l.fond}`}>
+                    <l.icone className="h-4 w-4" />
+                  </span>
+                  {l.libelle}
+                </span>
+                <span className="text-sm font-extrabold text-slate-900 tabular-nums">{l.valeur}</span>
+              </div>
+              <div className="rounded-full bg-slate-100 overflow-hidden" style={{ height: "10px" }}>
+                <div
+                  className="h-full rounded-full transition-all duration-500"
+                  style={{ width: `${pct(l.valeur)}%`, backgroundColor: l.couleur }}
+                />
+              </div>
+              <p className="mt-1.5 text-[11px] text-slate-400">{l.detail}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="flex items-center justify-between px-5 py-3 bg-slate-50/70 border-t border-slate-100 text-xs">
+        <span className="font-semibold text-slate-500">Total élèves</span>
+        <span className="font-extrabold text-slate-900 tabular-nums">{disponible ? total : "—"}</span>
+      </div>
+    </div>
+  );
+}
+
 function badgeStatut(statut) {
   switch (statut) {
     case "publie":
@@ -511,154 +600,97 @@ function TableauDeBordComptable({ role }) {
         />
       </div>
 
-      {/* Situation des inscriptions */}
-      <Card className="space-y-4">
-        <div className="flex justify-between items-center pb-2 border-b border-slate-100">
-          <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-            <Users className="h-4 w-4 text-[#2563EB]" />
-            Situation des Inscriptions
-          </h3>
-        </div>
-
-        {!inscriptionsDisponibles ? (
-          <div className="py-8 text-center text-slate-400 text-xs">
-            Impossible de charger la situation des inscriptions.
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-            <div className="space-y-4">
-              <div>
-                <div className="flex justify-between items-center text-xs mb-1.5">
-                  <span className="font-semibold text-slate-600">Nouveaux élèves</span>
-                  <span className="font-bold text-slate-900">{situationInscriptions.nouveaux}</span>
-                </div>
-                <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
-                  <div
-                    className="h-full rounded-full bg-blue-500 transition-all"
-                    style={{
-                      width: `${situationInscriptions.total > 0 ? Math.round((situationInscriptions.nouveaux / situationInscriptions.total) * 100) : 0}%`,
-                    }}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <div className="flex justify-between items-center text-xs mb-1.5">
-                  <span className="font-semibold text-slate-600">Réinscrits</span>
-                  <span className="font-bold text-slate-900">{situationInscriptions.reinscrits}</span>
-                </div>
-                <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
-                  <div
-                    className="h-full rounded-full bg-emerald-500 transition-all"
-                    style={{
-                      width: `${situationInscriptions.total > 0 ? Math.round((situationInscriptions.reinscrits / situationInscriptions.total) * 100) : 0}%`,
-                    }}
-                  />
-                </div>
+      {/* Versements (3/5) et situation des inscriptions (2/5) */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-5 items-stretch">
+        {/* Derniers versements encaissés */}
+        <div
+          className="lg:col-span-3 bg-white overflow-hidden border border-slate-100"
+          style={{ borderRadius: "16px", boxShadow: "0 4px 24px rgba(0,0,0,0.06)" }}
+        >
+          <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-slate-100">
+            <div className="flex items-center gap-3 min-w-0">
+              <span className="h-10 w-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                <CreditCard className="h-5 w-5" />
+              </span>
+              <div className="min-w-0">
+                <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                  Derniers versements encaissés
+                  {versementsDemo && (
+                    <span className="px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 text-[10px] font-bold">Démo</span>
+                  )}
+                </h3>
+                <p className="text-xs text-slate-400">Journal des encaissements en temps réel</p>
               </div>
             </div>
-
-            <div className="space-y-4">
-              <div className="flex justify-between items-center text-xs">
-                <span className="font-semibold text-slate-600">À réinscrire</span>
-                <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-amber-50 text-amber-600 text-[11px] font-bold">
-                  {situationInscriptions.aReinscrire}
-                </span>
-              </div>
-
-              <div className="pt-3 border-t border-slate-100 flex justify-between items-center text-xs">
-                <span className="font-semibold text-slate-500">Total</span>
-                <span className="font-bold text-slate-900">{situationInscriptions.total}</span>
-              </div>
-            </div>
+            <button
+              onClick={() => navigate("/paiements")}
+              className="inline-flex items-center gap-1 text-xs font-semibold text-[#2563EB] hover:text-[#1d4ed8] transition-colors cursor-pointer shrink-0"
+            >
+              Voir tout <ArrowRight className="h-3.5 w-3.5" />
+            </button>
           </div>
-        )}
-      </Card>
 
-      {/* Derniers versements encaissés */}
-      <div
-        className="bg-white overflow-hidden border border-slate-100"
-        style={{ borderRadius: "16px", boxShadow: "0 4px 24px rgba(0,0,0,0.06)" }}
-      >
-        <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-slate-100">
-          <div className="flex items-center gap-3 min-w-0">
-            <span className="h-10 w-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-              <CreditCard className="h-5 w-5" />
-            </span>
-            <div className="min-w-0">
-              <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                Derniers versements encaissés
-                {versementsDemo && (
-                  <span className="px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 text-[10px] font-bold">Démo</span>
-                )}
-              </h3>
-              <p className="text-xs text-slate-400">Journal des encaissements en temps réel</p>
-            </div>
-          </div>
-          <button
-            onClick={() => navigate("/paiements")}
-            className="inline-flex items-center gap-1 text-xs font-semibold text-[#2563EB] hover:text-[#1d4ed8] transition-colors cursor-pointer shrink-0"
-          >
-            Voir tout <ArrowRight className="h-3.5 w-3.5" />
-          </button>
-        </div>
-
-        {versementsRecents.length === 0 ? (
-          <div className="py-10 text-center text-slate-400 text-xs">Aucun versement encaissé pour l'instant.</div>
-        ) : (
-          <ul className="divide-y divide-slate-100">
-            {versementsRecents.map((p, i) => {
-              const nom = p.eleve?.nom_complet || "Élève";
-              const partiel = p.statut === "partiel";
-              return (
-                <li
-                  key={p.id ?? i}
-                  onClick={() => p.eleve?.id && navigate(`/eleves/${p.eleve.id}`)}
-                  className={`flex items-center justify-between gap-3 px-5 py-3.5 transition-colors hover:bg-[#eff6ff] ${p.eleve?.id ? "cursor-pointer" : ""}`}
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <span className={`h-10 w-10 rounded-full flex items-center justify-center font-bold text-xs shrink-0 ${couleurAvatar(nom)}`}>
-                      {initialesNomComplet(nom)}
-                    </span>
-                    <div className="min-w-0">
-                      <p className="text-sm font-bold text-slate-900 truncate">{nom}</p>
-                      <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
-                        {p.eleve?.classe && (
-                          <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[10px] font-semibold whitespace-nowrap">
-                            {p.eleve.classe}
+          {versementsRecents.length === 0 ? (
+            <div className="py-10 text-center text-slate-400 text-xs">Aucun versement encaissé pour l'instant.</div>
+          ) : (
+            <ul className="divide-y divide-slate-100">
+              {versementsRecents.map((p, i) => {
+                const nom = p.eleve?.nom_complet || "Élève";
+                const partiel = p.statut === "partiel";
+                return (
+                  <li
+                    key={p.id ?? i}
+                    onClick={() => p.eleve?.id && navigate(`/eleves/${p.eleve.id}`)}
+                    className={`flex items-center justify-between gap-3 px-5 py-3.5 transition-colors hover:bg-[#eff6ff] ${p.eleve?.id ? "cursor-pointer" : ""}`}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <span className={`h-10 w-10 rounded-full flex items-center justify-center font-bold text-xs shrink-0 ${couleurAvatar(nom)}`}>
+                        {initialesNomComplet(nom)}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold text-slate-900 truncate">{nom}</p>
+                        <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
+                          {p.eleve?.classe && (
+                            <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[10px] font-semibold whitespace-nowrap">
+                              {p.eleve.classe}
+                            </span>
+                          )}
+                          <span className="text-[11px] text-slate-400 truncate">
+                            {[p.type_frais, p.periode].filter(Boolean).join(" · ") || "Paiement"}
                           </span>
-                        )}
-                        <span className="text-[11px] text-slate-400 truncate">
-                          {[p.type_frais, p.periode].filter(Boolean).join(" · ") || "Paiement"}
-                        </span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  <div className="text-right shrink-0">
-                    <p className="text-sm font-extrabold text-emerald-600 tabular-nums">+{formaterGNF(p.montant)}</p>
-                    <div className="flex items-center justify-end gap-1.5 mt-0.5">
-                      <span
-                        className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                          partiel ? "bg-amber-50 text-amber-700" : "bg-emerald-50 text-emerald-700"
-                        }`}
-                      >
-                        {partiel ? "Partiel" : "Payé"}
-                      </span>
-                      {p.heure && <span className="text-[11px] text-slate-400 tabular-nums">{p.heure}</span>}
+                    <div className="text-right shrink-0">
+                      <p className="text-sm font-extrabold text-emerald-600 tabular-nums">+{formaterGNF(p.montant)}</p>
+                      <div className="flex items-center justify-end gap-1.5 mt-0.5">
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                            partiel ? "bg-amber-50 text-amber-700" : "bg-emerald-50 text-emerald-700"
+                          }`}
+                        >
+                          {partiel ? "Partiel" : "Payé"}
+                        </span>
+                        {p.heure && <span className="text-[11px] text-slate-400 tabular-nums">{p.heure}</span>}
+                      </div>
                     </div>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
 
-        <div className="flex items-center justify-between gap-3 px-5 py-3 bg-slate-50/70 border-t border-slate-100 text-[11px] text-slate-400">
-          <span>Tous les reçus sont générés avec référence fiscale interne</span>
-          <span className="font-semibold text-slate-500 whitespace-nowrap">
-            {versementsRecents.length} affiché{versementsRecents.length > 1 ? "s" : ""}
-            {!versementsDemo && tousPaiements.length > 0 ? ` sur ${tousPaiements.length}` : ""}
-          </span>
+          <div className="flex items-center justify-between gap-3 px-5 py-3 bg-slate-50/70 border-t border-slate-100 text-[11px] text-slate-400">
+            <span>Tous les reçus sont générés avec référence fiscale interne</span>
+            <span className="font-semibold text-slate-500 whitespace-nowrap">
+              {versementsRecents.length} affiché{versementsRecents.length > 1 ? "s" : ""}
+              {!versementsDemo && tousPaiements.length > 0 ? ` sur ${tousPaiements.length}` : ""}
+            </span>
+          </div>
+        </div>
+
+        <div className="lg:col-span-2">
+          <SectionInscriptions situation={situationInscriptions} disponible={inscriptionsDisponibles} />
         </div>
       </div>
 
