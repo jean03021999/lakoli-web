@@ -189,6 +189,7 @@ function SectionInscriptions({ situation, disponible }) {
     {
       libelle: "Nouveaux inscrits",
       valeur: nouveaux,
+      affichage: `${nouveaux}/${total}`,
       couleur: "#3b82f6",
       fond: "bg-blue-50 text-blue-600",
       icone: CheckCircle2,
@@ -589,12 +590,13 @@ function TableauDeBordComptable({ role }) {
         />
         <StatCard
           label="Inscriptions"
-          valeur={financesDisponibles ? formaterNombre(finances.inscriptions) : "—"}
-          unite="GNF"
+          valeur={inscriptionsDisponibles && situationInscriptions.total > 0
+            ? `${situationInscriptions.nouveaux}/${situationInscriptions.total}`
+            : "—"}
           icone={ClipboardList}
           gradient="linear-gradient(135deg, #d97706, #f59e0b)"
-          tendance={financesDisponibles ? { sens: "hausse", texte: `${pctFinance(finances.inscriptions)}% du total` } : null}
-          progression={financesDisponibles ? pctFinance(finances.inscriptions) : 0}
+          tendance={financesDisponibles ? { sens: "hausse", texte: `${formaterGNF(finances.inscriptions)} encaissés` } : null}
+          progression={situationInscriptions.total > 0 ? Math.round((situationInscriptions.nouveaux / situationInscriptions.total) * 100) : 0}
         />
         <StatCard
           label="Réinscriptions"
