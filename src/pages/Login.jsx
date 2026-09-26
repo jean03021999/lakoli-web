@@ -351,7 +351,7 @@ export default function LoginPage() {
 
             {/* Titre du formulaire, sur une bande bleue identique au bouton "Se connecter" */}
             <div
-              className="px-4 py-2.5 text-white"
+              className="px-4 py-2.5 text-white text-center"
               style={{
                 borderRadius: "10px",
                 background: "linear-gradient(135deg, #0C447C 0%, #1565c0 100%)",
