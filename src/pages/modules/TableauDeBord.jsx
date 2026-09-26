@@ -706,7 +706,10 @@ function TableauDeBordComptable({ role }) {
                     <div className="flex items-center gap-4 ml-auto">
                       <div className="text-right">
                         <p className="text-[11px] text-slate-500">
-                          {e.retard ? (
+                          {e.retard?.motif === "aucun_paiement" ? (
+                            // Regle du 10 : rien paye apres le 10 du premier mois de la session
+                            <>Aucun paiement · {e.retard.echeance} attendu depuis le {new Date(e.retard.date_limite).toLocaleDateString("fr-FR")}</>
+                          ) : e.retard ? (
                             <>
                               {e.retard.echeance} · dépassée depuis le {new Date(e.retard.date_limite).toLocaleDateString("fr-FR")}
                               {e.retard.nombre_echeances > 1 && ` (+${e.retard.nombre_echeances - 1})`}
