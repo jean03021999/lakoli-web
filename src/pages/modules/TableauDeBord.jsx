@@ -320,6 +320,7 @@ function TableauDeBordComptable({ role }) {
 
   const [stats, setStats] = useState({ totalEleves: "—", inscrits: "—", enRetard: "—", aEchoir: "—" });
   const [elevesEnRetard, setElevesEnRetard] = useState([]);
+  const [listeEleves, setListeEleves] = useState([]);
   const [tousPaiements, setTousPaiements] = useState([]);
   const [totalEncaisse, setTotalEncaisse] = useState(null);
   const [paiementsDisponibles, setPaiementsDisponibles] = useState(true);
@@ -375,6 +376,7 @@ function TableauDeBordComptable({ role }) {
           enRetard: eleves.value.data.stats.en_retard,
           aEchoir: eleves.value.data.stats.a_echoir,
         });
+        setListeEleves(eleves.value.data.eleves);
         setElevesEnRetard(
           eleves.value.data.eleves.filter((e) => e.statut_paiement === "en_retard")
         );
@@ -749,6 +751,7 @@ function TableauDeBordComptable({ role }) {
         financesDisponibles={financesDisponibles}
         classes={statsParClasse}
         classesDisponibles={statsClasseDisponibles}
+        eleves={listeEleves}
       />
 
       {/* Versements (3/5) et situation des inscriptions (2/5) */}
