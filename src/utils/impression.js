@@ -235,7 +235,6 @@ const STYLES = `
   .doc-releve.rapport .vide { color: #64748b; font-style: italic; font-size: 12px; }
   .doc-releve.rapport .note { margin: 6px 0 0; color: #64748b; font-size: 11px; }
   .doc-releve.rapport .gris { color: #64748b; font-size: 11px; }
-  .doc-releve.rapport .tuile .val .sur { font-size: 12px; font-weight: normal; color: #64748b; }
 
   .doc-releve .pied-premium {
     margin-top: 24px; padding-top: 12px; border-top: 1px solid #e2e8f0;
@@ -813,7 +812,7 @@ export function genererRapportComptableHtml({
   const tuiles = [
     ["Élèves inscrits", indicateurs.inscrits === null || indicateurs.inscrits === undefined
       ? tiret
-      : `${nombre(indicateurs.inscrits)} <span class="sur">/ ${nombre(indicateurs.totalEleves)}</span>`],
+      : `${nombre(indicateurs.inscrits)}/${nombre(indicateurs.totalEleves)}`],
     ["Paiements aujourd'hui", nombre(indicateurs.paiementsAujourdhui)],
     ["Élèves en retard", nombre(indicateurs.enRetard)],
     ["Total encaissé", indicateurs.totalEncaisse === null ? tiret : `${formaterMontant(indicateurs.totalEncaisse)} GNF`],

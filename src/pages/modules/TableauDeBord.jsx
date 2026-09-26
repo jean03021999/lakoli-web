@@ -264,7 +264,7 @@ function SectionInscriptions({ situation, disponible }) {
       <div className="flex items-center justify-between px-5 py-3 bg-slate-50/70 border-t border-slate-100 text-xs">
         <span className="font-semibold text-slate-500">Élèves inscrits</span>
         <span className="font-extrabold text-slate-900 tabular-nums">
-          {disponible ? `${inscrits} sur ${total} élève${total > 1 ? "s" : ""}` : "—"}
+          {disponible ? `${inscrits}/${total}` : "—"}
         </span>
       </div>
     </div>
@@ -555,10 +555,10 @@ function TableauDeBordComptable({ role }) {
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
         <StatCard
           label="Élèves inscrits"
-          valeur={stats.inscrits}
+          valeur={typeof stats.inscrits === "number" && totalEleves > 0 ? `${stats.inscrits}/${totalEleves}` : "—"}
           icone={Users}
           gradient="linear-gradient(135deg, #1d4ed8, #3b82f6)"
-          tendance={totalEleves > 0 ? { sens: "hausse", texte: `sur ${totalEleves} élève${totalEleves > 1 ? "s" : ""}` } : null}
+          tendance={totalEleves > 0 && typeof stats.inscrits === "number" ? { sens: "hausse", texte: `${Math.round((stats.inscrits / totalEleves) * 100)}% inscrits` } : null}
           progression={totalEleves > 0 && typeof stats.inscrits === "number" ? Math.round((stats.inscrits / totalEleves) * 100) : 0}
         />
         <StatCard
