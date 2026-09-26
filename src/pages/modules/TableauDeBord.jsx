@@ -197,6 +197,7 @@ function SectionInscriptions({ situation, disponible }) {
     {
       libelle: "Réinscrits",
       valeur: reinscrits,
+      affichage: `${reinscrits}/${total}`,
       couleur: "#10b981",
       fond: "bg-emerald-50 text-emerald-600",
       icone: TrendingUp,
@@ -247,7 +248,7 @@ function SectionInscriptions({ situation, disponible }) {
                   </span>
                   {l.libelle}
                 </span>
-                <span className="text-sm font-extrabold text-slate-900 tabular-nums">{l.valeur}</span>
+                <span className="text-sm font-extrabold text-slate-900 tabular-nums">{l.affichage ?? l.valeur}</span>
               </div>
               <div className="rounded-full bg-slate-100 overflow-hidden" style={{ height: "10px" }}>
                 <div
@@ -597,12 +598,13 @@ function TableauDeBordComptable({ role }) {
         />
         <StatCard
           label="Réinscriptions"
-          valeur={financesDisponibles ? formaterNombre(finances.reinscriptions) : "—"}
-          unite="GNF"
+          valeur={inscriptionsDisponibles && situationInscriptions.total > 0
+            ? `${situationInscriptions.reinscrits}/${situationInscriptions.total}`
+            : "—"}
           icone={RefreshCw}
           gradient="linear-gradient(135deg, #4f46e5, #818cf8)"
-          tendance={financesDisponibles ? { sens: "hausse", texte: `${pctFinance(finances.reinscriptions)}% du total` } : null}
-          progression={financesDisponibles ? pctFinance(finances.reinscriptions) : 0}
+          tendance={financesDisponibles ? { sens: "hausse", texte: `${formaterGNF(finances.reinscriptions)} encaissés` } : null}
+          progression={situationInscriptions.total > 0 ? Math.round((situationInscriptions.reinscrits / situationInscriptions.total) * 100) : 0}
         />
       </div>
 
