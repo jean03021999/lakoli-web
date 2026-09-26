@@ -27,8 +27,11 @@ import {
   Bell,
   ChevronDown,
   X,
-  Shield,
   DollarSign,
+  Building,
+  Calendar as CalendarIcon,
+  AlertTriangle,
+  ArrowRight,
 } from "lucide-react";
 
 const COULEURS = {
@@ -98,12 +101,14 @@ function initiales(nom) {
     .join("");
 }
 
-export default function Layout({ children, role, permissions = [] }) {
+export default function Layout({ children, role, permissions = [], etablissement = null, session = null }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [menuCompteOuvert, setMenuCompteOuvert] = useState(false);
   const [menuMobileOuvert, setMenuMobileOuvert] = useState(false);
-  const [nbNotifications, setNbNotifications] = useState(0);
+  const [notifications, setNotifications] = useState([]);
+  const [menuNotificationsOuvert, setMenuNotificationsOuvert] = useState(false);
+  const [enLigne, setEnLigne] = useState(typeof navigator === "undefined" ? true : navigator.onLine);
 
   const modulesVisibles = MODULES.filter((m) => moduleVisible(m, permissions, role));
   const peutVoirEleves = permissions.includes("eleves.voir");
@@ -118,17 +123,49 @@ export default function Layout({ children, role, permissions = [] }) {
         peutVoirNotes ? api.get("/evaluations", { params: { vue: "direction" } }) : Promise.reject(),
       ]);
 
-      let total = 0;
-      if (eleves.status === "fulfilled") {
-        total += eleves.value.data.stats.en_retard || 0;
+      const liste = [];
+      const nbRetard = eleves.status === "fulfilled" ? eleves.value.data.stats.en_retard || 0 : 0;
+      if (nbRetard > 0) {
+        liste.push({
+          id: "retards",
+          icone: AlertTriangle,
+          couleur: "bg-rose-50 text-rose-600",
+          titre: `${nbRetard} élève${nbRetard > 1 ? "s" : ""} en retard de paiement`,
+          detail: "Échéance de scolarité dépassée, à relancer.",
+          chemin: "/eleves",
+        });
       }
-      if (evaluations.status === "fulfilled") {
-        total += evaluations.value.data.filter((ev) => ev.statut === "soumis").length;
+      const nbSoumises = evaluations.status === "fulfilled"
+        ? evaluations.value.data.filter((ev) => ev.statut === "soumis").length
+        : 0;
+      if (nbSoumises > 0) {
+        liste.push({
+          id: "evaluations",
+          icone: ClipboardCheck,
+          couleur: "bg-blue-50 text-blue-600",
+          titre: `${nbSoumises} évaluation${nbSoumises > 1 ? "s" : ""} à valider`,
+          detail: "Notes soumises par les enseignants.",
+          chemin: "/notes",
+        });
       }
-      setNbNotifications(total);
+      setNotifications(liste);
     }
     if (role) chargerNotifications();
   }, [role, peutVoirEleves, peutVoirNotes]);
+
+  // Etat reel de la connexion : le badge "synchronise" ne doit pas s'afficher hors ligne.
+  useEffect(() => {
+    const maj = () => setEnLigne(navigator.onLine);
+    window.addEventListener("online", maj);
+    window.addEventListener("offline", maj);
+    return () => {
+      window.removeEventListener("online", maj);
+      window.removeEventListener("offline", maj);
+    };
+  }, []);
+
+  const nbNotifications = notifications.length;
+  const libelleEtablissement = [etablissement?.nom, etablissement?.ville].filter(Boolean).join(" · ");
 
   const allerA = (chemin) => {
     setMenuMobileOuvert(false);
@@ -153,79 +190,134 @@ export default function Layout({ children, role, permissions = [] }) {
   return (
     <div className="h-screen overflow-hidden bg-[#F8FAFC] text-slate-800 flex flex-col font-sans selection:bg-[#0C447C] selection:text-white">
       {/* En-tête */}
-      <header className="shrink-0 z-40 bg-[#0C447C]" style={{ boxShadow: "0 1px 3px rgba(0,0,0,0.1)" }}>
+      <header
+        className="sticky top-0 shrink-0 z-40 bg-white/80 backdrop-blur-md border-b border-slate-200/70"
+        style={{ boxShadow: "0 1px 3px rgba(15,23,42,0.04)" }}
+      >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-4 h-16">
+          <div className="flex items-center gap-3 h-16">
             {/* Icône menu hamburger (mobile : ouvre le menu complet) */}
             <button
               onClick={() => setMenuMobileOuvert(true)}
-              className="md:hidden p-2 -ml-2 rounded-xl text-white/80 hover:text-white hover:bg-white/10 transition-colors cursor-pointer shrink-0"
+              className="md:hidden p-2 -ml-2 rounded-xl text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer shrink-0"
               title="Menu"
             >
               <Menu className="h-5 w-5" />
             </button>
 
-            {/* Logo LAKOLI */}
-            <div
+            {/* Logo LAKOLI (retour au tableau de bord) */}
+            <button
               onClick={() => navigate("/tableau-de-bord")}
-              className="flex items-center gap-3.5 cursor-pointer select-none shrink-0"
+              className="flex items-center gap-2.5 cursor-pointer select-none shrink-0"
+              title="Tableau de bord"
             >
-              <div style={{ position: 'relative', flexShrink: 0 }}>
-                <div style={{ width: '40px', height: '40px', background: 'linear-gradient(135deg, #0C447C 0%, #1a6bb5 60%, #2980d9 100%)', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 6px 20px rgba(12,68,124,0.35)', overflow: 'hidden', position: 'relative' }}>
-                  <div style={{ position: 'absolute', top: '-8px', right: '-8px', width: '24px', height: '24px', background: 'rgba(255,255,255,0.12)', borderRadius: '50%' }} />
-                  <GraduationCap size={20} color="white" style={{ position: 'relative', zIndex: 1 }} />
-                </div>
-                <div style={{ position: 'absolute', bottom: '0px', right: '0px', width: '10px', height: '10px', background: '#10b981', borderRadius: '50%', border: '2px solid #0C447C', boxShadow: '0 0 0 2px rgba(16,185,129,0.25)' }} />
-              </div>
-              <div className="hidden sm:flex" style={{ flexDirection: 'column', gap: '3px' }}>
-                <span style={{ fontSize: '18px', fontWeight: '600', letterSpacing: '2.5px', color: '#ffffff', lineHeight: '1' }}>LAKOLI</span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: '9px', color: 'rgba(255,255,255,0.65)' }}>Gestion Scolaire</span>
-                  <span style={{ width: '3px', height: '3px', background: 'rgba(255,255,255,0.35)', borderRadius: '50%', display: 'inline-block' }} />
-                  <span style={{ fontSize: '9px', color: 'rgba(255,255,255,0.65)' }}>Guinée</span>
-                  <span style={{ width: '3px', height: '3px', background: 'rgba(255,255,255,0.35)', borderRadius: '50%', display: 'inline-block' }} />
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', background: 'linear-gradient(135deg, #eff6ff, #dbeafe)', color: '#0C447C', fontSize: '9px', fontWeight: '500', padding: '2px 7px', borderRadius: '6px', border: '0.5px solid #bfdbfe' }}>
-                    <Shield size={8} /> SaaS 2026
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Espace de travail (rôle actif), centré */}
-            <div className="flex-1 flex justify-center">
-              <span className="inline-flex items-center px-3 py-1.5 rounded-full bg-white/15 text-white text-xs font-bold whitespace-nowrap">
-                Espace de Travail {LABELS_ROLES[role] || role}
+              <span
+                className="h-9 w-9 rounded-xl flex items-center justify-center"
+                style={{ background: "linear-gradient(135deg, #0C447C 0%, #1a6bb5 100%)", boxShadow: "0 4px 14px rgba(12,68,124,0.3)" }}
+              >
+                <GraduationCap className="h-5 w-5 text-white" />
               </span>
+              <span className="hidden lg:inline text-base font-bold tracking-[2px] text-[#0C447C]">LAKOLI</span>
+            </button>
+
+            {/* Etablissement et session active (GET /user) */}
+            <div className="flex items-center gap-2 min-w-0 flex-1">
+              {libelleEtablissement && (
+                <span className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-100 text-slate-700 text-xs font-semibold min-w-0">
+                  <Building className="h-3.5 w-3.5 text-slate-500 shrink-0" />
+                  <span className="truncate">{libelleEtablissement}</span>
+                </span>
+              )}
+              {session && (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-blue-50 text-blue-700 text-xs font-bold whitespace-nowrap border border-blue-100">
+                  <CalendarIcon className="h-3.5 w-3.5" />
+                  {session}
+                </span>
+              )}
             </div>
 
             {/* Outils de droite */}
-            <div className="flex items-center gap-2 sm:gap-4 shrink-0">
-              <button
-                onClick={() => navigate("/eleves")}
-                className="relative p-2 rounded-xl text-white/80 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
-                title={nbNotifications > 0 ? `${nbNotifications} élément(s) à traiter` : "Aucune alerte"}
+            <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+              <span
+                className={`hidden xl:inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold border ${
+                  enLigne ? "bg-emerald-50 text-emerald-700 border-emerald-100" : "bg-rose-50 text-rose-700 border-rose-100"
+                }`}
               >
-                <Bell className="h-5 w-5" />
-                {nbNotifications > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 h-4 w-4 rounded-full bg-rose-500 text-white text-[10px] font-bold flex items-center justify-center">
-                    {nbNotifications > 9 ? "9+" : nbNotifications}
-                  </span>
-                )}
-              </button>
+                <span className="relative flex h-2 w-2">
+                  {enLigne && <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75 animate-ping" />}
+                  <span className={`relative inline-flex h-2 w-2 rounded-full ${enLigne ? "bg-emerald-500" : "bg-rose-500"}`} />
+                </span>
+                {enLigne ? "Serveur Caisse Synchronisé" : "Hors ligne"}
+              </span>
 
+              {/* Notifications */}
+              <div className="relative">
+                <button
+                  onClick={() => setMenuNotificationsOuvert((v) => !v)}
+                  className="relative p-2 rounded-xl text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer"
+                  title={nbNotifications > 0 ? `${nbNotifications} notification(s)` : "Aucune notification"}
+                >
+                  <Bell className="h-5 w-5" />
+                  {nbNotifications > 0 && (
+                    <span className="absolute -top-0.5 -right-0.5 h-4 min-w-4 px-1 rounded-full bg-rose-500 text-white text-[10px] font-bold flex items-center justify-center ring-2 ring-white">
+                      {nbNotifications}
+                    </span>
+                  )}
+                </button>
+
+                {menuNotificationsOuvert && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setMenuNotificationsOuvert(false)} />
+                    <div className="absolute right-0 top-full mt-2 w-80 max-w-[calc(100vw-2rem)] bg-white rounded-2xl border border-slate-200 shadow-xl z-50 overflow-hidden">
+                      <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+                        <p className="text-sm font-bold text-slate-900">Notifications</p>
+                        <span className="text-[11px] font-semibold text-slate-400">{nbNotifications} en attente</span>
+                      </div>
+                      {notifications.length === 0 ? (
+                        <p className="px-4 py-6 text-center text-xs text-slate-400">Aucune notification pour le moment.</p>
+                      ) : (
+                        notifications.map((n) => (
+                          <button
+                            key={n.id}
+                            onClick={() => {
+                              setMenuNotificationsOuvert(false);
+                              navigate(n.chemin);
+                            }}
+                            className="w-full flex items-start gap-3 px-4 py-3 text-left hover:bg-slate-50 transition-colors cursor-pointer"
+                          >
+                            <span className={`h-8 w-8 rounded-full flex items-center justify-center shrink-0 ${n.couleur}`}>
+                              <n.icone className="h-4 w-4" />
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block text-sm font-semibold text-slate-900">{n.titre}</span>
+                              <span className="block text-xs text-slate-500">{n.detail}</span>
+                            </span>
+                            <ArrowRight className="h-4 w-4 text-slate-300 mt-1 shrink-0" />
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* Compte utilisateur */}
               <div className="relative">
                 <button
                   onClick={() => setMenuCompteOuvert((v) => !v)}
-                  className="flex items-center gap-2.5 pl-1 pr-2 py-1 rounded-xl hover:bg-white/10 transition-colors cursor-pointer"
+                  className="flex items-center gap-2.5 pl-1 pr-2 py-1 rounded-xl hover:bg-slate-100 transition-colors cursor-pointer"
                 >
-                  <div className="h-9 w-9 rounded-full bg-white/15 text-white flex items-center justify-center font-bold text-xs shrink-0">
+                  <div
+                    className="h-9 w-9 rounded-full text-white flex items-center justify-center font-bold text-xs shrink-0"
+                    style={{ background: "linear-gradient(135deg, #0C447C 0%, #1a6bb5 100%)" }}
+                  >
                     {initiales(nomUtilisateur)}
                   </div>
                   <div className="hidden sm:block text-left leading-tight">
-                    <p className="text-sm font-semibold text-white">{nomUtilisateur}</p>
-                    <p className="text-[11px] text-white/60">{LABELS_ROLES[role] || role}</p>
+                    <p className="text-sm font-semibold text-slate-900">{nomUtilisateur}</p>
+                    <p className="text-[11px] text-slate-500">{LABELS_ROLES[role] || role}</p>
                   </div>
-                  <ChevronDown className="h-4 w-4 text-white/70 hidden sm:block" />
+                  <ChevronDown className="h-4 w-4 text-slate-400 hidden sm:block" />
                 </button>
 
                 {menuCompteOuvert && (

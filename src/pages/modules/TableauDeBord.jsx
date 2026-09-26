@@ -10,15 +10,17 @@ import {
   AlertTriangle,
   CheckCircle2,
   CreditCard,
-  MoreVertical,
   Plus,
-  ChevronDown,
   Search,
   Banknote,
   ClipboardList,
   RefreshCw,
   TrendingUp,
   TrendingDown,
+  Clock,
+  FileDown,
+  PlusCircle,
+  ArrowRight,
 } from "lucide-react";
 import api from "../../services/api";
 import { StatCard as StatCardSysteme, Card, Badge, Button, PageHeader } from "../../components/ui/LakoliDesignSystem";
@@ -34,6 +36,50 @@ function formaterGNF(montant) {
 
 function formaterNombre(montant) {
   return Number(montant).toLocaleString("fr-FR");
+}
+
+const LIBELLES_ROLES = {
+  COMPTABLE: "Comptable",
+  DIRECTEUR: "Directeur",
+  FONDATEUR: "Fondateur",
+  PROVISEUR: "Proviseur",
+  CENSEUR: "Censeur",
+};
+
+// Couleur d'avatar stable, deduite du nom (le meme eleve garde toujours la meme couleur).
+const COULEURS_AVATAR = [
+  "bg-blue-100 text-blue-700",
+  "bg-emerald-100 text-emerald-700",
+  "bg-violet-100 text-violet-700",
+  "bg-amber-100 text-amber-700",
+  "bg-rose-100 text-rose-700",
+  "bg-cyan-100 text-cyan-700",
+  "bg-indigo-100 text-indigo-700",
+];
+
+function couleurAvatar(nom) {
+  let h = 0;
+  for (const c of nom || "") h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  return COULEURS_AVATAR[h % COULEURS_AVATAR.length];
+}
+
+function initialesNomComplet(nomComplet) {
+  return (nomComplet || "?").trim().split(/\s+/).slice(0, 2).map((s) => s[0]).join("").toUpperCase();
+}
+
+// Telecharge un CSV (separateur ";" et BOM UTF-8 : s'ouvre correctement dans Excel en francais).
+function telechargerCsv(nomFichier, lignes) {
+  const echapper = (v) => {
+    const t = String(v ?? "");
+    return /[";\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t;
+  };
+  const contenu = "﻿" + lignes.map((l) => l.map(echapper).join(";")).join("\r\n");
+  const url = URL.createObjectURL(new Blob([contenu], { type: "text/csv;charset=utf-8" }));
+  const lien = document.createElement("a");
+  lien.href = url;
+  lien.download = nomFichier;
+  lien.click();
+  URL.revokeObjectURL(url);
 }
 
 function getInitialesEleve(nom, prenom) {
@@ -164,12 +210,12 @@ function badgeStatut(statut) {
 
 export default function TableauDeBord({ role }) {
   if (role === "COMPTABLE") {
-    return <TableauDeBordComptable />;
+    return <TableauDeBordComptable role={role} />;
   }
   return <TableauDeBordGenerique role={role} />;
 }
 
-function TableauDeBordComptable() {
+function TableauDeBordComptable({ role }) {
   const navigate = useNavigate();
 
   const [stats, setStats] = useState({ totalEleves: "—", enRetard: "—", aEchoir: "—" });
@@ -177,9 +223,11 @@ function TableauDeBordComptable() {
   const [tousPaiements, setTousPaiements] = useState([]);
   const [totalEncaisse, setTotalEncaisse] = useState(null);
   const [paiementsDisponibles, setPaiementsDisponibles] = useState(true);
-  const [versementsOuvert, setVersementsOuvert] = useState(true);
-  const [rechercheVersements, setRechercheVersements] = useState("");
-  const [suggestionsOuvertes, setSuggestionsOuvertes] = useState(false);
+  const [versementsRecents, setVersementsRecents] = useState([]);
+  const [versementsDemo, setVersementsDemo] = useState(false);
+  const [dateMaj, setDateMaj] = useState(null);
+  const [rafraichissement, setRafraichissement] = useState(0);
+  const [enChargement, setEnChargement] = useState(true);
   const [rechercheRetard, setRechercheRetard] = useState("");
   const [suggestionsRetardOuvertes, setSuggestionsRetardOuvertes] = useState(false);
   const [statsParClasse, setStatsParClasse] = useState([]);
@@ -191,11 +239,22 @@ function TableauDeBordComptable() {
 
   useEffect(() => {
     async function charger() {
-      const [eleves, paiements, parClasse] = await Promise.allSettled([
+      setEnChargement(true);
+      const [eleves, paiements, parClasse, recents] = await Promise.allSettled([
         api.get("/eleves"),
         api.get("/frais/paiements"),
         api.get("/frais/stats-par-classe"),
+        api.get("/frais/paiements/recent"),
       ]);
+
+      // Versements recents : donnees de demonstration (signalees) si l'API ne repond pas.
+      if (recents.status === "fulfilled" && Array.isArray(recents.value.data)) {
+        setVersementsRecents(recents.value.data);
+        setVersementsDemo(false);
+      } else {
+        setVersementsRecents(PAIEMENTS_EXEMPLE);
+        setVersementsDemo(true);
+      }
 
       if (eleves.status === "fulfilled") {
         setStats({
@@ -251,9 +310,11 @@ function TableauDeBordComptable() {
       } else {
         setFinancesDisponibles(false);
       }
+      setDateMaj(new Date());
+      setEnChargement(false);
     }
     charger();
-  }, []);
+  }, [rafraichissement]);
 
   const enRetard = typeof stats.enRetard === "number" ? stats.enRetard : 0;
   const totalEleves = typeof stats.totalEleves === "number" ? stats.totalEleves : 0;
@@ -279,27 +340,6 @@ function TableauDeBordComptable() {
     ? Math.round((totalEncaisse / montantTotalGlobal) * 100)
     : 0;
 
-  const paiementsFiltres = tousPaiements.filter((p) => {
-    if (!rechercheVersements.trim()) return true;
-    const terme = normaliser(rechercheVersements.trim());
-    return (
-      normaliser(p.eleve?.nom_complet).includes(terme) ||
-      normaliser(p.eleve?.classe).includes(terme) ||
-      normaliser(p.periode || p.libelle).includes(terme)
-    );
-  });
-
-  const suggestionsNoms = (() => {
-    if (!rechercheVersements.trim()) return [];
-    const terme = normaliser(rechercheVersements.trim());
-    const noms = new Set();
-    tousPaiements.forEach((p) => {
-      const nom = p.eleve?.nom_complet;
-      if (nom && normaliser(nom).includes(terme)) noms.add(nom);
-    });
-    return Array.from(noms).slice(0, 6);
-  })();
-
   const elevesRetardFiltres = elevesEnRetard.filter((e) => {
     if (!rechercheRetard.trim()) return true;
     const terme = normaliser(rechercheRetard.trim());
@@ -324,15 +364,96 @@ function TableauDeBordComptable() {
   const totalFinances = finances.inscriptions + finances.reinscriptions + finances.scolarite + finances.autres;
   const pctFinance = (valeur) => (totalFinances > 0 ? Math.round((valeur / totalFinances) * 100) : 0);
 
+  const exporterRapport = () => {
+    telechargerCsv(`rapport-comptable-${new Date().toISOString().slice(0, 10)}.csv`, [
+      ["Rapport comptable LAKOLI", dateMaj ? `${dateMaj.toLocaleDateString("fr-FR")} ${dateMaj.toLocaleTimeString("fr-FR")}` : ""],
+      [],
+      ["Indicateur", "Valeur"],
+      ["Élèves inscrits", totalEleves],
+      ["Paiements aujourd'hui", paiementsAujourdHui],
+      ["Élèves en retard", enRetard],
+      ["Total encaissé (GNF)", totalEncaisse ?? 0],
+      ["Inscriptions (GNF)", finances.inscriptions],
+      ["Réinscriptions (GNF)", finances.reinscriptions],
+      ["Scolarité (GNF)", finances.scolarite],
+      ["Autres frais (GNF)", finances.autres],
+      [],
+      ["Classe", "Élèves", "Montant total (GNF)", "Encaissé (GNF)", "Soldés", "En retard"],
+      ...statsParClasse.map((c) => [c.classe, c.nombre_eleves, c.montant_total, c.montant_encaisse, c.nombre_soldes, c.nombre_en_retard]),
+    ]);
+  };
+
   return (
     <div className="space-y-6" style={{ backgroundColor: "#f8fafc" }}>
+      {/* Bannière */}
       <div
-        className="sticky top-0 z-10 rounded-2xl p-5 sm:p-6 flex flex-col items-center justify-center text-center shadow-md"
-        style={{ background: "linear-gradient(135deg, #0C447C, #1a5a9e)" }}
+        className="relative isolate overflow-hidden p-6 sm:p-8 text-white"
+        style={{
+          background: "linear-gradient(135deg, #0C447C 0%, #1a6bb5 100%)",
+          borderRadius: "20px",
+          boxShadow: "0 12px 32px rgba(12,68,124,0.28)",
+        }}
       >
-        <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
-          Tableau de Bord Comptable
-        </h1>
+        {/* Cercles décoratifs */}
+        <div className="absolute -top-16 -right-10 h-56 w-56 rounded-full bg-white/10 pointer-events-none" />
+        <div className="absolute top-10 right-40 h-24 w-24 rounded-full bg-white/5 pointer-events-none" />
+        <div className="absolute -bottom-20 left-1/3 h-48 w-48 rounded-full bg-white/5 pointer-events-none" />
+        <div className="absolute -bottom-10 -left-10 h-32 w-32 rounded-full bg-white/10 pointer-events-none" />
+
+        <div className="relative z-10 flex flex-col lg:flex-row lg:items-end justify-between gap-6">
+          <div className="space-y-3 min-w-0">
+            <span className="inline-flex flex-wrap items-center gap-2 px-3 py-1.5 rounded-full bg-white/15 text-xs font-semibold backdrop-blur-sm">
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75 animate-ping" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
+              </span>
+              Espace de travail {LIBELLES_ROLES[role] || role}
+              <span className="text-white/60">·</span>
+              <span className="text-white/80">Session Ouverte</span>
+            </span>
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight">Tableau de bord LAKOLI</h1>
+            <p className="text-sm sm:text-base text-white/70 max-w-xl">
+              Suivi des encaissements, des retards de paiement et des inscriptions de l'établissement.
+            </p>
+          </div>
+
+          <div className="flex flex-col items-start lg:items-end gap-3 shrink-0">
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/15 text-xs font-medium">
+                <Clock className="h-3.5 w-3.5" />
+                {dateMaj
+                  ? `Mis à jour le ${dateMaj.toLocaleDateString("fr-FR")} à ${dateMaj.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}`
+                  : "Chargement…"}
+              </span>
+              <button
+                onClick={() => setRafraichissement((n) => n + 1)}
+                disabled={enChargement}
+                className="h-8 w-8 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center transition-colors cursor-pointer disabled:cursor-wait"
+                title="Actualiser"
+                aria-label="Actualiser les données"
+              >
+                <RefreshCw className={`h-4 w-4 ${enChargement ? "animate-spin" : ""}`} />
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-2.5">
+              <button
+                onClick={exporterRapport}
+                disabled={enChargement}
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-white/40 text-sm font-semibold text-white hover:bg-white/10 transition-colors cursor-pointer disabled:opacity-60"
+              >
+                <FileDown className="h-4 w-4" />
+                Exporter le rapport
+              </button>
+              <button
+                onClick={() => navigate("/frais-scolarite")}
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white text-sm font-bold text-[#0C447C] hover:bg-blue-50 shadow-sm transition-colors cursor-pointer"
+              >
+                <PlusCircle className="h-4 w-4" />
+                Enregistrer un paiement
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* 6 cartes statistiques */}
@@ -454,148 +575,92 @@ function TableauDeBordComptable() {
         )}
       </Card>
 
-      {/* Derniers versements encaissés — liste déroulante avec recherche */}
-      <Card className="p-0 overflow-hidden">
-        <button
-          onClick={() => setVersementsOuvert((v) => !v)}
-          className="w-full flex justify-between items-center px-5 py-4 border-b border-slate-100 cursor-pointer"
-        >
-          <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-            <Wallet className="h-4 w-4 text-[#2563EB]" />
-            Derniers Versements Encaissés
-            <span className="text-[11px] font-semibold text-slate-400">({tousPaiements.length})</span>
-          </h3>
-          <div className="flex items-center gap-3">
-            <span
-              onClick={(e) => { e.stopPropagation(); navigate("/frais-scolarite"); }}
-              className="text-xs font-semibold text-[#2563EB] hover:text-[#1d4ed8] transition-colors"
-            >
-              Voir tout →
+      {/* Derniers versements encaissés */}
+      <div
+        className="bg-white overflow-hidden border border-slate-100"
+        style={{ borderRadius: "16px", boxShadow: "0 4px 24px rgba(0,0,0,0.06)" }}
+      >
+        <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-slate-100">
+          <div className="flex items-center gap-3 min-w-0">
+            <span className="h-10 w-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+              <CreditCard className="h-5 w-5" />
             </span>
-            <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform ${versementsOuvert ? "rotate-180" : ""}`} />
-          </div>
-        </button>
-
-        {versementsOuvert && (
-          <>
-            {/* Barre de recherche */}
-            <div className="px-5 py-3 border-b border-slate-100">
-              <div className="relative max-w-sm">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                <input
-                  type="text"
-                  value={rechercheVersements}
-                  onChange={(e) => {
-                    setRechercheVersements(e.target.value);
-                    setSuggestionsOuvertes(true);
-                  }}
-                  onFocus={() => setSuggestionsOuvertes(true)}
-                  onBlur={() => setTimeout(() => setSuggestionsOuvertes(false), 150)}
-                  placeholder="Rechercher un élève, une classe, une période..."
-                  className="w-full pl-9 pr-9 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl text-slate-700 placeholder:text-slate-400 focus:outline-none focus:border-[#0C447C]/40 focus:bg-white transition-colors"
-                />
-                {rechercheVersements && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setRechercheVersements("");
-                      setSuggestionsOuvertes(false);
-                    }}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 h-5 w-5 flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-200 hover:text-slate-600 transition-colors cursor-pointer"
-                    aria-label="Effacer la recherche"
-                  >
-                    ×
-                  </button>
+            <div className="min-w-0">
+              <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                Derniers versements encaissés
+                {versementsDemo && (
+                  <span className="px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 text-[10px] font-bold">Démo</span>
                 )}
-
-                {suggestionsOuvertes && suggestionsNoms.length > 0 && (
-                  <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-20 overflow-hidden">
-                    {suggestionsNoms.map((nom) => (
-                      <button
-                        key={nom}
-                        type="button"
-                        onClick={() => {
-                          setRechercheVersements(nom);
-                          setSuggestionsOuvertes(false);
-                        }}
-                        className="w-full text-left px-3.5 py-2 text-xs text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
-                      >
-                        {nom}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
+              </h3>
+              <p className="text-xs text-slate-400">Journal des encaissements en temps réel</p>
             </div>
+          </div>
+          <button
+            onClick={() => navigate("/paiements")}
+            className="inline-flex items-center gap-1 text-xs font-semibold text-[#2563EB] hover:text-[#1d4ed8] transition-colors cursor-pointer shrink-0"
+          >
+            Voir tout <ArrowRight className="h-3.5 w-3.5" />
+          </button>
+        </div>
 
-            {!paiementsDisponibles ? (
-              <div className="py-8 text-center text-slate-400 text-xs">Impossible de charger les paiements.</div>
-            ) : paiementsFiltres.length === 0 ? (
-              <div className="py-8 text-center text-slate-400 text-xs">
-                {rechercheVersements ? "Aucun versement ne correspond à votre recherche." : "Aucun versement récent."}
-              </div>
-            ) : (
-              <div className="overflow-x-auto h-64 overflow-y-auto">
-                <table className="w-full text-left border-collapse">
-                  <thead className="sticky top-0 z-10">
-                    <tr className="text-[10px] font-bold text-slate-400 uppercase tracking-wider bg-slate-50">
-                      <th className="py-3 px-5">Élève</th>
-                      <th className="py-3 px-5">Classe</th>
-                      <th className="py-3 px-5">Montant</th>
-                      <th className="py-3 px-5">Date</th>
-                      <th className="py-3 px-5">Statut</th>
-                      <th className="py-3 px-5"></th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {paiementsFiltres.map((p, i) => (
-                      <tr key={p.id ?? i} className="hover:bg-slate-50/60 transition-colors bg-white">
-                        <td className="py-3.5 px-5">
-                          <div className="flex items-center gap-3">
-                            <div className="h-9 w-9 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center font-bold text-xs shrink-0">
-                              {(p.eleve?.nom_complet || "?").split(" ").map((s) => s[0]).slice(0, 2).join("").toUpperCase()}
-                            </div>
-                            <div className="min-w-0">
-                              <p className="font-bold text-slate-900 truncate">{p.eleve?.nom_complet || "Élève"}</p>
-                              <p className="text-[11px] text-slate-400">{p.periode || p.libelle || ""}</p>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="py-3.5 px-5">
-                          <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 text-[11px] font-semibold">
-                            {p.eleve?.classe || "—"}
+        {versementsRecents.length === 0 ? (
+          <div className="py-10 text-center text-slate-400 text-xs">Aucun versement encaissé pour l'instant.</div>
+        ) : (
+          <ul className="divide-y divide-slate-100">
+            {versementsRecents.map((p, i) => {
+              const nom = p.eleve?.nom_complet || "Élève";
+              const partiel = p.statut === "partiel";
+              return (
+                <li
+                  key={p.id ?? i}
+                  onClick={() => p.eleve?.id && navigate(`/eleves/${p.eleve.id}`)}
+                  className={`flex items-center justify-between gap-3 px-5 py-3.5 transition-colors hover:bg-[#eff6ff] ${p.eleve?.id ? "cursor-pointer" : ""}`}
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <span className={`h-10 w-10 rounded-full flex items-center justify-center font-bold text-xs shrink-0 ${couleurAvatar(nom)}`}>
+                      {initialesNomComplet(nom)}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold text-slate-900 truncate">{nom}</p>
+                      <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
+                        {p.eleve?.classe && (
+                          <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[10px] font-semibold whitespace-nowrap">
+                            {p.eleve.classe}
                           </span>
-                        </td>
-                        <td className="py-3.5 px-5">
-                          <span className="font-bold text-emerald-600">+{formaterGNF(p.montant)}</span>
-                        </td>
-                        <td className="py-3.5 px-5 text-xs text-slate-500 leading-tight">
-                          <p>{p.date_paiement || "—"}</p>
-                          {p.heure && <p className="text-[10px] text-slate-400">{p.heure}</p>}
-                        </td>
-                        <td className="py-3.5 px-5">
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-600 text-[11px] font-bold">
-                            <CheckCircle2 className="h-3 w-3" />
-                            Payé
-                          </span>
-                        </td>
-                        <td className="py-3.5 px-5 text-right">
-                          <button
-                            onClick={() => p.eleve?.id && navigate(`/eleves/${p.eleve.id}`)}
-                            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
-                          >
-                            <MoreVertical className="h-4 w-4" />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </>
+                        )}
+                        <span className="text-[11px] text-slate-400 truncate">
+                          {[p.type_frais, p.periode].filter(Boolean).join(" · ") || "Paiement"}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className="text-sm font-extrabold text-emerald-600 tabular-nums">+{formaterGNF(p.montant)}</p>
+                    <div className="flex items-center justify-end gap-1.5 mt-0.5">
+                      <span
+                        className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                          partiel ? "bg-amber-50 text-amber-700" : "bg-emerald-50 text-emerald-700"
+                        }`}
+                      >
+                        {partiel ? "Partiel" : "Payé"}
+                      </span>
+                      {p.heure && <span className="text-[11px] text-slate-400 tabular-nums">{p.heure}</span>}
+                    </div>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
         )}
-      </Card>
+
+        <div className="flex items-center justify-between gap-3 px-5 py-3 bg-slate-50/70 border-t border-slate-100 text-[11px] text-slate-400">
+          <span>Tous les reçus sont générés avec référence fiscale interne</span>
+          <span className="font-semibold text-slate-500 whitespace-nowrap">
+            {versementsRecents.length} affiché{versementsRecents.length > 1 ? "s" : ""}
+            {!versementsDemo && tousPaiements.length > 0 ? ` sur ${tousPaiements.length}` : ""}
+          </span>
+        </div>
+      </div>
 
       {/* Élèves en retard de paiement */}
       <Card className="p-0 overflow-hidden">

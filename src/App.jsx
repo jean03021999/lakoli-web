@@ -50,6 +50,8 @@ function AppContent() {
   const location = useLocation();
   const [role, setRole] = useState(null);
   const [permissions, setPermissions] = useState([]);
+  const [etablissement, setEtablissement] = useState(null);
+  const [session, setSession] = useState(null);
   const [chargementRole, setChargementRole] = useState(true);
 
   const estPageAuth = AUTH_PATHS.includes(location.pathname);
@@ -68,6 +70,8 @@ function AppContent() {
       .then((res) => {
         setRole(res.data.role);
         setPermissions(res.data.permissions || []);
+        setEtablissement(res.data.etablissement || null);
+        setSession(res.data.session || null);
         if (res.data.user?.name) {
           localStorage.setItem("user_name", res.data.user.name);
         }
@@ -104,7 +108,7 @@ function AppContent() {
   }
 
   return (
-    <Layout role={role} permissions={permissions}>
+    <Layout role={role} permissions={permissions} etablissement={etablissement} session={session}>
       <Routes>
         <Route path="/tableau-de-bord" element={<TableauDeBord role={role} />} />
         <Route path="/eleves" element={<Eleves permissions={permissions} />} />
