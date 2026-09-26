@@ -446,9 +446,6 @@ function TableauDeBordComptable({ role }) {
     return Array.from(noms).slice(0, 6);
   })();
 
-  // Poids de chaque catégorie de frais dans le total, pour les barres de progression
-  const totalFinances = finances.inscriptions + finances.reinscriptions + finances.scolarite + finances.autres;
-  const pctFinance = (valeur) => (totalFinances > 0 ? Math.round((valeur / totalFinances) * 100) : 0);
 
   // Rapport imprimable (ou PDF via "Enregistrer au format PDF") avec les donnees reelles chargees ;
   // une source en echec apparait "indisponible" dans le rapport, jamais remplacee par des exemples.
