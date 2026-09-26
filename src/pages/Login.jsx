@@ -76,6 +76,8 @@ export default function LoginPage() {
   const profileCards = [
     {
       key: 'FONDATEUR',
+      emoji: '👑',
+      court: 'Vision & bilans',
       label: 'Fondateur',
       description: 'Vision stratégique & bilans',
       icon: Crown,
@@ -85,6 +87,8 @@ export default function LoginPage() {
     },
     {
       key: 'DIRECTEUR',
+      emoji: '🏢',
+      court: 'Direction adm.',
       label: 'Directeur',
       description: 'Direction administrative',
       icon: Building2,
@@ -94,6 +98,8 @@ export default function LoginPage() {
     },
     {
       key: 'PROVISEUR',
+      emoji: '🛡️',
+      court: 'Pédagogie',
       label: 'Proviseur',
       description: 'Direction pédagogique',
       icon: Shield,
@@ -103,6 +109,8 @@ export default function LoginPage() {
     },
     {
       key: 'CENSEUR',
+      emoji: '📚',
+      court: 'Coordination',
       label: 'Censeur',
       description: 'Coordination études',
       icon: BookOpen,
@@ -112,6 +120,8 @@ export default function LoginPage() {
     },
     {
       key: 'COMPTABLE',
+      emoji: '💼',
+      court: 'Recouvrement',
       label: 'Comptable',
       description: 'Recouvrement & paie',
       icon: Wallet,
@@ -120,6 +130,9 @@ export default function LoginPage() {
       defaultEmail: 'comptable@lakoli.edu'
     }
   ];
+
+  // Profil Parent : affiche (design) mais pas encore disponible
+  const PROFIL_PARENT = { key: 'PARENT', label: 'Parent', description: "Suivi de l'enfant", court: 'Suivi enfant', emoji: '👨‍👩‍👧', disabled: true, badge: 'Bientôt' };
 
   // Handle Role selection
   const handleSelectRole = (card) => {
@@ -297,224 +310,254 @@ export default function LoginPage() {
         </div>
 
         {/* ========================================================= */}
-        {/* PARTIE DROITE (50%)                                       */}
-        {/* Fond : #1e293b (gris bleu sombre)                         */}
+        {/* PARTIE DROITE (50%) — formulaire (design Google AI Studio) */}
         {/* ========================================================= */}
-        <div className="lg:col-span-6 bg-[#1e293b] p-6 sm:p-8 lg:p-10 flex flex-col justify-between">
-
-          <div className="space-y-4">
-
-            {/* Header LAKOLI Branding */}
-            <div className="flex items-center justify-between border-b border-[#334155] pb-3.5">
-              <div className="flex items-center gap-2.5">
-                <div className="h-9 w-9 rounded-xl bg-[#0C447C] text-[#f1f5f9] flex items-center justify-center font-black shadow-md shadow-[#0C447C]/30">
-                  <GraduationCap className="h-5 w-5" />
-                </div>
-                <div>
-                  <h1 className="text-lg font-black text-[#f1f5f9] tracking-tight leading-none">
+        <div
+          className="lg:col-span-6 flex items-center justify-center p-6 sm:p-10 lg:p-12 backdrop-blur-md lg:overflow-y-auto"
+          style={{ background: "linear-gradient(135deg, rgba(240, 244, 248, 0.97) 0%, rgba(255, 255, 255, 1) 100%)" }}
+        >
+          <div className="w-full max-w-[400px] bg-white/95 rounded-2xl p-7 sm:p-9 shadow-2xl border border-slate-200/70 space-y-4 text-[#1e293b]">
+            {/* Logo LAKOLI + mini drapeau guinéen */}
+            <div className="flex items-center gap-3">
+              <div
+                className="flex items-center justify-center text-white shrink-0"
+                style={{
+                  width: "44px",
+                  height: "44px",
+                  background: "linear-gradient(135deg, #0C447C 0%, #1a6bb5 100%)",
+                  borderRadius: "12px",
+                  boxShadow: "0 4px 12px rgba(12, 68, 124, 0.25)",
+                }}
+              >
+                <GraduationCap className="w-6 h-6" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="leading-none" style={{ color: "#0C447C", fontSize: "22px", fontWeight: 900, letterSpacing: "2px" }}>
                     LAKOLI
-                  </h1>
-                  <span className="text-[10px] font-bold text-[#94a3b8] uppercase tracking-wider">
-                    SaaS Éducation
+                  </span>
+                  <span
+                    className="flex rounded-[2px] overflow-hidden border border-slate-200 shrink-0"
+                    style={{ width: "20px", height: "13px" }}
+                    title="République de Guinée"
+                  >
+                    <span className="w-1/3 h-full bg-[#CE1126]" />
+                    <span className="w-1/3 h-full bg-[#FCD116]" />
+                    <span className="w-1/3 h-full bg-[#009460]" />
                   </span>
                 </div>
+                <p className="text-[11px] text-[#64748b] font-medium mt-0.5">Gestion Scolaire · Guinée</p>
               </div>
-
-              <span className="px-2.5 py-1 bg-[#0f172a] text-[#94a3b8] text-[10px] font-bold rounded-full border border-[#334155]">
-                v2.4.0 SaaS LAKOLI
-              </span>
             </div>
 
-            {/* SECTION "CHOIX DU PROFIL D'ACCÈS" AVEC ÉTIQUETTE DU PROFIL ACTIF EN BLEU À DROITE */}
-            <div className="space-y-2">
-              <div className="flex justify-between items-center text-xs font-bold text-[#f1f5f9]">
-                <span>Choix du profil d'accès :</span>
-                <span className="text-xs font-extrabold text-[#38bdf8] bg-[#0C447C]/40 px-2 py-0.5 rounded-md border border-[#0C447C]">
-                  {activeCardConfig.label}
+            <div className="border-t border-[#e2e8f0]" />
+
+            {/* Titre du formulaire */}
+            <div className="space-y-0.5">
+              <h2 className="font-extrabold text-[#0C447C] tracking-tight leading-tight" style={{ fontSize: "22px" }}>
+                Connexion à votre espace
+              </h2>
+              <p className="text-[13px] text-[#64748b]">Accédez à votre tableau de bord sécurisé</p>
+            </div>
+
+            {/* Sélection du profil (grille 3 x 2) */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="block text-[10px] font-bold uppercase tracking-wider text-[#0C447C]/80">
+                  Votre profil d'accès
+                </span>
+                <span className="text-[10px] font-semibold text-[#0C447C] bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">
+                  {activeCardConfig.label} sélectionné
                 </span>
               </div>
 
-              {/* GRILLE DE CARTES PROFILS */}
-              <div className="flex flex-wrap justify-center gap-2">
-                {profileCards.map((card) => {
+              <div className="grid grid-cols-3 gap-2">
+                {[...profileCards, PROFIL_PARENT].map((card) => {
                   const isSelected = selectedRoleKey === card.key;
-                  const Icon = card.icon;
-
+                  const isDisabled = !!card.disabled;
                   return (
                     <button
                       key={card.key}
                       type="button"
-                      onClick={() => handleSelectRole(card)}
+                      onClick={() => !isDisabled && handleSelectRole(card)}
+                      disabled={isDisabled}
                       title={card.description}
-                      className={`relative flex-1 basis-[30%] p-2.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between min-h-[66px] ${
-                        isSelected
-                          ? 'border-[#0C447C] bg-[#1e3a5f] ring-2 ring-[#0C447C]/40 shadow-sm'
-                          : 'border-[#334155] bg-[#0f172a]/80 hover:bg-[#0f172a] hover:border-[#475569]'
+                      className={`relative text-left transition-all duration-200 select-none text-white ${
+                        isDisabled
+                          ? "opacity-60 cursor-not-allowed"
+                          : isSelected
+                          ? "scale-[1.02] cursor-pointer"
+                          : "hover:brightness-110 cursor-pointer"
                       }`}
+                      style={{
+                        borderRadius: "10px",
+                        padding: "10px",
+                        background: isSelected
+                          ? "linear-gradient(135deg, #0C447C 0%, #1565c0 100%)"
+                          : "linear-gradient(145deg, #0a2d5a 0%, #0C447C 100%)",
+                        border: isSelected ? "2px solid #60a5fa" : "1px solid rgba(255, 255, 255, 0.15)",
+                        boxShadow: isSelected ? "0 4px 14px rgba(12, 68, 124, 0.4)" : "0 2px 6px rgba(0, 0, 0, 0.08)",
+                      }}
                     >
-                      <div className="flex items-center justify-between">
-                        <Icon className={`h-4.5 w-4.5 ${card.iconColor}`} />
-
-                        {isSelected && (
-                          <div className="h-4 w-4 rounded-full bg-[#0C447C] text-white flex items-center justify-center">
-                            <Check className="h-2.5 w-2.5 text-[#f1f5f9]" />
-                          </div>
-                        )}
+                      {isSelected && (
+                        <span className="absolute top-1.5 right-1.5 w-3.5 h-3.5 rounded-full bg-[#10b981] text-white flex items-center justify-center">
+                          <Check className="w-2.5 h-2.5 stroke-[3]" />
+                        </span>
+                      )}
+                      {card.badge && (
+                        <span className="absolute top-1.5 right-1.5 px-1 rounded text-[8px] font-bold bg-amber-400/20 text-amber-300 border border-amber-400/40">
+                          {card.badge}
+                        </span>
+                      )}
+                      <div className="w-6 h-6 rounded-md bg-white/15 flex items-center justify-center text-[15px] mb-1.5 border border-white/10">
+                        {card.emoji}
                       </div>
-
-                      <div className="mt-1">
-                        <p className="text-xs font-extrabold text-[#f1f5f9] truncate">
-                          {card.label}
-                        </p>
-                        <p className="text-[9px] text-[#94a3b8] truncate">
-                          {card.description}
-                        </p>
-                      </div>
+                      <p className="text-[11px] font-bold leading-tight truncate text-white">{card.label}</p>
+                      <p className="text-[9px] text-blue-100/80 leading-tight truncate mt-0.5">{card.court}</p>
                     </button>
                   );
                 })}
               </div>
             </div>
 
-            {/* Error Banner */}
+            {/* Message d'erreur de connexion */}
             {error && (
-              <div className="p-3 bg-[#0f172a] border border-[#f59e0b] text-[#f59e0b] rounded-xl text-xs font-bold flex items-center gap-2.5 animate-in fade-in duration-200">
-                <AlertCircle className="h-4 w-4 shrink-0 text-[#f59e0b]" />
+              <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-xs font-semibold flex items-center gap-2.5">
+                <AlertCircle className="h-4 w-4 shrink-0" />
                 <span className="leading-tight">{error}</span>
               </div>
             )}
 
-            {/* LOGIN FORM */}
-            <form onSubmit={handleSubmit} className="space-y-3">
-
-              {/* Email ou numéro de téléphone */}
+            {/* Formulaire */}
+            <form onSubmit={handleSubmit} className="space-y-3 pt-0.5" noValidate>
               <div className="space-y-1">
-                <label className="text-xs font-bold text-[#f1f5f9] block">
-                  Email ou numéro de téléphone <span className="text-[#f59e0b]">*</span>
+                <label htmlFor="identifiant" className="block text-[11px] font-semibold text-[#0C447C]/90">
+                  Email ou numéro
                 </label>
                 <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-[#94a3b8]">
-                    <Mail className="h-4 w-4" />
-                  </div>
+                  <Mail className="w-4 h-4 text-[#0C447C]/60 absolute left-3 top-3.5" />
                   <input
+                    id="identifiant"
                     type="text"
-                    required
+                    autoComplete="username"
                     value={identifier}
                     onChange={(e) => {
                       setIdentifier(e.target.value);
                       if (fieldErrors.identifier) setFieldErrors({ ...fieldErrors, identifier: undefined });
                     }}
-                    placeholder="nom@lakoli.edu ou +224 620..."
-                    className={`w-full pl-10 pr-4 py-2.5 bg-[#0f172a] border rounded-xl text-xs font-medium focus:ring-2 focus:ring-[#0C447C] focus:border-[#0C447C] transition-all outline-none text-[#f1f5f9] placeholder:text-[#64748b] ${
-                      fieldErrors.identifier
-                        ? 'border-[#f59e0b] ring-1 ring-[#f59e0b]'
-                        : 'border-[#334155]'
-                    }`}
+                    placeholder="Entrez votre email ou identifiant"
+                    className="w-full pl-9 pr-3.5 border text-sm text-[#1e293b] placeholder:text-[#94a3b8] hover:border-[#0C447C]/50 focus:outline-none focus:border-[#0C447C] focus:shadow-[0_0_0_3px_rgba(12,68,124,0.15)] transition-all"
+                    style={{
+                      backgroundColor: "#f8fafc",
+                      borderColor: fieldErrors.identifier ? "#f43f5e" : "rgba(12, 68, 124, 0.28)",
+                      borderRadius: "10px",
+                      height: "44px",
+                    }}
                   />
                 </div>
-                {fieldErrors.identifier && (
-                  <p className="text-[10px] text-[#f59e0b] font-bold pl-1">{fieldErrors.identifier}</p>
-                )}
+                {fieldErrors.identifier && <p className="text-[11px] text-rose-600 font-semibold pl-1">{fieldErrors.identifier}</p>}
               </div>
 
-              {/* Mot de passe avec oeil et lien mot de passe oublié */}
               <div className="space-y-1">
-                <div className="flex justify-between items-center">
-                  <label className="text-xs font-bold text-[#f1f5f9] block">
-                    Mot de passe <span className="text-[#f59e0b]">*</span>
+                <div className="flex items-center justify-between">
+                  <label htmlFor="mot-de-passe" className="block text-[11px] font-semibold text-[#0C447C]/90">
+                    Mot de passe
                   </label>
                   <button
                     type="button"
                     onClick={() => setShowForgotModal(true)}
-                    className="text-xs font-bold text-[#38bdf8] hover:underline cursor-pointer"
+                    className="text-[11px] font-semibold text-[#0C447C] hover:underline cursor-pointer"
                   >
-                    Mot de passe oublié ?
+                    Oublié ?
                   </button>
                 </div>
                 <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-[#94a3b8]">
-                    <Lock className="h-4 w-4" />
-                  </div>
+                  <Lock className="w-4 h-4 text-[#0C447C]/60 absolute left-3 top-3.5" />
                   <input
-                    type={showPassword ? 'text' : 'password'}
-                    required
+                    id="mot-de-passe"
+                    type={showPassword ? "text" : "password"}
+                    autoComplete="current-password"
                     value={password}
                     onChange={(e) => {
                       setPassword(e.target.value);
                       if (fieldErrors.password) setFieldErrors({ ...fieldErrors, password: undefined });
                     }}
-                    placeholder="••••••••••••"
-                    className={`w-full pl-10 pr-10 py-2.5 bg-[#0f172a] border rounded-xl text-xs font-medium focus:ring-2 focus:ring-[#0C447C] focus:border-[#0C447C] transition-all outline-none text-[#f1f5f9] placeholder:text-[#64748b] ${
-                      fieldErrors.password
-                        ? 'border-[#f59e0b] ring-1 ring-[#f59e0b]'
-                        : 'border-[#334155]'
-                    }`}
+                    placeholder="Entrez votre mot de passe"
+                    className="w-full pl-9 pr-10 border text-sm text-[#1e293b] placeholder:text-[#94a3b8] hover:border-[#0C447C]/50 focus:outline-none focus:border-[#0C447C] focus:shadow-[0_0_0_3px_rgba(12,68,124,0.15)] transition-all"
+                    style={{
+                      backgroundColor: "#f8fafc",
+                      borderColor: fieldErrors.password ? "#f43f5e" : "rgba(12, 68, 124, 0.28)",
+                      borderRadius: "10px",
+                      height: "44px",
+                    }}
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-[#94a3b8] hover:text-[#f1f5f9] cursor-pointer"
-                    title={showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"}
+                    className="absolute right-3 top-3 text-[#0C447C]/60 hover:text-[#0C447C] transition-colors p-0.5 cursor-pointer"
+                    aria-label={showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"}
                   >
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
-                {fieldErrors.password && (
-                  <p className="text-[10px] text-[#f59e0b] font-bold pl-1">{fieldErrors.password}</p>
-                )}
+                {fieldErrors.password && <p className="text-[11px] text-rose-600 font-semibold pl-1">{fieldErrors.password}</p>}
               </div>
 
-              {/* Case à cocher "Se souvenir de moi pendant 30 jours" */}
-              <div className="flex items-center justify-between pt-0.5">
-                <label className="flex items-center gap-2 cursor-pointer group">
-                  <input
-                    type="checkbox"
-                    checked={rememberMe}
-                    onChange={(e) => setRememberMe(e.target.checked)}
-                    className="h-4 w-4 rounded border-[#334155] bg-[#0f172a] text-[#0C447C] focus:ring-[#0C447C] cursor-pointer"
-                  />
-                  <span className="text-xs font-medium text-[#94a3b8] group-hover:text-[#f1f5f9] transition-colors">
-                    Se souvenir de moi pendant 30 jours
-                  </span>
+              <div className="flex items-center gap-2 pt-0.5">
+                <input
+                  id="se-souvenir"
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  className="w-4 h-4 rounded text-[#0C447C] focus:ring-0 cursor-pointer"
+                  style={{ borderColor: "rgba(12, 68, 124, 0.35)" }}
+                />
+                <label htmlFor="se-souvenir" className="text-[12px] text-[#475569] cursor-pointer select-none">
+                  Se souvenir 30 jours
                 </label>
               </div>
 
-              {/* BOUTON CONNEXION : #0C447C avec hover #1a5a9e, pleine largeur */}
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full py-3 px-6 bg-[#0C447C] hover:bg-[#1a5a9e] text-[#f1f5f9] rounded-xl text-xs font-black shadow-lg shadow-[#0C447C]/30 transition-all cursor-pointer flex items-center justify-center gap-2 group disabled:opacity-75 mt-2"
+                className="w-full text-white text-sm flex items-center justify-center gap-2 transition-all duration-200 hover:shadow-[0_6px_20px_rgba(12,68,124,0.4)] hover:brightness-105 active:scale-[0.99] cursor-pointer disabled:opacity-75"
+                style={{
+                  height: "46px",
+                  borderRadius: "10px",
+                  fontWeight: 700,
+                  background: "linear-gradient(135deg, #0C447C 0%, #1565c0 100%)",
+                  boxShadow: "0 4px 16px rgba(12, 68, 124, 0.3)",
+                }}
               >
                 {isLoading ? (
                   <>
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    <span>Authentification LAKOLI...</span>
+                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span>Connexion en cours...</span>
                   </>
                 ) : (
                   <>
-                    <span>Connexion</span>
-                    <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                    <span>Se connecter</span>
+                    <ArrowRight className="w-4 h-4" />
                   </>
                 )}
               </button>
-
             </form>
 
+            {/* Pied du formulaire */}
+            <div className="pt-2">
+              <div className="border-t border-[#e2e8f0] pt-3 flex items-center justify-between text-[11px] text-[#64748b]">
+                <button
+                  type="button"
+                  onClick={() => setShowSecuritySpecsModal(true)}
+                  className="flex items-center gap-1.5 hover:text-[#0C447C] transition-colors cursor-pointer"
+                >
+                  <span>🔒</span>
+                  <span>Chiffrement SSL & Architecture JWT</span>
+                </button>
+                <span className="font-mono text-[#94a3b8]">v2.4.0 SaaS LAKOLI</span>
+              </div>
+            </div>
           </div>
-
-          {/* FOOTER DROIT : Icône SSL + Chiffrement SSL & Architecture JWT et v2.4.0 SaaS LAKOLI */}
-          <div className="mt-4 pt-3 border-t border-[#334155] flex items-center justify-between text-[11px] text-[#94a3b8]">
-            <button
-              type="button"
-              onClick={() => setShowSecuritySpecsModal(true)}
-              className="flex items-center gap-1.5 hover:text-[#f1f5f9] transition-colors cursor-pointer"
-            >
-              <ShieldCheck className="h-4 w-4 text-[#10b981]" />
-              <span>Chiffrement SSL & Architecture JWT</span>
-            </button>
-            <span>v2.4.0 SaaS LAKOLI</span>
-          </div>
-
         </div>
 
       </div>
