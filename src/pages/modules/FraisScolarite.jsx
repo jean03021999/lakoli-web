@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import api from "../../services/api";
 import {
   Plus,
@@ -129,7 +130,13 @@ export default function FraisScolarite({ permissions = [] }) {
 
   // Colonne gauche : classe + recherche + liste des eleves.
   const [classes, setClasses] = useState([]);
-  const [classeId, setClasseId] = useState(lireClasseFiltre);
+  // Eleve a pre-selectionner, transmis par la navigation (ex. "Payer maintenant" du tableau de bord).
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [eleveAPreselectionner, setEleveAPreselectionner] = useState(location.state?.eleveId ?? null);
+  const [classeId, setClasseId] = useState(() =>
+    location.state?.classeId ? String(location.state.classeId) : lireClasseFiltre()
+  );
   const [eleves, setEleves] = useState([]);
   const [recherche, setRecherche] = useState("");
   const [afficherSuggestions, setAfficherSuggestions] = useState(false);
@@ -463,6 +470,17 @@ export default function FraisScolarite({ permissions = [] }) {
     setPaiement(null);
     chargerSuivi(e.id);
   };
+
+  // Des que les eleves de la classe sont charges, ouvre l'eleve transmis par la navigation, une seule
+  // fois ; l'etat de navigation est ensuite efface (un rechargement ne le reselectionne pas).
+  useEffect(() => {
+    if (!eleveAPreselectionner || chargementEleves || eleves.length === 0) return;
+    const eleve = eleves.find((e) => String(e.id) === String(eleveAPreselectionner));
+    setEleveAPreselectionner(null);
+    navigate(location.pathname, { replace: true, state: null });
+    if (eleve) selectionnerEleve(eleve);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [eleves, chargementEleves, eleveAPreselectionner]);
 
   // Types "Inscription" / "Réinscription" retrouves par leur nom (les ids different d'un etablissement a l'autre)
   // et montant de la grille de la classe de l'eleve.

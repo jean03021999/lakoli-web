@@ -21,6 +21,7 @@ import {
   FileDown,
   PlusCircle,
   ArrowRight,
+  X,
 } from "lucide-react";
 import api from "../../services/api";
 import { imprimerDocument, genererRapportComptableHtml } from "../../utils/impression";
@@ -134,12 +135,29 @@ function CarteStatistique({ titre, valeur, icone: Icon, degrade, badge, progress
 // translucide, badge de tendance en haut a droite, grande valeur et barre de progression.
 // `tendance` : { sens: "hausse" | "baisse", texte } — le texte decrit la donnee reelle
 // (aucun historique n'existe pour calculer une variation).
-function StatCard({ label, valeur, unite, icone: Icon, gradient, tendance, progression = 0 }) {
+// `onClick` rend la carte cliquable (curseur, anneau au survol, clavier) ; `actif` la met en avant.
+function StatCard({ label, valeur, unite, icone: Icon, gradient, tendance, progression = 0, onClick, actif = false, titre }) {
   const IconeTendance = tendance?.sens === "baisse" ? TrendingDown : TrendingUp;
+  const cliquable = typeof onClick === "function";
   return (
     <div
-      className="relative isolate overflow-hidden p-5 text-white shadow-md transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl"
+      className={`relative isolate overflow-hidden p-5 text-white shadow-md transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl ${
+        cliquable ? "cursor-pointer hover:ring-4 hover:ring-white/40 focus:outline-none focus-visible:ring-4 focus-visible:ring-white/70" : ""
+      } ${actif ? "ring-4 ring-white/70 -translate-y-1" : ""}`}
       style={{ background: gradient, borderRadius: "18px" }}
+      {...(cliquable && {
+        role: "button",
+        tabIndex: 0,
+        "aria-expanded": actif,
+        title: titre,
+        onClick,
+        onKeyDown: (ev) => {
+          if (ev.key === "Enter" || ev.key === " ") {
+            ev.preventDefault();
+            onClick();
+          }
+        },
+      })}
     >
       {/* Cercles decoratifs flous, pour la profondeur */}
       <div className="absolute -top-8 -right-8 h-28 w-28 rounded-full bg-white/10 blur-2xl pointer-events-none" />
@@ -312,6 +330,10 @@ function TableauDeBordComptable({ role }) {
   const [etablissement, setEtablissement] = useState("");
   const [elevesSession, setElevesSession] = useState("");
   const [erreurRapport, setErreurRapport] = useState("");
+  const [retardsOuverts, setRetardsOuverts] = useState(false);
+  const [retardsListe, setRetardsListe] = useState([]);
+  const [retardsChargement, setRetardsChargement] = useState(false);
+  const [retardsErreur, setRetardsErreur] = useState("");
   const [rechercheRetard, setRechercheRetard] = useState("");
   const [suggestionsRetardOuvertes, setSuggestionsRetardOuvertes] = useState(false);
   const [statsParClasse, setStatsParClasse] = useState([]);
@@ -447,6 +469,25 @@ function TableauDeBordComptable({ role }) {
   })();
 
 
+  const basculerRetards = async () => {
+    if (retardsOuverts) {
+      setRetardsOuverts(false);
+      return;
+    }
+    setRetardsOuverts(true);
+    setRetardsChargement(true);
+    setRetardsErreur("");
+    try {
+      const res = await api.get("/eleves", { params: { statut_paiement: "en_retard" } });
+      setRetardsListe(res.data.eleves);
+    } catch {
+      setRetardsListe([]);
+      setRetardsErreur("Impossible de charger les élèves en retard.");
+    } finally {
+      setRetardsChargement(false);
+    }
+  };
+
   // Rapport imprimable (ou PDF via "Enregistrer au format PDF") avec les donnees reelles chargees ;
   // une source en echec apparait "indisponible" dans le rapport, jamais remplacee par des exemples.
   const exporterRapport = () => {
@@ -575,6 +616,9 @@ function TableauDeBordComptable({ role }) {
           gradient="linear-gradient(135deg, #dc2626, #ef4444)"
           tendance={enRetard > 0 ? { sens: "baisse", texte: `${enRetard} à relancer` } : { sens: "hausse", texte: "Aucun retard" }}
           progression={totalEleves > 0 ? Math.round((enRetard / totalEleves) * 100) : 0}
+          onClick={enRetard > 0 ? basculerRetards : undefined}
+          actif={retardsOuverts}
+          titre={retardsOuverts ? "Masquer la liste des élèves en retard" : "Voir les élèves en retard"}
         />
         <StatCard
           label="Total encaissé"
@@ -606,6 +650,88 @@ function TableauDeBordComptable({ role }) {
           progression={situationInscriptions.total > 0 ? Math.round((situationInscriptions.reinscrits / situationInscriptions.total) * 100) : 0}
         />
       </div>
+
+      {/* Élèves en retard : liste ouverte depuis la carte "Paiements en retard" */}
+      {retardsOuverts && (
+        <div
+          className="bg-white overflow-hidden border border-rose-100"
+          style={{ borderRadius: "16px", boxShadow: "0 4px 24px rgba(0,0,0,0.06)" }}
+        >
+          <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-rose-100 bg-rose-50/40">
+            <h3 className="flex items-center gap-2 text-sm font-bold text-rose-600">
+              <AlertTriangle className="h-4 w-4" />
+              Élèves avec paiements en retard
+              <span className="min-w-6 h-6 px-2 rounded-full bg-rose-600 text-white text-[11px] font-bold inline-flex items-center justify-center">
+                {retardsChargement ? "…" : retardsListe.length}
+              </span>
+            </h3>
+            <button
+              onClick={() => setRetardsOuverts(false)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:bg-white hover:text-slate-900 border border-slate-200 transition-colors cursor-pointer"
+            >
+              <X className="h-3.5 w-3.5" />
+              Fermer
+            </button>
+          </div>
+
+          {retardsChargement ? (
+            <div className="py-10 text-center text-slate-400 text-xs">Chargement des élèves en retard…</div>
+          ) : retardsErreur ? (
+            <div className="py-10 text-center text-rose-600 text-xs">{retardsErreur}</div>
+          ) : retardsListe.length === 0 ? (
+            <div className="py-10 text-center text-slate-400 text-xs">Aucun élève en retard de paiement.</div>
+          ) : (
+            <ul className="divide-y divide-slate-100 max-h-96 overflow-y-auto">
+              {retardsListe.map((e) => {
+                const nom = `${e.nom || ""} ${e.prenom || ""}`.trim();
+                return (
+                  <li key={e.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5 hover:bg-rose-50/40 transition-colors">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <span className={`h-10 w-10 rounded-full flex items-center justify-center font-bold text-xs shrink-0 ${couleurAvatar(nom)}`}>
+                        {getInitialesEleve(e.nom, e.prenom)}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold text-slate-900 truncate">{nom}</p>
+                        <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                          <span className="text-[11px] text-slate-400 font-mono">{e.matricule}</span>
+                          {e.classe && (
+                            <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[10px] font-semibold whitespace-nowrap">
+                              {e.classe}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-4 ml-auto">
+                      <div className="text-right">
+                        <p className="text-[11px] text-slate-500">
+                          {e.retard ? (
+                            <>
+                              {e.retard.echeance} · dépassée depuis le {new Date(e.retard.date_limite).toLocaleDateString("fr-FR")}
+                              {e.retard.nombre_echeances > 1 && ` (+${e.retard.nombre_echeances - 1})`}
+                            </>
+                          ) : "Échéance dépassée"}
+                        </p>
+                        <p className="text-sm font-extrabold text-rose-600 tabular-nums">
+                          {e.retard ? formaterGNF(e.retard.montant_du) : "—"}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => navigate("/frais-scolarite", { state: { eleveId: e.id, classeId: e.classe_id } })}
+                        className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-sm transition-colors cursor-pointer whitespace-nowrap"
+                      >
+                        <Wallet className="h-3.5 w-3.5" />
+                        Payer maintenant
+                      </button>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+      )}
 
       {/* Versements (3/5) et situation des inscriptions (2/5) */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-5 items-stretch">
