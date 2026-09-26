@@ -349,12 +349,19 @@ export default function LoginPage() {
 
             <div className="border-t border-[#e2e8f0]" />
 
-            {/* Titre du formulaire */}
-            <div className="space-y-0.5">
-              <h2 className="font-extrabold text-[#0C447C] tracking-tight leading-tight" style={{ fontSize: "19px" }}>
+            {/* Titre du formulaire, sur une bande bleue identique au bouton "Se connecter" */}
+            <div
+              className="px-4 py-2.5 text-white"
+              style={{
+                borderRadius: "10px",
+                background: "linear-gradient(135deg, #0C447C 0%, #1565c0 100%)",
+                boxShadow: "0 4px 16px rgba(12, 68, 124, 0.3)",
+              }}
+            >
+              <h2 className="font-extrabold tracking-tight leading-tight" style={{ fontSize: "17px" }}>
                 Connexion à votre espace
               </h2>
-              <p className="text-[12px] text-[#64748b]">Accédez à votre tableau de bord sécurisé</p>
+              <p className="text-[12px] text-white/75">Accédez à votre tableau de bord sécurisé</p>
             </div>
 
             {/* Sélection du profil (grille 3 x 2) */}
