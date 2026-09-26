@@ -268,13 +268,33 @@ export default function Layout({ children, role, permissions = [], etablissement
   const nomUtilisateur = localStorage.getItem("user_name") || "Utilisateur";
 
   return (
-    <div className="h-screen overflow-hidden bg-[#F8FAFC] text-slate-800 flex flex-col font-sans selection:bg-[#0C447C] selection:text-white">
+    <div className="h-screen overflow-hidden bg-[#F8FAFC] text-slate-800 flex font-sans selection:bg-[#0C447C] selection:text-white">
+      <div className="flex flex-1 min-h-0 w-full max-w-7xl mx-auto">
+        {/* Sidebar (fixe, pleine hauteur jusqu'au logo, ne défile pas) */}
+        <aside
+          className="w-60 shrink-0 hidden md:block h-full"
+          style={{ background: "linear-gradient(180deg, #0C447C 0%, #0a2d5a 100%)" }}
+        >
+          <ContenuSidebar
+            modules={modulesVisibles}
+            estActif={estActif}
+            etablissement={etablissement}
+            session={session}
+            nomUtilisateur={nomUtilisateur}
+            libelleRole={LABELS_ROLES[role] || role}
+            enLigne={enLigne}
+            onDeconnexion={handleDeconnexion}
+            onNaviguer={navigate}
+          />
+        </aside>
+
+        <div className="flex-1 min-w-0 h-full flex flex-col">
       {/* En-tête */}
       <header
         className="sticky top-0 shrink-0 z-40 bg-white/80 backdrop-blur-md border-b border-slate-200/70"
         style={{ boxShadow: "0 1px 3px rgba(15,23,42,0.04)" }}
       >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-3 h-16">
             {/* Icône menu hamburger (mobile : ouvre le menu complet) */}
             <button
@@ -430,29 +450,11 @@ export default function Layout({ children, role, permissions = [], etablissement
         </div>
       </header>
 
-      <div className="flex flex-1 min-h-0 w-full max-w-7xl mx-auto">
-        {/* Sidebar (fixe, ne défile pas) */}
-        <aside
-          className="w-60 shrink-0 hidden md:block h-full"
-          style={{ background: "linear-gradient(180deg, #0C447C 0%, #0a2d5a 100%)" }}
-        >
-          <ContenuSidebar
-            modules={modulesVisibles}
-            estActif={estActif}
-            etablissement={etablissement}
-            session={session}
-            nomUtilisateur={nomUtilisateur}
-            libelleRole={LABELS_ROLES[role] || role}
-            enLigne={enLigne}
-            onDeconnexion={handleDeconnexion}
-            onNaviguer={navigate}
-          />
-        </aside>
-
         {/* Contenu principal (seule zone qui défile) */}
-        <main className="flex-1 h-full overflow-y-auto overflow-x-hidden min-w-0 px-4 sm:px-6 md:px-8 py-6 space-y-6">
+        <main className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden min-w-0 px-4 sm:px-6 md:px-8 py-6 space-y-6">
           {children}
         </main>
+        </div>
       </div>
 
       {/* Navigation mobile */}
