@@ -368,7 +368,16 @@ export function genererEtImprimerRecu(data, fenetrePreouverte) {
   const fenetre = fenetrePreouverte || window.open("", "_blank");
   if (!fenetre) return false;
 
-  const html = `<!DOCTYPE html>
+  fenetre.document.open();
+  fenetre.document.write(genererRecuHtml(data));
+  fenetre.document.close();
+  fenetre.focus();
+  return true;
+}
+
+// Document HTML complet du recu (separe de l'ouverture de la fenetre pour pouvoir le tester).
+export function genererRecuHtml(data) {
+  return `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="UTF-8">
@@ -467,11 +476,18 @@ export function genererEtImprimerRecu(data, fenetrePreouverte) {
       .recu { box-shadow: none; margin: 0; border-radius: 0; }
       .total-check { animation: none; }
       .btn-group { display: none !important; }
+      /* Un peu plus compact a l'impression : le recu doit tenir sur une seule page A4. */
+      .section { padding-top: 10px; padding-bottom: 10px; }
+      .statut-box { margin-top: 8px; margin-bottom: 8px; }
+      .signature-box { padding-top: 22px; }
+      .footer { margin-top: 10px; }
+      .page-recu { break-inside: avoid; }
       @page { margin: 8mm; size: A4; }
     }
   </style>
 </head>
 <body>
+  <div class="page-recu">
   <div class="bande-top"></div>
   <div class="header">
     <div class="header-left">
@@ -557,19 +573,33 @@ export function genererEtImprimerRecu(data, fenetrePreouverte) {
       </div>
     </div>
   </div>
+  </div>
 
   <div class="btn-group">
     <button class="btn btn-print" onclick="window.print()">🖨️ Imprimer</button>
     <button class="btn btn-close" onclick="window.close()">✕ Fermer</button>
   </div>
+  <script>
+    // Le recu doit toujours tenir sur UNE page A4 (QR code compris) : juste avant l'impression, on
+    // mesure sa hauteur et, s'il depasse la zone imprimable (A4 moins 2 x 8 mm, soit ~1062 px CSS),
+    // on le reduit proportionnellement. Taille normale retablie apres l'impression.
+    (function () {
+      var HAUTEUR_MAX = 1030;
+      var recu = document.querySelector(".page-recu");
+      function ajuster() {
+        recu.style.zoom = "";
+        var hauteur = recu.getBoundingClientRect().height;
+        if (hauteur > HAUTEUR_MAX) recu.style.zoom = String(Math.floor((HAUTEUR_MAX / hauteur) * 1000) / 1000);
+      }
+      window.addEventListener("beforeprint", ajuster);
+      window.addEventListener("afterprint", function () { recu.style.zoom = ""; });
+      if (window.matchMedia) {
+        window.matchMedia("print").addEventListener("change", function (m) { if (m.matches) ajuster(); });
+      }
+    })();
+  </script>
 </body>
 </html>`;
-
-  fenetre.document.open();
-  fenetre.document.write(html);
-  fenetre.document.close();
-  fenetre.focus();
-  return true;
 }
 
 // Minuscules et sans accents : reconnait "Inscription"/"Réinscription" quel que soit le cas.
