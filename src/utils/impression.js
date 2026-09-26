@@ -235,6 +235,7 @@ const STYLES = `
   .doc-releve.rapport .vide { color: #64748b; font-style: italic; font-size: 12px; }
   .doc-releve.rapport .note { margin: 6px 0 0; color: #64748b; font-size: 11px; }
   .doc-releve.rapport .gris { color: #64748b; font-size: 11px; }
+  .doc-releve.rapport .tuile .val .sur { font-size: 12px; font-weight: normal; color: #64748b; }
 
   .doc-releve .pied-premium {
     margin-top: 24px; padding-top: 12px; border-top: 1px solid #e2e8f0;
@@ -784,10 +785,10 @@ export function genererListeElevesHtml({ etablissement, session, classes, filtre
 // Rapport comptable — synthese imprimable (ou enregistrable en PDF) du tableau de bord comptable,
 // avec les donnees reelles. Une section dont la source n'a pas pu etre chargee est signalee
 // « indisponible » plutot que remplie de zeros. A passer a imprimerDocument().
-//   indicateurs : { totalEleves, paiementsAujourdhui, enRetard, totalEncaisse } (null = indisponible)
+//   indicateurs : { totalEleves, inscrits, paiementsAujourdhui, enRetard, totalEncaisse } (null = indisponible)
 //   finances    : { inscriptions, reinscriptions, scolarite, autres } | null
 //   classes     : [{ classe, niveau, nombre_eleves, montant_total, montant_encaisse, nombre_soldes, nombre_en_retard }] | null
-//   inscriptions: { nouveaux, reinscrits, aReinscrire, total } | null
+//   inscriptions: { nouveaux, reinscrits, nonInscrits, total } | null (inscrit = frais d'inscription enregistres)
 //   elevesEnRetard : [{ nom, prenom, matricule, classe }] | null
 //   paiements   : versements (utils/versements.js) [{ date_paiement, heure, eleve: { nom_complet, classe }, objet, montant, moyen_paiement }] | null
 // ---------------------------------------------------------------------------
@@ -810,7 +811,9 @@ export function genererRapportComptableHtml({
   const totalEncaisseClasses = classes ? classes.reduce((s, c) => s + Number(c.montant_encaisse || 0), 0) : null;
 
   const tuiles = [
-    ["Élèves inscrits", nombre(indicateurs.totalEleves)],
+    ["Élèves inscrits", indicateurs.inscrits === null || indicateurs.inscrits === undefined
+      ? tiret
+      : `${nombre(indicateurs.inscrits)} <span class="sur">/ ${nombre(indicateurs.totalEleves)}</span>`],
     ["Paiements aujourd'hui", nombre(indicateurs.paiementsAujourdhui)],
     ["Élèves en retard", nombre(indicateurs.enRetard)],
     ["Total encaissé", indicateurs.totalEncaisse === null ? tiret : `${formaterMontant(indicateurs.totalEncaisse)} GNF`],
@@ -881,13 +884,13 @@ export function genererRapportComptableHtml({
   // Situation des inscriptions
   let sectionInscriptions = indisponible("d'inscription");
   if (inscriptions) {
-    const { nouveaux, reinscrits, aReinscrire, total } = inscriptions;
+    const { nouveaux, reinscrits, nonInscrits, total } = inscriptions;
     sectionInscriptions = `<table class="tableau-premium">
       <thead><tr><th>Situation</th><th class="droite">Élèves</th><th class="droite">Part</th></tr></thead>
       <tbody>
         <tr><td>Nouveaux inscrits</td><td class="droite">${nouveaux}</td><td class="droite">${pct(nouveaux, total)}</td></tr>
         <tr><td>Réinscrits</td><td class="droite">${reinscrits}</td><td class="droite">${pct(reinscrits, total)}</td></tr>
-        <tr><td>À réinscrire</td><td class="droite">${aReinscrire}</td><td class="droite">${pct(aReinscrire, total)}</td></tr>
+        <tr><td>Pas encore inscrits (frais d'inscription non enregistrés)</td><td class="droite">${nonInscrits}</td><td class="droite">${pct(nonInscrits, total)}</td></tr>
         <tr class="total"><td>TOTAL</td><td class="droite">${total}</td><td class="droite">${total > 0 ? "100 %" : tiret}</td></tr>
       </tbody>
     </table>`;

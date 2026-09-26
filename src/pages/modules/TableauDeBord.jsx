@@ -182,7 +182,8 @@ function StatCard({ label, valeur, unite, icone: Icon, gradient, tendance, progr
 // Situation des inscriptions (design Google AI Studio) : 3 barres epaisses rapportees a l'effectif
 // total, badge du taux global d'inscription (nouveaux + reinscrits) et total en pied de carte.
 function SectionInscriptions({ situation, disponible }) {
-  const { nouveaux, reinscrits, aReinscrire, total } = situation;
+  const { nouveaux, reinscrits, nonInscrits, total } = situation;
+  const inscrits = nouveaux + reinscrits;
   const pct = (n) => (total > 0 ? Math.round((n / total) * 100) : 0);
   const lignes = [
     {
@@ -202,12 +203,12 @@ function SectionInscriptions({ situation, disponible }) {
       detail: `${pct(reinscrits)} % de l'effectif · anciens élèves reconduits`,
     },
     {
-      libelle: "À réinscrire",
-      valeur: aReinscrire,
+      libelle: "Pas encore inscrits",
+      valeur: nonInscrits,
       couleur: "#f59e0b",
       fond: "bg-amber-50 text-amber-600",
       icone: Clock,
-      detail: aReinscrire > 0 ? "Sans inscription active sur la session en cours" : "Tous les élèves sont inscrits",
+      detail: nonInscrits > 0 ? "Frais d'inscription ou de réinscription non enregistrés" : "Tous les élèves sont inscrits",
     },
   ];
 
@@ -228,7 +229,7 @@ function SectionInscriptions({ situation, disponible }) {
         </div>
         {disponible && (
           <span className="px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 text-[11px] font-bold whitespace-nowrap shrink-0">
-            {pct(nouveaux + reinscrits)}% Global
+            {pct(inscrits)}% Global
           </span>
         )}
       </div>
@@ -261,8 +262,10 @@ function SectionInscriptions({ situation, disponible }) {
       )}
 
       <div className="flex items-center justify-between px-5 py-3 bg-slate-50/70 border-t border-slate-100 text-xs">
-        <span className="font-semibold text-slate-500">Total élèves</span>
-        <span className="font-extrabold text-slate-900 tabular-nums">{disponible ? total : "—"}</span>
+        <span className="font-semibold text-slate-500">Élèves inscrits</span>
+        <span className="font-extrabold text-slate-900 tabular-nums">
+          {disponible ? `${inscrits} sur ${total} élève${total > 1 ? "s" : ""}` : "—"}
+        </span>
       </div>
     </div>
   );
@@ -294,7 +297,7 @@ export default function TableauDeBord({ role }) {
 function TableauDeBordComptable({ role }) {
   const navigate = useNavigate();
 
-  const [stats, setStats] = useState({ totalEleves: "—", enRetard: "—", aEchoir: "—" });
+  const [stats, setStats] = useState({ totalEleves: "—", inscrits: "—", enRetard: "—", aEchoir: "—" });
   const [elevesEnRetard, setElevesEnRetard] = useState([]);
   const [tousPaiements, setTousPaiements] = useState([]);
   const [totalEncaisse, setTotalEncaisse] = useState(null);
@@ -313,7 +316,7 @@ function TableauDeBordComptable({ role }) {
   const [statsClasseDisponibles, setStatsClasseDisponibles] = useState(true);
   const [finances, setFinances] = useState({ inscriptions: 0, reinscriptions: 0, scolarite: 0, autres: 0 });
   const [financesDisponibles, setFinancesDisponibles] = useState(true);
-  const [situationInscriptions, setSituationInscriptions] = useState({ nouveaux: 0, reinscrits: 0, aReinscrire: 0, total: 0 });
+  const [situationInscriptions, setSituationInscriptions] = useState({ nouveaux: 0, reinscrits: 0, nonInscrits: 0, total: 0 });
   const [inscriptionsDisponibles, setInscriptionsDisponibles] = useState(true);
 
   useEffect(() => {
@@ -343,6 +346,7 @@ function TableauDeBordComptable({ role }) {
         );
         setStats({
           totalEleves: eleves.value.data.stats.total,
+          inscrits: eleves.value.data.stats.inscrits,
           enRetard: eleves.value.data.stats.en_retard,
           aEchoir: eleves.value.data.stats.a_echoir,
         });
@@ -371,10 +375,12 @@ function TableauDeBordComptable({ role }) {
 
       if (eleves.status === "fulfilled") {
         const listeEleves = eleves.value.data.eleves;
-        const nouveaux = listeEleves.filter((e) => e.inscription_active?.type_inscription === "nouvelle").length;
-        const reinscrits = listeEleves.filter((e) => e.inscription_active?.type_inscription === "reinscription").length;
-        const aReinscrire = listeEleves.filter((e) => !e.inscription_active).length;
-        setSituationInscriptions({ nouveaux, reinscrits, aReinscrire, total: listeEleves.length });
+        // Inscrit = frais d'inscription ou de reinscription enregistres sur la session (et non la
+        // simple inscription "active", creee aussi par l'import des eleves).
+        const nouveaux = listeEleves.filter((e) => e.inscription_reglee === "inscription").length;
+        const reinscrits = listeEleves.filter((e) => e.inscription_reglee === "reinscription").length;
+        const nonInscrits = listeEleves.length - nouveaux - reinscrits;
+        setSituationInscriptions({ nouveaux, reinscrits, nonInscrits, total: listeEleves.length });
         setInscriptionsDisponibles(true);
       } else {
         setInscriptionsDisponibles(false);
@@ -403,15 +409,6 @@ function TableauDeBordComptable({ role }) {
 
   const enRetard = typeof stats.enRetard === "number" ? stats.enRetard : 0;
   const totalEleves = typeof stats.totalEleves === "number" ? stats.totalEleves : 0;
-
-  // Nombre de classes réellement suivies (issu du calcul par classe)
-  const nombreClasses = statsParClasse.length;
-
-  // Part réelle des élèves pour qui une grille tarifaire a été appliquée
-  const nombreSansFrais = statsParClasse.reduce((s, c) => s + (c.nombre_sans_frais || 0), 0);
-  const pctCouvertureFrais = totalEleves > 0
-    ? Math.round(((totalEleves - nombreSansFrais) / totalEleves) * 100)
-    : 0;
 
   // Paiements réellement encaissés aujourd'hui
   const aujourdHui = new Date().toISOString().slice(0, 10);
@@ -461,6 +458,7 @@ function TableauDeBordComptable({ role }) {
       dateDonnees: dateMaj,
       indicateurs: {
         totalEleves: typeof stats.totalEleves === "number" ? stats.totalEleves : null,
+        inscrits: typeof stats.inscrits === "number" ? stats.inscrits : null,
         paiementsAujourdhui: paiementsDisponibles ? paiementsAujourdHui : null,
         enRetard: typeof stats.enRetard === "number" ? stats.enRetard : null,
         totalEncaisse: paiementsDisponibles ? totalEncaisse : null,
@@ -557,11 +555,11 @@ function TableauDeBordComptable({ role }) {
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
         <StatCard
           label="Élèves inscrits"
-          valeur={stats.totalEleves}
+          valeur={stats.inscrits}
           icone={Users}
           gradient="linear-gradient(135deg, #1d4ed8, #3b82f6)"
-          tendance={nombreClasses > 0 ? { sens: "hausse", texte: `${nombreClasses} classe${nombreClasses > 1 ? "s" : ""}` } : null}
-          progression={pctCouvertureFrais}
+          tendance={totalEleves > 0 ? { sens: "hausse", texte: `sur ${totalEleves} élève${totalEleves > 1 ? "s" : ""}` } : null}
+          progression={totalEleves > 0 && typeof stats.inscrits === "number" ? Math.round((stats.inscrits / totalEleves) * 100) : 0}
         />
         <StatCard
           label="Paiements aujourd'hui"
@@ -935,7 +933,7 @@ function TableauDeBordGenerique({ role }) {
   const [paiementsDisponibles, setPaiementsDisponibles] = useState(true);
   const [finances, setFinances] = useState({ inscriptions: 0, reinscriptions: 0, scolarite: 0, autres: 0 });
   const [financesDisponibles, setFinancesDisponibles] = useState(true);
-  const [situationInscriptions, setSituationInscriptions] = useState({ nouveaux: 0, reinscrits: 0, aReinscrire: 0, total: 0 });
+  const [situationInscriptions, setSituationInscriptions] = useState({ nouveaux: 0, reinscrits: 0, nonInscrits: 0, total: 0 });
   const [inscriptionsDisponibles, setInscriptionsDisponibles] = useState(true);
 
   useEffect(() => {
@@ -970,10 +968,12 @@ function TableauDeBordGenerique({ role }) {
 
       if (eleves.status === "fulfilled") {
         const listeEleves = eleves.value.data.eleves;
-        const nouveaux = listeEleves.filter((e) => e.inscription_active?.type_inscription === "nouvelle").length;
-        const reinscrits = listeEleves.filter((e) => e.inscription_active?.type_inscription === "reinscription").length;
-        const aReinscrire = listeEleves.filter((e) => !e.inscription_active).length;
-        setSituationInscriptions({ nouveaux, reinscrits, aReinscrire, total: listeEleves.length });
+        // Inscrit = frais d'inscription ou de reinscription enregistres sur la session (et non la
+        // simple inscription "active", creee aussi par l'import des eleves).
+        const nouveaux = listeEleves.filter((e) => e.inscription_reglee === "inscription").length;
+        const reinscrits = listeEleves.filter((e) => e.inscription_reglee === "reinscription").length;
+        const nonInscrits = listeEleves.length - nouveaux - reinscrits;
+        setSituationInscriptions({ nouveaux, reinscrits, nonInscrits, total: listeEleves.length });
         setInscriptionsDisponibles(true);
       } else {
         setInscriptionsDisponibles(false);
@@ -1207,9 +1207,9 @@ function TableauDeBordGenerique({ role }) {
                 </div>
 
                 <div className="flex justify-between items-center text-xs">
-                  <span className="font-semibold text-slate-600">À réinscrire</span>
+                  <span className="font-semibold text-slate-600">Pas encore inscrits</span>
                   <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-amber-50 text-amber-600 text-[11px] font-bold">
-                    {situationInscriptions.aReinscrire}
+                    {situationInscriptions.nonInscrits}
                   </span>
                 </div>
 
