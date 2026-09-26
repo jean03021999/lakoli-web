@@ -312,28 +312,25 @@ export default function LoginPage() {
         {/* ========================================================= */}
         {/* PARTIE DROITE (50%) — formulaire (design Google AI Studio) */}
         {/* ========================================================= */}
-        <div
-          className="lg:col-span-6 flex items-center justify-center p-6 sm:p-10 lg:p-12 backdrop-blur-md lg:overflow-y-auto"
-          style={{ background: "linear-gradient(135deg, rgba(240, 244, 248, 0.97) 0%, rgba(255, 255, 255, 1) 100%)" }}
-        >
-          <div className="w-full max-w-[400px] bg-white/95 rounded-2xl p-7 sm:p-9 shadow-2xl border border-slate-200/70 space-y-4 text-[#1e293b]">
+        <div className="lg:col-span-6 bg-white flex items-center justify-center px-6 py-6 sm:px-10 lg:px-14 lg:overflow-y-auto">
+          <div className="w-full max-w-[380px] space-y-3 text-[#1e293b]">
             {/* Logo LAKOLI + mini drapeau guinéen */}
             <div className="flex items-center gap-3">
               <div
                 className="flex items-center justify-center text-white shrink-0"
                 style={{
-                  width: "44px",
-                  height: "44px",
+                  width: "38px",
+                  height: "38px",
                   background: "linear-gradient(135deg, #0C447C 0%, #1a6bb5 100%)",
                   borderRadius: "12px",
                   boxShadow: "0 4px 12px rgba(12, 68, 124, 0.25)",
                 }}
               >
-                <GraduationCap className="w-6 h-6" />
+                <GraduationCap className="w-5 h-5" />
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="leading-none" style={{ color: "#0C447C", fontSize: "22px", fontWeight: 900, letterSpacing: "2px" }}>
+                  <span className="leading-none" style={{ color: "#0C447C", fontSize: "19px", fontWeight: 900, letterSpacing: "2px" }}>
                     LAKOLI
                   </span>
                   <span
@@ -354,10 +351,10 @@ export default function LoginPage() {
 
             {/* Titre du formulaire */}
             <div className="space-y-0.5">
-              <h2 className="font-extrabold text-[#0C447C] tracking-tight leading-tight" style={{ fontSize: "22px" }}>
+              <h2 className="font-extrabold text-[#0C447C] tracking-tight leading-tight" style={{ fontSize: "19px" }}>
                 Connexion à votre espace
               </h2>
-              <p className="text-[13px] text-[#64748b]">Accédez à votre tableau de bord sécurisé</p>
+              <p className="text-[12px] text-[#64748b]">Accédez à votre tableau de bord sécurisé</p>
             </div>
 
             {/* Sélection du profil (grille 3 x 2) */}
@@ -371,7 +368,7 @@ export default function LoginPage() {
                 </span>
               </div>
 
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-3 gap-1.5">
                 {[...profileCards, PROFIL_PARENT].map((card) => {
                   const isSelected = selectedRoleKey === card.key;
                   const isDisabled = !!card.disabled;
@@ -390,8 +387,8 @@ export default function LoginPage() {
                           : "hover:brightness-110 cursor-pointer"
                       }`}
                       style={{
-                        borderRadius: "10px",
-                        padding: "10px",
+                        borderRadius: "9px",
+                        padding: "7px 8px",
                         background: isSelected
                           ? "linear-gradient(135deg, #0C447C 0%, #1565c0 100%)"
                           : "linear-gradient(145deg, #0a2d5a 0%, #0C447C 100%)",
@@ -409,7 +406,7 @@ export default function LoginPage() {
                           {card.badge}
                         </span>
                       )}
-                      <div className="w-6 h-6 rounded-md bg-white/15 flex items-center justify-center text-[15px] mb-1.5 border border-white/10">
+                      <div className="w-5 h-5 rounded-md bg-white/15 flex items-center justify-center text-[12px] mb-1 border border-white/10">
                         {card.emoji}
                       </div>
                       <p className="text-[11px] font-bold leading-tight truncate text-white">{card.label}</p>
@@ -429,13 +426,13 @@ export default function LoginPage() {
             )}
 
             {/* Formulaire */}
-            <form onSubmit={handleSubmit} className="space-y-3 pt-0.5" noValidate>
+            <form onSubmit={handleSubmit} className="space-y-2.5" noValidate>
               <div className="space-y-1">
                 <label htmlFor="identifiant" className="block text-[11px] font-semibold text-[#0C447C]/90">
                   Email ou numéro
                 </label>
                 <div className="relative">
-                  <Mail className="w-4 h-4 text-[#0C447C]/60 absolute left-3 top-3.5" />
+                  <Mail className="w-4 h-4 text-[#0C447C]/60 absolute left-3 top-3" />
                   <input
                     id="identifiant"
                     type="text"
@@ -451,7 +448,7 @@ export default function LoginPage() {
                       backgroundColor: "#f8fafc",
                       borderColor: fieldErrors.identifier ? "#f43f5e" : "rgba(12, 68, 124, 0.28)",
                       borderRadius: "10px",
-                      height: "44px",
+                      height: "40px",
                     }}
                   />
                 </div>
@@ -472,7 +469,7 @@ export default function LoginPage() {
                   </button>
                 </div>
                 <div className="relative">
-                  <Lock className="w-4 h-4 text-[#0C447C]/60 absolute left-3 top-3.5" />
+                  <Lock className="w-4 h-4 text-[#0C447C]/60 absolute left-3 top-3" />
                   <input
                     id="mot-de-passe"
                     type={showPassword ? "text" : "password"}
@@ -488,13 +485,13 @@ export default function LoginPage() {
                       backgroundColor: "#f8fafc",
                       borderColor: fieldErrors.password ? "#f43f5e" : "rgba(12, 68, 124, 0.28)",
                       borderRadius: "10px",
-                      height: "44px",
+                      height: "40px",
                     }}
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-3 text-[#0C447C]/60 hover:text-[#0C447C] transition-colors p-0.5 cursor-pointer"
+                    className="absolute right-3 top-2.5 text-[#0C447C]/60 hover:text-[#0C447C] transition-colors p-0.5 cursor-pointer"
                     aria-label={showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"}
                   >
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -522,7 +519,7 @@ export default function LoginPage() {
                 disabled={isLoading}
                 className="w-full text-white text-sm flex items-center justify-center gap-2 transition-all duration-200 hover:shadow-[0_6px_20px_rgba(12,68,124,0.4)] hover:brightness-105 active:scale-[0.99] cursor-pointer disabled:opacity-75"
                 style={{
-                  height: "46px",
+                  height: "42px",
                   borderRadius: "10px",
                   fontWeight: 700,
                   background: "linear-gradient(135deg, #0C447C 0%, #1565c0 100%)",
@@ -544,8 +541,8 @@ export default function LoginPage() {
             </form>
 
             {/* Pied du formulaire */}
-            <div className="pt-2">
-              <div className="border-t border-[#e2e8f0] pt-3 flex items-center justify-between text-[11px] text-[#64748b]">
+            <div className="pt-1">
+              <div className="border-t border-[#e2e8f0] pt-2.5 flex items-center justify-between text-[11px] text-[#64748b]">
                 <button
                   type="button"
                   onClick={() => setShowSecuritySpecsModal(true)}
