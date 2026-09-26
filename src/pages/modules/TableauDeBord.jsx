@@ -501,7 +501,7 @@ function TableauDeBordComptable({ role }) {
               <span className="text-white/60">·</span>
               <span className="text-white/80">Session Ouverte</span>
             </span>
-            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight">Tableau de bord LAKOLI</h1>
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight">Tableau de bord Comptable</h1>
             <p className="text-sm sm:text-base text-white/70 max-w-xl">
               Suivi des encaissements, des retards de paiement et des inscriptions de l'établissement.
             </p>
