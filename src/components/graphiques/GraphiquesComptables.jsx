@@ -13,7 +13,7 @@ import {
   CartesianGrid,
   Tooltip,
 } from "recharts";
-import { BarChart2, ArrowUpRight, ArrowDownRight, Filter } from "lucide-react";
+import { BarChart2, ArrowUpRight, ArrowDownRight, Filter, TrendingUp, PieChart as IconeDonut, School, UserPlus } from "lucide-react";
 
 // Graphiques du tableau de bord Comptable (design Google AI Studio "Lakoli 5"), alimentes par les
 // donnees reelles deja chargees : paiements (GET /frais/paiements), stats par classe et
@@ -42,42 +42,66 @@ function abreger(montant) {
   return n.toLocaleString("fr-FR");
 }
 
-function Carte({ children, className = "" }) {
+// Carte moyenne : lisere degrade en haut, halo decoratif flou et legere elevation au survol.
+function Carte({ children, degrade, halo }) {
   return (
-    <div className={`bg-white p-5 sm:p-6 border border-slate-100 flex flex-col h-full ${className}`} style={STYLE_CARTE}>
+    <div
+      className="group relative isolate overflow-hidden bg-white p-4 sm:p-5 border border-slate-100 flex flex-col h-full transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_12px_32px_rgba(12,68,124,0.12)]"
+      style={STYLE_CARTE}
+    >
+      <div className="absolute inset-x-0 top-0 h-1" style={{ background: degrade }} />
+      <div
+        className="absolute -top-16 -right-16 h-40 w-40 rounded-full blur-3xl opacity-60 pointer-events-none -z-10 transition-opacity duration-300 group-hover:opacity-100"
+        style={{ backgroundColor: halo }}
+      />
       {children}
     </div>
   );
 }
 
-function EnTete({ titre, sousTitre, badge, children }) {
+function EnTete({ titre, sousTitre, badge, icone: Icone, degrade, children }) {
   return (
-    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
-      <div className="min-w-0">
-        <div className="flex items-center gap-2.5 flex-wrap">
-          <h3 className="text-base font-bold text-[#0C447C] tracking-tight">{titre}</h3>
-          {badge && (
-            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 text-[#0C447C] border border-blue-200">
-              {badge}
-            </span>
-          )}
+    <div className="flex items-start justify-between gap-3 mb-4">
+      <div className="flex items-start gap-3 min-w-0">
+        <span
+          className="h-9 w-9 rounded-xl flex items-center justify-center text-white shrink-0"
+          style={{ background: degrade, boxShadow: "0 6px 16px rgba(12,68,124,0.22)" }}
+        >
+          <Icone className="h-4.5 w-4.5" />
+        </span>
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h3 className="text-sm font-bold text-[#0C447C] tracking-tight">{titre}</h3>
+            {badge && (
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-[#0C447C] border border-blue-200">
+                {badge}
+              </span>
+            )}
+          </div>
+          <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">{sousTitre}</p>
         </div>
-        <p className="text-xs text-slate-500 mt-0.5">{sousTitre}</p>
       </div>
-      {children && <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">{children}</div>}
+      {children && <div className="flex items-center gap-2 shrink-0">{children}</div>}
     </div>
   );
 }
 
+const DEGRADES = {
+  bleu: "linear-gradient(135deg, #0C447C 0%, #1a6bb5 100%)",
+  vert: "linear-gradient(135deg, #059669 0%, #34d399 100%)",
+  ambre: "linear-gradient(135deg, #d97706 0%, #fbbf24 100%)",
+  violet: "linear-gradient(135deg, #6d28d9 0%, #a78bfa 100%)",
+};
+
 function Selecteur({ options, valeur, onChange }) {
   return (
-    <div className="flex items-center gap-1 p-1 bg-[#f0f4f8] rounded-xl border border-slate-200/80">
+    <div className="flex items-center gap-0.5 p-0.5 bg-[#f0f4f8] rounded-xl border border-slate-200/80">
       {options.map((o) => (
         <button
           key={o.valeur}
           type="button"
           onClick={() => onChange(o.valeur)}
-          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+          className={`px-2 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
             valeur === o.valeur ? "bg-white text-[#0C447C] shadow-xs" : "text-slate-500 hover:text-[#0C447C]"
           }`}
         >
@@ -89,7 +113,7 @@ function Selecteur({ options, valeur, onChange }) {
 }
 
 function Vide({ texte }) {
-  return <div className="flex-1 flex items-center justify-center py-12 text-center text-slate-400 text-xs">{texte}</div>;
+  return <div className="flex-1 flex items-center justify-center py-10 text-center text-slate-400 text-xs">{texte}</div>;
 }
 
 function Infobulle({ titre, badge, lignes, pied }) {
@@ -137,6 +161,22 @@ function BadgeVariation({ variation }) {
   );
 }
 
+// Petit indicateur chiffre en tete de carte.
+function MiniStat({ libelle, valeur, unite, couleur, extra }) {
+  return (
+    <div className="px-3 py-2 rounded-xl bg-gradient-to-br from-slate-50 to-[#f0f4f8] border border-slate-200/60 min-w-0">
+      <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400 block truncate">{libelle}</span>
+      <span className="flex items-center gap-1.5 min-w-0">
+        <span className={`text-sm font-extrabold truncate ${couleur}`}>
+          {valeur}
+          {unite && <span className="text-[10px] font-semibold text-slate-400 ml-1">{unite}</span>}
+        </span>
+        {extra}
+      </span>
+    </div>
+  );
+}
+
 // 1. Evolution mensuelle des encaissements (somme des paiements par mois de date_paiement).
 function EvolutionEncaissements({ paiements, disponible }) {
   const [periode, setPeriode] = useState(12);
@@ -169,19 +209,20 @@ function EvolutionEncaissements({ paiements, disponible }) {
   const dernier = visibles[visibles.length - 1];
 
   return (
-    <Carte>
+    <Carte degrade={DEGRADES.bleu} halo="#dbeafe">
       <EnTete
         titre="Évolution des encaissements"
-        badge={`${periode} mois`}
-        sousTitre="Montants réellement encaissés chaque mois (paiements enregistrés en caisse)"
+        icone={TrendingUp}
+        degrade={DEGRADES.bleu}
+        sousTitre="Montants encaissés chaque mois"
       >
         <Selecteur
           valeur={periode}
           onChange={setPeriode}
           options={[
-            { valeur: 3, libelle: "Trimestre" },
-            { valeur: 6, libelle: "Semestre" },
-            { valeur: 12, libelle: "Année" },
+            { valeur: 3, libelle: "3 m" },
+            { valeur: 6, libelle: "6 m" },
+            { valeur: 12, libelle: "12 m" },
           ]}
         />
       </EnTete>
@@ -190,41 +231,31 @@ function EvolutionEncaissements({ paiements, disponible }) {
         <Vide texte="Impossible de charger les paiements." />
       ) : (
         <>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3.5 mb-5 rounded-xl bg-[#f0f4f8]/60 border border-slate-200/60">
-            <div>
-              <span className="text-[10px] font-bold uppercase text-slate-400 block">Total période</span>
-              <span className="text-sm sm:text-base font-extrabold text-[#0C447C]">{formaterGNF(total)}</span>
-            </div>
-            <div>
-              <span className="text-[10px] font-bold uppercase text-slate-400 block">Moyenne mensuelle</span>
-              <span className="text-sm sm:text-base font-bold text-slate-600">{formaterGNF(moyenne)}</span>
-            </div>
-            <div>
-              <span className="text-[10px] font-bold uppercase text-slate-400 block">Meilleur mois</span>
-              <span className="text-sm sm:text-base font-bold text-emerald-600">
-                {meilleur.encaisse > 0 ? meilleur.moisComplet : "—"}
-              </span>
-            </div>
-            <div>
-              <span className="text-[10px] font-bold uppercase text-slate-400 block">Ce mois vs précédent</span>
-              <span className="text-sm sm:text-base font-bold text-slate-600">
-                {dernier.variation === null ? "—" : <BadgeVariation variation={dernier.variation} />}
-              </span>
-            </div>
+          <div className="grid grid-cols-2 gap-2 mb-3">
+            <MiniStat libelle="Total période" valeur={abreger(total)} unite="GNF" couleur="text-[#0C447C]" />
+            <MiniStat
+              libelle="Ce mois"
+              valeur={abreger(dernier.encaisse)}
+              unite="GNF"
+              couleur="text-slate-700"
+              extra={<BadgeVariation variation={dernier.variation} />}
+            />
+            <MiniStat libelle="Moyenne / mois" valeur={abreger(moyenne)} unite="GNF" couleur="text-slate-600" />
+            <MiniStat libelle="Meilleur mois" valeur={meilleur.encaisse > 0 ? meilleur.moisComplet : "—"} couleur="text-emerald-600" />
           </div>
 
-          <div className="w-full h-[280px]">
+          <div className="w-full h-[190px] mt-auto">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={visibles} margin={{ top: 15, right: 15, left: 0, bottom: 5 }}>
+              <AreaChart data={visibles} margin={{ top: 10, right: 8, left: -8, bottom: 0 }}>
                 <defs>
                   <linearGradient id="degradeEncaisse" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#0C447C" stopOpacity={0.15} />
+                    <stop offset="0%" stopColor="#1a6bb5" stopOpacity={0.35} />
                     <stop offset="100%" stopColor="#0C447C" stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid stroke="#f1f5f9" vertical={false} />
                 <XAxis dataKey="mois" axisLine={false} tickLine={false} tick={TICK} dy={8} />
-                <YAxis axisLine={false} tickLine={false} tick={TICK} tickFormatter={abreger} width={56} />
+                <YAxis axisLine={false} tickLine={false} tick={TICK} tickFormatter={abreger} width={48} />
                 <Tooltip
                   content={({ active, payload }) => {
                     if (!active || !payload?.length) return null;
@@ -243,11 +274,11 @@ function EvolutionEncaissements({ paiements, disponible }) {
                   type="monotone"
                   dataKey="encaisse"
                   stroke="#0C447C"
-                  strokeWidth={3}
+                  strokeWidth={2.5}
                   fill="url(#degradeEncaisse)"
                   animationDuration={1200}
-                  dot={{ r: 4, fill: "#ffffff", stroke: "#0C447C", strokeWidth: 2 }}
-                  activeDot={{ r: 6, fill: "#0C447C", stroke: "#ffffff", strokeWidth: 2 }}
+                  dot={{ r: 3, fill: "#ffffff", stroke: "#0C447C", strokeWidth: 2 }}
+                  activeDot={{ r: 5, fill: "#0C447C", stroke: "#ffffff", strokeWidth: 2 }}
                 />
               </AreaChart>
             </ResponsiveContainer>
@@ -274,8 +305,8 @@ function RepartitionFrais({ finances, disponible }) {
   const survol = actif !== null ? segments[actif] : null;
 
   return (
-    <Carte>
-      <EnTete titre="Répartition des frais" sousTitre="Structure des encaissements par catégorie de recettes" />
+    <Carte degrade={DEGRADES.vert} halo="#d1fae5">
+      <EnTete titre="Répartition des frais" icone={IconeDonut} degrade={DEGRADES.vert} sousTitre="Encaissements par catégorie de recettes" />
 
       {!disponible ? (
         <Vide texte="Impossible de charger les paiements." />
@@ -283,16 +314,17 @@ function RepartitionFrais({ finances, disponible }) {
         <Vide texte="Aucun encaissement enregistré pour l'instant." />
       ) : (
         <>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 items-center my-auto">
-            <div className="relative w-full h-[230px]">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center my-auto">
+            <div className="relative w-full h-[180px]">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
                     data={avecMontant}
                     dataKey="valeur"
                     nameKey="nom"
-                    innerRadius={68}
-                    outerRadius={100}
+                    innerRadius={54}
+                    outerRadius={80}
+                    cornerRadius={6}
                     paddingAngle={avecMontant.length > 1 ? 3 : 0}
                     animationDuration={1000}
                     onMouseEnter={(_, i) => setActif(segments.indexOf(avecMontant[i]))}
@@ -314,7 +346,7 @@ function RepartitionFrais({ finances, disponible }) {
                 <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
                   {survol ? survol.nom : "Total encaissé"}
                 </span>
-                <span className="text-xl sm:text-2xl font-black text-[#0C447C] leading-none mt-0.5">
+                <span className="text-lg font-black text-[#0C447C] leading-none mt-0.5">
                   {abreger(survol ? survol.valeur : total)}
                 </span>
                 <span className="text-[10px] font-semibold text-slate-500 mt-0.5">
@@ -323,21 +355,20 @@ function RepartitionFrais({ finances, disponible }) {
               </div>
             </div>
 
-            <div className="space-y-2.5">
+            <div className="space-y-1.5">
               {segments.map((s, i) => (
                 <div
                   key={s.nom}
                   onMouseEnter={() => setActif(i)}
                   onMouseLeave={() => setActif(null)}
-                  className={`p-2.5 rounded-xl border transition-all duration-200 flex items-center justify-between gap-2 ${
+                  className={`px-2.5 py-1.5 rounded-xl border transition-all duration-200 flex items-center justify-between gap-2 ${
                     actif === i ? "bg-blue-50/70 border-[#0C447C]/40 shadow-xs" : "bg-[#f0f4f8]/50 border-slate-200/60"
                   }`}
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
-                    <span className="w-3.5 h-3.5 rounded-[4px] shrink-0" style={{ backgroundColor: s.couleur }} />
+                    <span className="w-3 h-3 rounded-[4px] shrink-0" style={{ backgroundColor: s.couleur }} />
                     <div className="min-w-0">
                       <p className="text-xs font-bold text-slate-600 leading-tight">{s.nom}</p>
-                      <p className="text-[10px] text-slate-400 leading-tight mt-0.5 truncate">{s.desc}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
@@ -349,7 +380,7 @@ function RepartitionFrais({ finances, disponible }) {
             </div>
           </div>
 
-          <div className="pt-3 mt-4 border-t border-slate-100 flex items-center justify-between gap-3 text-[11px] text-slate-500">
+          <div className="pt-2.5 mt-3 border-t border-slate-100 flex items-center justify-between gap-3 text-[11px] text-slate-500">
             <span className="flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-emerald-500" />
               Session scolaire en cours
@@ -385,17 +416,17 @@ function StatutParClasse({ classes, disponible }) {
     });
 
   return (
-    <Carte>
-      <EnTete titre="Recouvrement par classe" sousTitre="Montant encaissé et reste à encaisser sur la scolarité due">
+    <Carte degrade={DEGRADES.ambre} halo="#fef3c7">
+      <EnTete titre="Recouvrement par classe" icone={School} degrade={DEGRADES.ambre} sousTitre="Encaissé et reste à encaisser">
         {niveaux.length > 1 && (
           <div className="flex items-center gap-1.5">
-            <Filter className="w-3.5 h-3.5 text-slate-400" />
+            <Filter className="w-3.5 h-3.5 text-slate-400 hidden sm:block" />
             <select
               value={niveau}
               onChange={(e) => setNiveau(e.target.value)}
-              className="text-xs font-semibold text-[#0C447C] bg-[#f0f4f8] border border-slate-200/80 rounded-[10px] px-2.5 py-1.5 focus:outline-none cursor-pointer"
+              className="text-xs font-semibold text-[#0C447C] bg-[#f0f4f8] border border-slate-200/80 rounded-[10px] px-2 py-1 max-w-[120px] focus:outline-none cursor-pointer"
             >
-              <option value="tous">Tous les niveaux</option>
+              <option value="tous">Tous</option>
               {niveaux.map((n) => (
                 <option key={n} value={n}>{n}</option>
               ))}
@@ -410,7 +441,7 @@ function StatutParClasse({ classes, disponible }) {
         <Vide texte="Aucune classe créée pour l'instant." />
       ) : (
         <>
-          <div className="flex flex-wrap items-center gap-4 mb-4 p-2.5 rounded-xl bg-[#f0f4f8]/50 border border-slate-200/60 text-xs">
+          <div className="flex flex-wrap items-center gap-4 mb-2 text-[11px]">
             <span className="flex items-center gap-1.5 font-semibold text-slate-600">
               <span className="w-3 h-3 rounded-[3px] bg-emerald-500" /> Encaissé
             </span>
@@ -419,18 +450,25 @@ function StatutParClasse({ classes, disponible }) {
             </span>
           </div>
 
-          <div className="w-full" style={{ height: Math.max(180, donnees.length * 42 + 30) }}>
+          <div className="w-full overflow-y-auto" style={{ height: 210 }}>
+          <div style={{ height: Math.max(200, donnees.length * 30 + 20) }}>
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart layout="vertical" data={donnees} margin={{ top: 5, right: 20, left: 5, bottom: 5 }} barCategoryGap={10}>
+              <BarChart layout="vertical" data={donnees} margin={{ top: 0, right: 12, left: 0, bottom: 0 }} barCategoryGap={8}>
+                <defs>
+                  <linearGradient id="degradeRecouvre" x1="0" y1="0" x2="1" y2="0">
+                    <stop offset="0%" stopColor="#059669" />
+                    <stop offset="100%" stopColor="#34d399" />
+                  </linearGradient>
+                </defs>
                 <CartesianGrid stroke="#f1f5f9" horizontal={false} />
-                <XAxis type="number" axisLine={false} tickLine={false} tick={TICK} tickFormatter={abreger} />
+                <XAxis type="number" hide axisLine={false} tickLine={false} tick={TICK} tickFormatter={abreger} />
                 <YAxis
                   type="category"
                   dataKey="classe"
                   axisLine={false}
                   tickLine={false}
-                  tick={{ fill: "#0C447C", fontSize: 11, fontWeight: 700 }}
-                  width={90}
+                  tick={{ fill: "#0C447C", fontSize: 10, fontWeight: 700 }}
+                  width={80}
                 />
                 <Tooltip
                   cursor={{ fill: "#f8fafc" }}
@@ -456,13 +494,14 @@ function StatutParClasse({ classes, disponible }) {
                     );
                   }}
                 />
-                <Bar dataKey="encaisse" stackId="a" fill="#10b981" animationDuration={1000} />
-                <Bar dataKey="reste" stackId="a" fill="#cbd5e1" radius={[0, 6, 6, 0]} animationDuration={1000} />
+                <Bar dataKey="encaisse" stackId="a" fill="url(#degradeRecouvre)" animationDuration={1000} />
+                <Bar dataKey="reste" stackId="a" fill="#e2e8f0" radius={[0, 6, 6, 0]} animationDuration={1000} />
               </BarChart>
             </ResponsiveContainer>
           </div>
+          </div>
 
-          <div className="pt-3 mt-auto border-t border-slate-100 flex flex-wrap items-center gap-1.5">
+          <div className="pt-2.5 mt-auto border-t border-slate-100 flex flex-wrap items-center gap-1.5 max-h-14 overflow-y-auto">
             {donnees.map((d) => (
               <span
                 key={d.classe}
@@ -523,38 +562,40 @@ function InscriptionsHebdomadaires({ paiements, disponible }) {
   const pic = donnees.reduce((a, b) => (b.nouvelles + b.reinscriptions > a.nouvelles + a.reinscriptions ? b : a), donnees[0]);
 
   return (
-    <Carte>
+    <Carte degrade={DEGRADES.violet} halo="#ede9fe">
       <EnTete
         titre="Inscriptions & Réinscriptions"
-        badge="8 semaines"
-        sousTitre="Élèves ayant réglé leurs frais d'inscription ou de réinscription, semaine par semaine"
+        badge="8 sem."
+        icone={UserPlus}
+        degrade={DEGRADES.violet}
+        sousTitre="Frais d'inscription réglés par semaine"
       />
 
       {!disponible ? (
         <Vide texte="Impossible de charger les paiements." />
       ) : (
         <>
-          <div className="flex flex-wrap items-center justify-between gap-4 p-3 mb-4 rounded-xl bg-[#f0f4f8]/50 border border-slate-200/60 text-xs">
-            <div className="flex flex-wrap items-center gap-4">
-              <span className="flex items-center gap-2 font-bold text-slate-600">
-                <span className="w-3.5 h-3.5 rounded-[4px] bg-[#0C447C]" />
-                Nouvelles inscriptions : <strong className="text-[#0C447C]">{totalNouvelles}</strong>
-              </span>
-              <span className="flex items-center gap-2 font-bold text-slate-600">
-                <span className="w-3.5 h-3.5 rounded-[4px] bg-emerald-500" />
-                Réinscriptions : <strong className="text-emerald-600">{totalReinscriptions}</strong>
-              </span>
-            </div>
-            <span className="flex items-center gap-1.5 font-bold text-[#0C447C] bg-white px-3 py-1 rounded-lg border border-slate-200 shadow-xs">
-              Total : <span className="text-sm font-extrabold">{totalNouvelles + totalReinscriptions} élèves</span>
-            </span>
+          <div className="grid grid-cols-3 gap-2 mb-3">
+            <MiniStat libelle="Nouveaux" valeur={totalNouvelles} couleur="text-[#0C447C]" />
+            <MiniStat libelle="Réinscrits" valeur={totalReinscriptions} couleur="text-emerald-600" />
+            <MiniStat libelle="Total" valeur={totalNouvelles + totalReinscriptions} unite="élèves" couleur="text-violet-600" />
           </div>
 
-          <div className="w-full h-[260px]">
+          <div className="w-full h-[190px] mt-auto">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={donnees} margin={{ top: 15, right: 15, left: -15, bottom: 5 }} barGap={4}>
+              <BarChart data={donnees} margin={{ top: 10, right: 8, left: -24, bottom: 0 }} barGap={3}>
+                <defs>
+                  <linearGradient id="degradeNouveaux" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#1a6bb5" />
+                    <stop offset="100%" stopColor="#0C447C" />
+                  </linearGradient>
+                  <linearGradient id="degradeReinscrits" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#34d399" />
+                    <stop offset="100%" stopColor="#059669" />
+                  </linearGradient>
+                </defs>
                 <CartesianGrid stroke="#f1f5f9" vertical={false} />
-                <XAxis dataKey="semaine" axisLine={false} tickLine={false} tick={{ ...TICK, fontSize: 12, fontWeight: 700 }} dy={6} />
+                <XAxis dataKey="semaine" axisLine={false} tickLine={false} tick={{ ...TICK, fontWeight: 700 }} dy={4} />
                 <YAxis axisLine={false} tickLine={false} tick={TICK} allowDecimals={false} />
                 <Tooltip
                   cursor={{ fill: "#f8fafc" }}
@@ -573,15 +614,15 @@ function InscriptionsHebdomadaires({ paiements, disponible }) {
                     );
                   }}
                 />
-                <Bar dataKey="nouvelles" fill="#0C447C" radius={[6, 6, 0, 0]} barSize={18} animationDuration={1000} />
-                <Bar dataKey="reinscriptions" fill="#10b981" radius={[6, 6, 0, 0]} barSize={18} animationDuration={1000} />
+                <Bar dataKey="nouvelles" fill="url(#degradeNouveaux)" radius={[5, 5, 0, 0]} barSize={12} animationDuration={1000} />
+                <Bar dataKey="reinscriptions" fill="url(#degradeReinscrits)" radius={[5, 5, 0, 0]} barSize={12} animationDuration={1000} />
               </BarChart>
             </ResponsiveContainer>
           </div>
 
-          <div className="pt-3 border-t border-slate-100 text-[11px] text-slate-500">
+          <div className="pt-2.5 mt-2 border-t border-slate-100 text-[11px] text-slate-500 truncate">
             {pic.nouvelles + pic.reinscriptions > 0
-              ? `Pic d'inscriptions : ${pic.libelle.toLowerCase()} (${pic.nouvelles + pic.reinscriptions} élèves)`
+              ? `Pic : ${pic.libelle.toLowerCase()} (${pic.nouvelles + pic.reinscriptions} élèves)`
               : "Aucune inscription enregistrée sur les 8 dernières semaines."}
           </div>
         </>
@@ -593,7 +634,10 @@ function InscriptionsHebdomadaires({ paiements, disponible }) {
 export default function GraphiquesComptables({ paiements, paiementsDisponibles, finances, financesDisponibles, classes, classesDisponibles }) {
   return (
     <section className="space-y-5">
-      <div className="flex items-center gap-3 bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs">
+      <div
+        className="flex items-center gap-3 p-4 rounded-2xl border border-blue-100"
+        style={{ background: "linear-gradient(120deg, #ffffff 0%, #eff6ff 60%, #ecfdf5 100%)", boxShadow: "0 4px 18px rgba(12,68,124,0.06)" }}
+      >
         <span
           className="w-11 h-11 rounded-xl flex items-center justify-center text-white shrink-0"
           style={{ background: "linear-gradient(135deg, #0C447C 0%, #1a6bb5 100%)" }}
@@ -602,7 +646,7 @@ export default function GraphiquesComptables({ paiements, paiementsDisponibles, 
         </span>
         <div className="min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <h2 className="text-lg font-bold text-[#0C447C] tracking-tight">Analyses & Statistiques</h2>
+            <h2 className="text-base font-bold text-[#0C447C] tracking-tight">Analyses & Statistiques</h2>
             <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200 text-xs font-bold">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
               Données réelles
@@ -613,14 +657,10 @@ export default function GraphiquesComptables({ paiements, paiementsDisponibles, 
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        <div className="lg:col-span-2">
-          <EvolutionEncaissements paiements={paiements} disponible={paiementsDisponibles} />
-        </div>
+        <EvolutionEncaissements paiements={paiements} disponible={paiementsDisponibles} />
         <RepartitionFrais finances={finances} disponible={financesDisponibles} />
         <StatutParClasse classes={classes} disponible={classesDisponibles} />
-        <div className="lg:col-span-2">
-          <InscriptionsHebdomadaires paiements={paiements} disponible={paiementsDisponibles} />
-        </div>
+        <InscriptionsHebdomadaires paiements={paiements} disponible={paiementsDisponibles} />
       </div>
     </section>
   );
