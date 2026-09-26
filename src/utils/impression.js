@@ -241,6 +241,106 @@ const STYLES = `
     text-align: center; font-size: 11px; color: #475569;
   }
 
+  /* Releve A4 de l'eleve (design "Prestige academique") : double cadre marine/or, en-tete
+     officiel, cartouche 3 colonnes, paves financiers, echeancier et coupon detachable. */
+  .releve-a4 { position: relative; padding: 22px 24px; font-size: 11px; }
+  .releve-a4 .cadre-a4 { position: absolute; inset: 4px; border: 2px solid rgba(12,68,124,0.4); pointer-events: none; }
+  .releve-a4 .cadre-a4::after { content: ""; position: absolute; inset: 3px; border: 1px solid rgba(217,119,6,0.4); }
+  .releve-a4 .coin { position: absolute; width: 12px; height: 12px; border-color: #d97706; border-style: solid; border-width: 0; }
+  .releve-a4 .coin.hg { top: -5px; left: -5px; border-top-width: 2px; border-left-width: 2px; }
+  .releve-a4 .coin.hd { top: -5px; right: -5px; border-top-width: 2px; border-right-width: 2px; }
+  .releve-a4 .coin.bg { bottom: -5px; left: -5px; border-bottom-width: 2px; border-left-width: 2px; }
+  .releve-a4 .coin.bd { bottom: -5px; right: -5px; border-bottom-width: 2px; border-right-width: 2px; }
+  .releve-a4 .mono { font-family: "Courier New", monospace; }
+  .releve-a4 .bleu { color: #0C447C; }
+  .releve-a4 .vert { color: #047857; }
+  .releve-a4 .maj { text-transform: uppercase; }
+  .releve-a4 .droite { text-align: right; }
+  .releve-a4 .centre { text-align: center; }
+
+  .releve-a4 .entete-a4 { display: flex; align-items: flex-start; gap: 14px; border-bottom: 2px solid #0C447C; padding-bottom: 12px; }
+  .releve-a4 .republique { width: 34%; font-size: 9px; color: #475569; }
+  .releve-a4 .republique .pays { display: flex; align-items: center; gap: 6px; font-size: 10px; font-weight: 900; letter-spacing: 0.5px; color: #1e293b; }
+  .releve-a4 .drapeau { display: inline-flex; width: 26px; height: 12px; border: 1px solid #cbd5e1; }
+  .releve-a4 .drapeau i { flex: 1; }
+  .releve-a4 .devise { font-style: italic; font-weight: bold; margin-top: 2px; }
+  .releve-a4 .ministere { margin-top: 4px; font-weight: 600; text-transform: uppercase; color: #1e293b; font-size: 8.5px; line-height: 1.3; }
+  .releve-a4 .ecole { flex: 1; text-align: center; }
+  .releve-a4 .logo-ecole { display: inline-flex; width: 44px; height: 44px; padding: 5px; border-radius: 10px; background: #0C447C; }
+  .releve-a4 .logo-ecole svg { width: 100%; height: 100%; }
+  .releve-a4 .nom-ecole { margin-top: 4px; font-size: 16px; font-weight: 900; text-transform: uppercase; color: #0C447C; line-height: 1.1; }
+  .releve-a4 .coord { margin-top: 3px; font-size: 8.5px; color: #64748b; }
+  .releve-a4 .reference { width: 30%; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+  .releve-a4 .boite-ref { width: 100%; text-align: right; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; padding: 6px 8px; }
+  .releve-a4 .boite-ref .lib { display: block; font-size: 8px; font-weight: bold; text-transform: uppercase; color: #64748b; }
+  .releve-a4 .boite-ref .val { display: block; font-family: "Courier New", monospace; font-size: 11px; font-weight: 800; color: #0C447C; word-break: break-all; }
+  .releve-a4 .boite-ref .date { display: block; font-size: 8.5px; color: #475569; margin-top: 2px; }
+  .releve-a4 .qr svg { display: block; }
+
+  .releve-a4 .bandeau-titre { margin: 12px 0; padding: 8px 14px; border-radius: 8px; text-align: center; color: #fff;
+    background: linear-gradient(135deg, #0C447C 0%, #155b9e 100%); border-top: 2px solid #fbbf24; border-bottom: 2px solid #fbbf24; }
+  .releve-a4 .bandeau-titre h1 { margin: 0; font-size: 13px; font-weight: 900; letter-spacing: 0.6px; color: #fde68a; }
+  .releve-a4 .bandeau-titre p { margin: 2px 0 0; font-size: 9px; color: rgba(255,255,255,0.85); }
+
+  .releve-a4 .cartouche { display: grid; grid-template-columns: repeat(3, 1fr); background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; padding: 10px; }
+  .releve-a4 .cartouche .col { display: flex; flex-direction: column; gap: 1px; padding: 0 10px; font-size: 10.5px; color: #1e293b; }
+  .releve-a4 .cartouche .col + .col { border-left: 1px solid #e2e8f0; }
+  .releve-a4 .cartouche .titre-col { font-size: 8.5px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.6px; color: #0C447C; border-bottom: 1px solid #bfdbfe; padding-bottom: 2px; margin-bottom: 4px; }
+  .releve-a4 .cartouche .lib { font-size: 8.5px; color: #64748b; margin-top: 3px; }
+
+  .releve-a4 .paves { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 12px 0; }
+  .releve-a4 .pave { border: 1px solid #cbd5e1; border-radius: 8px; padding: 7px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  .releve-a4 .pave .lib { font-size: 8px; font-weight: bold; text-transform: uppercase; color: #64748b; }
+  .releve-a4 .pave .val { font-size: 13px; font-weight: 900; color: #0f172a; }
+  .releve-a4 .pave.gris { background: #f0f4f8; }
+  .releve-a4 .pave.vert { background: #ecfdf5; border-color: #6ee7b7; }
+  .releve-a4 .pave.vert .val { color: #047857; }
+  .releve-a4 .pave.ambre { background: #fffbeb; border-color: #fcd34d; }
+  .releve-a4 .pave.ambre .val { color: #b45309; }
+  .releve-a4 .pave.rouge { background: #fff1f2; border-color: #fda4af; }
+  .releve-a4 .pave.rouge .val { color: #be123c; }
+  .releve-a4 .pastille { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 9.5px; font-weight: 900; text-transform: uppercase; border: 1px solid; }
+  .releve-a4 .pastille.vert { background: #d1fae5; color: #065f46; border-color: #6ee7b7; }
+  .releve-a4 .pastille.ambre { background: #fef3c7; color: #92400e; border-color: #fcd34d; }
+  .releve-a4 .pastille.rouge { background: #ffe4e6; color: #9f1239; border-color: #fda4af; }
+
+  .releve-a4 .titre-livre { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; font-size: 10.5px; font-weight: 800; text-transform: uppercase; color: #0C447C; }
+  .releve-a4 .titre-livre .devise-legale { font-family: "Courier New", monospace; font-size: 8px; font-weight: normal; text-transform: none; color: #64748b; }
+  .releve-a4 table.livre { width: 100%; border-collapse: collapse; font-size: 9.5px; border: 1px solid #cbd5e1; }
+  .releve-a4 table.livre th { background: #0C447C; color: #fff; padding: 5px 5px; font-size: 8px; text-transform: uppercase; text-align: left; }
+  .releve-a4 table.livre td { padding: 5px 5px; border-top: 1px solid #e2e8f0; vertical-align: top; }
+  .releve-a4 table.livre tbody tr:nth-child(even) { background: #f8fafc; }
+  .releve-a4 table.livre .num { width: 22px; text-align: center; color: #64748b; font-family: "Courier New", monospace; }
+  .releve-a4 table.livre .sous { display: block; font-size: 8.5px; color: #64748b; font-weight: normal; }
+  .releve-a4 table.livre .vide { text-align: center; color: #64748b; font-style: italic; padding: 14px; }
+  .releve-a4 table.livre tfoot td { background: #f1f5f9; font-weight: 900; color: #0C447C; border-top: 2px solid #cbd5e1; text-transform: uppercase; }
+  .releve-a4 table.livre tfoot td.droite:last-child { text-transform: none; font-weight: normal; color: #475569; }
+  .releve-a4 .etat { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 8px; font-weight: bold; }
+  .releve-a4 .etat-paye { background: #d1fae5; color: #065f46; }
+  .releve-a4 .etat-partiel { background: #fef3c7; color: #92400e; }
+  .releve-a4 .etat-retard { background: #ffe4e6; color: #9f1239; }
+  .releve-a4 .etat-echoir { background: #f1f5f9; color: #475569; }
+  .releve-a4 .arrete { margin-top: 4px; padding: 4px 8px; border: 1px solid #e2e8f0; border-radius: 4px; background: #f8fafc; font-size: 9px; }
+  .releve-a4 .arrete em { color: #0C447C; font-weight: 600; }
+
+  .releve-a4 .mention { margin-top: 10px; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 8px; background: #f8fafc; font-size: 9px; color: #334155; }
+  .releve-a4 .signatures-a4 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; align-items: end; margin-top: 14px; padding-top: 8px; border-top: 1px solid #cbd5e1; }
+  .releve-a4 .sig { display: flex; flex-direction: column; font-size: 9px; }
+  .releve-a4 .sig.droite { text-align: right; }
+  .releve-a4 .sig.centre { text-align: center; align-self: center; }
+  .releve-a4 .sig .role { font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; color: #0C447C; }
+  .releve-a4 .sig .note { font-style: italic; color: #64748b; font-size: 8.5px; }
+  .releve-a4 .sig .ligne-sig { display: block; height: 44px; border-bottom: 1px dashed #64748b; }
+
+  .releve-a4 .coupon { margin-top: 14px; padding-top: 8px; border-top: 2px dashed #94a3b8; break-inside: avoid; }
+  .releve-a4 .coupon-titre { display: flex; justify-content: space-between; font-family: "Courier New", monospace; font-size: 8px; text-transform: uppercase; color: #475569; margin-bottom: 5px; }
+  .releve-a4 .coupon-titre span:first-child { font-weight: bold; }
+  .releve-a4 .coupon-corps { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 7px 10px; border: 1px solid #fcd34d; border-radius: 8px; background: #fffbeb; font-size: 10px; }
+  .releve-a4 .coupon-corps .pill { display: inline-block; margin: 0 4px; padding: 0 6px; border-radius: 4px; background: #dbeafe; color: #0C447C; font-weight: bold; font-size: 9px; }
+  .releve-a4 .coupon .petit { font-size: 8.5px; color: #475569; }
+  .releve-a4 .coupon-etat { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+  @media print { .releve-a4 { padding: 18px 20px; } .releve-a4 table.livre tr { break-inside: avoid; } }
+
   @media print {
     body { padding: 0; }
     .no-print { display: none !important; }
@@ -284,10 +384,6 @@ export function imprimerDocument(titre, corps) {
   if (!fenetre) return false;
   ecrireDocumentImpression(fenetre, titre, corps);
   return true;
-}
-
-function ligneInfo(libelle, valeurHtml) {
-  return `<tr><td class="lib">${echapperHtml(libelle)}</td><td>${valeurHtml}</td></tr>`;
 }
 
 export const MOYENS_PAIEMENT = {
@@ -618,96 +714,211 @@ function classeBadgeStatut(statut) {
 }
 
 // ---------------------------------------------------------------------------
-// Releve de paiements
+// Releve de situation comptable d'un eleve (A4, design "Prestige academique" de Lakoli 2)
 // ---------------------------------------------------------------------------
-// eleve : { nom, prenom, matricule, classe, session } ;
-// lignes : [{ libelle, montant, paye, statut, dernierPaiement }] ; etablissement : nom.
-export function genererReleveHtml({ etablissement, eleve, lignes }) {
-  const tiret = "—";
+// etablissement : { nom, ville, adresse, telephone, email } ;
+// eleve : { nom, prenom, matricule, classe, session, date_naissance, lieu_naissance,
+//           type_inscription, statut_paiement, responsable: { nom, telephone } } ;
+// lignes : [{ rubrique, libelle, date_limite, montant, paye, statut (paye|partiel|a_echoir|
+//            en_retard), reference, moyen, date_paiement }], deja dans l'ordre voulu.
+// Uniquement des donnees reelles : aucun nom de signataire, cachet ou reference inventes.
+const ETATS_ECHEANCE_RELEVE = {
+  paye: { libelle: "Soldé", classe: "etat-paye" },
+  partiel: { libelle: "Partiel", classe: "etat-partiel" },
+  en_retard: { libelle: "Échu", classe: "etat-retard" },
+  a_echoir: { libelle: "À échoir", classe: "etat-echoir" },
+};
 
-  // Inscription puis Reinscription en tete, le reste (Trimestre 1, 2, 3...) dans l'ordre recu.
-  // Array#sort est stable (garanti depuis ES2019) : les egalites (toutes les lignes de
-  // scolarite, rang 2) conservent donc leur ordre d'origine.
-  const ORDRE_TETE = { inscription: 0, reinscription: 1 };
-  const lignesTriees = [...lignes].sort(
-    (a, b) => (ORDRE_TETE[normaliserTexte(a.libelle)] ?? 2) - (ORDRE_TETE[normaliserTexte(b.libelle)] ?? 2)
+const REGIMES_INSCRIPTION = {
+  nouvelle: "Nouvelle admission",
+  inscription: "Nouvelle admission",
+  reinscription: "Réinscription",
+};
+
+export function genererReleveHtml({ etablissement = {}, eleve, lignes }) {
+  const tiret = "—";
+  const e = (v) => echapperHtml(v || tiret);
+
+  const totalDu = lignes.reduce((s, l) => s + l.montant, 0);
+  const totalPaye = lignes.reduce((s, l) => s + l.paye, 0);
+  const reste = Math.max(0, totalDu - totalPaye);
+  const taux = totalDu > 0 ? Math.min(100, Math.round((totalPaye / totalDu) * 100)) : 0;
+
+  const solde = totalDu > 0 && reste === 0;
+  const enRetard = !solde && (eleve.statut_paiement === "en_retard" || lignes.some((l) => l.statut === "en_retard"));
+  const ton = solde ? "vert" : enRetard ? "rouge" : "ambre";
+  const situation = totalDu === 0 ? "Aucun frais" : solde ? "✓ Compte soldé" : enRetard ? "⚠ Échéance échue" : "⏳ Échéances en cours";
+  const accesCoupon = totalDu === 0 ? tiret : solde ? "À JOUR" : enRetard ? "RÉGULARISATION REQUISE" : "EN COURS";
+
+  const aujourdhui = new Date();
+  const dateCourte = aujourdhui.toLocaleDateString("fr-FR");
+  const dateLongue = aujourdhui.toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
+  const reference = `REL-${eleve.matricule || "ELEVE"}-${aujourdhui.getFullYear()}${String(aujourdhui.getMonth() + 1).padStart(2, "0")}${String(aujourdhui.getDate()).padStart(2, "0")}`;
+
+  const qr = qrCodeSvg(
+    [
+      `LAKOLI - Relevé ${reference}`,
+      etablissement.nom,
+      `Élève : ${eleve.nom} ${eleve.prenom} (${eleve.matricule || "-"})`,
+      eleve.classe && `Classe : ${eleve.classe}${eleve.session ? ` - ${eleve.session}` : ""}`,
+      `Encaissé : ${montantTexte(totalPaye)} GNF / Dû : ${montantTexte(totalDu)} GNF`,
+      `Édité le ${dateCourte}`,
+    ].filter(Boolean).join("\n"),
+    64
   );
 
-  const total = lignesTriees.reduce((s, l) => s + l.montant, 0);
-  const paye = lignesTriees.reduce((s, l) => s + l.paye, 0);
+  const coordonnees = [
+    [etablissement.adresse, etablissement.ville].filter(Boolean).join(", "),
+    etablissement.telephone && `Tél : ${etablissement.telephone}`,
+    etablissement.email,
+  ].filter(Boolean);
 
-  const corpsTableau = lignesTriees
-    .map(
-      (l) => `<tr>
-        <td>${echapperHtml(l.libelle)}</td>
-        <td class="droite">${formaterMontant(l.montant)}</td>
-        <td class="droite">${formaterMontant(l.paye)}</td>
-        <td class="droite">${formaterMontant(Math.max(0, l.montant - l.paye))}</td>
-        <td><span class="badge-statut ${classeBadgeStatut(l.statut)}">${echapperHtml(l.statut)}</span></td>
-        <td>${l.dernierPaiement ? formaterDate(l.dernierPaiement) : tiret}</td>
-      </tr>`
-    )
-    .join("");
+  const corpsTableau = lignes.length === 0
+    ? `<tr><td colspan="10" class="vide">Aucun frais enregistré pour cet élève.</td></tr>`
+    : lignes
+        .map((l, i) => {
+          const etat = ETATS_ECHEANCE_RELEVE[l.statut] || ETATS_ECHEANCE_RELEVE.a_echoir;
+          return `<tr>
+        <td class="num">${i + 1}</td>
+        <td><strong>${echapperHtml(l.rubrique || "Frais")}</strong>${l.libelle && l.libelle !== l.rubrique ? `<span class="sous">${echapperHtml(l.libelle)}</span>` : ""}</td>
+        <td>${l.date_limite ? formaterDate(l.date_limite) : tiret}</td>
+        <td class="droite mono">${formaterMontant(l.montant)}</td>
+        <td class="droite mono vert">${formaterMontant(l.paye)}</td>
+        <td class="droite mono">${formaterMontant(Math.max(0, l.montant - l.paye))}</td>
+        <td class="mono">${e(l.reference)}</td>
+        <td>${e(l.moyen)}</td>
+        <td>${l.date_paiement ? formaterDate(l.date_paiement) : tiret}</td>
+        <td class="centre"><span class="etat ${etat.classe}">${etat.libelle}</span></td>
+      </tr>`;
+        })
+        .join("");
 
   return `
-  <div class="doc-releve">
-    <div class="entete-premium">
-      <div class="logo">
-        ${LOGO_SVG_BLANC}
-        <div>
-          <div class="nom">LAKOLI</div>
-          ${etablissement ? `<span class="badge-etablissement">${echapperHtml(etablissement)}</span>` : ""}
+  <div class="doc-releve releve-a4">
+    <div class="cadre-a4"><span class="coin hg"></span><span class="coin hd"></span><span class="coin bg"></span><span class="coin bd"></span></div>
+
+    <div class="entete-a4">
+      <div class="republique">
+        <div class="pays"><span class="drapeau"><i style="background:#CE1126"></i><i style="background:#FCD116"></i><i style="background:#009460"></i></span>RÉPUBLIQUE DE GUINÉE</div>
+        <div class="devise">Travail — Justice — Solidarité</div>
+        <div class="ministere">Ministère de l'Enseignement Pré-Universitaire et de l'Alphabétisation</div>
+      </div>
+      <div class="ecole">
+        <div class="logo-ecole">${LOGO_SVG_BLANC}</div>
+        <div class="nom-ecole">${e(etablissement.nom)}</div>
+        ${coordonnees.length ? `<div class="coord">${coordonnees.map(echapperHtml).join(" · ")}</div>` : ""}
+      </div>
+      <div class="reference">
+        <div class="boite-ref">
+          <span class="lib">Réf. relevé</span>
+          <span class="val">${echapperHtml(reference)}</span>
+          <span class="date">Émis le <strong>${echapperHtml(dateLongue)}</strong></span>
         </div>
-      </div>
-      <div class="titre">
-        <h1>RELEVÉ DE PAIEMENTS</h1>
+        <div class="qr">${qr}</div>
       </div>
     </div>
 
-    <div class="bloc-eleve">
-      <h2>Élève</h2>
-      <table class="infos">
-        ${ligneInfo("Nom", echapperHtml(eleve.nom || tiret))}
-        ${ligneInfo("Prénom", echapperHtml(eleve.prenom || tiret))}
-        ${ligneInfo("Matricule", echapperHtml(eleve.matricule || tiret))}
-        ${ligneInfo("Classe", echapperHtml(eleve.classe || tiret))}
-        ${ligneInfo("Session scolaire", echapperHtml(eleve.session || tiret))}
-      </table>
+    <div class="bandeau-titre">
+      <h1>RELEVÉ DE SITUATION COMPTABLE &amp; HISTORIQUE DES RÈGLEMENTS</h1>
+      <p>${eleve.session ? `Année scolaire ${echapperHtml(eleve.session)} · ` : ""}Établi à partir des encaissements enregistrés dans LAKOLI</p>
     </div>
 
-    <table class="tableau-premium">
+    <div class="cartouche">
+      <div class="col">
+        <span class="titre-col">1. Identité de l'élève</span>
+        <span class="lib">Nom &amp; prénoms</span><strong class="maj">${e(`${eleve.nom || ""} ${eleve.prenom || ""}`.trim())}</strong>
+        <span class="lib">Matricule</span><span class="mono bleu">${e(eleve.matricule)}</span>
+        <span class="lib">Né(e) le / à</span><span>${eleve.date_naissance ? formaterDate(eleve.date_naissance) : tiret}${eleve.lieu_naissance ? ` à ${echapperHtml(eleve.lieu_naissance)}` : ""}</span>
+      </div>
+      <div class="col">
+        <span class="titre-col">2. Scolarité</span>
+        <span class="lib">Classe</span><strong class="bleu">${e(eleve.classe)}</strong>
+        <span class="lib">Année scolaire</span><span>${e(eleve.session)}</span>
+        <span class="lib">Régime d'inscription</span><span>${e(REGIMES_INSCRIPTION[eleve.type_inscription])}</span>
+      </div>
+      <div class="col">
+        <span class="titre-col">3. Responsable légal</span>
+        <span class="lib">Nom</span><strong>${e(eleve.responsable?.nom)}</strong>
+        <span class="lib">Téléphone</span><span>${e(eleve.responsable?.telephone)}</span>
+        ${eleve.responsable?.lien ? `<span class="lib">Lien</span><span>${echapperHtml(eleve.responsable.lien)}</span>` : ""}
+      </div>
+    </div>
+
+    <div class="paves">
+      <div class="pave gris"><span class="lib">Total dû</span><span class="val">${formaterMontant(totalDu)} GNF</span></div>
+      <div class="pave vert"><span class="lib">Total encaissé</span><span class="val">${formaterMontant(totalPaye)} GNF</span></div>
+      <div class="pave ${ton}"><span class="lib">Reste à payer</span><span class="val">${formaterMontant(reste)} GNF</span></div>
+      <div class="pave blanc"><span class="lib">Situation</span><span class="pastille ${ton}">${situation}</span></div>
+    </div>
+
+    <div class="titre-livre">
+      <span>Échéancier &amp; historique des encaissements</span>
+      <span class="devise-legale">Montants en francs guinéens (GNF)</span>
+    </div>
+    <table class="livre">
       <thead>
         <tr>
+          <th class="num">N°</th>
+          <th>Rubrique</th>
           <th>Échéance</th>
-          <th class="droite">Montant dû (GNF)</th>
-          <th class="droite">Payé (GNF)</th>
-          <th class="droite">Reste (GNF)</th>
-          <th>Statut</th>
-          <th>Dernier paiement</th>
+          <th class="droite">Exigible</th>
+          <th class="droite">Encaissé</th>
+          <th class="droite">Solde</th>
+          <th>Réf. quittance</th>
+          <th>Mode</th>
+          <th>Payé le</th>
+          <th class="centre">État</th>
         </tr>
       </thead>
-      <tbody>
-        ${corpsTableau}
-        <tr class="total">
-          <td>TOTAL GÉNÉRAL</td>
-          <td class="droite">${formaterMontant(total)}</td>
-          <td class="droite">${formaterMontant(paye)}</td>
-          <td class="droite">${formaterMontant(Math.max(0, total - paye))}</td>
-          <td colspan="2"></td>
+      <tbody>${corpsTableau}</tbody>
+      <tfoot>
+        <tr>
+          <td colspan="3">Totaux</td>
+          <td class="droite mono">${formaterMontant(totalDu)}</td>
+          <td class="droite mono">${formaterMontant(totalPaye)}</td>
+          <td class="droite mono">${formaterMontant(reste)}</td>
+          <td colspan="4" class="droite">Taux de recouvrement : <strong>${taux}%</strong></td>
         </tr>
-      </tbody>
+      </tfoot>
     </table>
+    <div class="arrete">
+      <strong>Arrêté le présent relevé à la somme encaissée de :</strong>
+      <em>${echapperHtml(montantEnLettres(totalPaye))}</em>
+    </div>
 
-    <div class="signature-zone">
-      <div class="cadre">
-        <div class="ligne"></div>
-        <div class="libelle">Signature et cachet du caissier</div>
+    <div class="mention">
+      Le présent relevé retrace l'ensemble des frais exigibles et des paiements enregistrés à la caisse de
+      l'établissement pour l'élève désigné ci-dessus, à la date d'édition. Toute réclamation doit être
+      présentée à la caisse, munie des reçus correspondants.
+    </div>
+
+    <div class="signatures-a4">
+      <div class="sig">
+        <span class="role">Le Comptable / Caissier</span>
+        <span class="note">Vu et certifié conforme à la caisse</span>
+        <span class="ligne-sig"></span>
+      </div>
+      <div class="sig centre">
+        <span class="note">Document généré par LAKOLI</span>
+      </div>
+      <div class="sig droite">
+        <span class="role">Le Chef d'Établissement</span>
+        <span class="note">${etablissement.ville ? `${echapperHtml(etablissement.ville)}, le ` : "Le "}${echapperHtml(dateLongue)}</span>
+        <span class="ligne-sig"></span>
       </div>
     </div>
 
-    <div class="pied-premium">
-      Document officiel LAKOLI · Certifié conforme aux normes scolaires de la République de Guinée<br>
-      Imprimé le ${echapperHtml(dateImpression())}
+    <div class="coupon">
+      <div class="coupon-titre"><span>✂ Coupon détachable — talon de situation</span><span>À conserver par le parent</span></div>
+      <div class="coupon-corps">
+        <div>
+          <div><strong class="maj">${e(`${eleve.nom || ""} ${eleve.prenom || ""}`.trim())}</strong>
+            ${eleve.classe ? `<span class="pill">${echapperHtml(eleve.classe)}</span>` : ""}
+            <span class="mono">${e(eleve.matricule)}</span></div>
+          <div class="petit">Réf. : <strong class="mono">${echapperHtml(reference)}</strong> · Encaissé : <strong class="vert">${formaterMontant(totalPaye)} GNF</strong> (${taux}%) · Reste : <strong>${formaterMontant(reste)} GNF</strong></div>
+        </div>
+        <div class="coupon-etat"><span class="petit">Situation</span><span class="pastille ${ton}">${accesCoupon}</span></div>
+      </div>
     </div>
   </div>`;
 }
