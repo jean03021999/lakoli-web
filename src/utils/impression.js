@@ -308,6 +308,8 @@ const STYLES = `
   .releve-a4 .titre-livre .devise-legale { font-family: "Courier New", monospace; font-size: 8px; font-weight: normal; text-transform: none; color: #64748b; }
   .releve-a4 table.livre { width: 100%; border-collapse: collapse; font-size: 9.5px; border: 1px solid #cbd5e1; }
   .releve-a4 table.livre th { background: #0C447C; color: #fff; padding: 5px 5px; font-size: 8px; text-transform: uppercase; text-align: left; }
+  .releve-a4 table.livre th.droite { text-align: right; }
+  .releve-a4 table.livre th.centre { text-align: center; }
   .releve-a4 table.livre td { padding: 5px 5px; border-top: 1px solid #e2e8f0; vertical-align: top; }
   .releve-a4 table.livre tbody tr:nth-child(even) { background: #f8fafc; }
   .releve-a4 table.livre .num { width: 22px; text-align: center; color: #64748b; font-family: "Courier New", monospace; }
@@ -393,50 +395,6 @@ export const MOYENS_PAIEMENT = {
   cheque: "Chèque",
 };
 
-// "Payé" -> "✓ Payé" ; les autres statuts (Partiel, À échoir, En retard) restent tels quels.
-function texteBadgeStatut(statut) {
-  return normaliserTexte(statut) === "paye" ? `✓ ${statut}` : statut;
-}
-
-// Section "Situation globale de l'élève" du recu : inscription (si presente) + chaque echeance
-// de scolarite + total restant du sur l'annee. Retourne une chaine vide si `situation` est
-// absent (le champ est optionnel sur `data`).
-function situationGlobaleHtml(situation) {
-  if (!situation) return "";
-
-  const ligneInscription = situation.inscription
-    ? `
-      <div class="ligne-situation">
-        <span>${echapperHtml(situation.inscription.libelle)}</span>
-        <span class="${classeBadgeStatut(situation.inscription.statut)}">${echapperHtml(texteBadgeStatut(situation.inscription.statut))}</span>
-        <span>${Number(situation.inscription.montant_paye).toLocaleString("fr-FR")} GNF</span>
-      </div>`
-    : "";
-
-  const lignesEcheances = (situation.echeances || [])
-    .map(
-      (ech) => `
-      <div class="ligne-situation">
-        <span>${echapperHtml(ech.libelle)}</span>
-        <span class="${classeBadgeStatut(ech.statut)}">${echapperHtml(texteBadgeStatut(ech.statut))}</span>
-        <span>${Number(ech.montant_paye).toLocaleString("fr-FR")} GNF / ${Number(ech.montant).toLocaleString("fr-FR")} GNF</span>
-      </div>`
-    )
-    .join("");
-
-  return `
-    <div class="section">
-      <div class="section-title">📊 Situation globale de l'élève</div>
-      ${ligneInscription}
-      <div class="situation-header">Scolarité annuelle : ${Number(situation.totalScolarite).toLocaleString("fr-FR")} GNF</div>
-      ${lignesEcheances}
-      <div class="reste-box">
-        <span>⚠️ RESTE À PAYER</span>
-        <span class="reste-montant">${Number(situation.resteGlobal).toLocaleString("fr-FR")} GNF</span>
-      </div>
-    </div>`;
-}
-
 // ---------------------------------------------------------------------------
 // Recu de paiement — document HTML autonome (son propre <style>, pas de dependance a STYLES
 // ni a ecrireDocumentImpression) : unique pour tous les types (scolarite, inscription,
@@ -472,228 +430,230 @@ export function genererEtImprimerRecu(data, fenetrePreouverte) {
 }
 
 // Document HTML complet du recu (separe de l'ouverture de la fenetre pour pouvoir le tester).
+// Meme habillage A4 que le releve de l'historique des paiements (.releve-a4) : double cadre,
+// en-tete officiel, bandeau titre, cartouche, paves, tableaux, signatures et coupon detachable.
+function etatDepuisLibelle(statut) {
+  const s = normaliserTexte(statut);
+  if (s === "paye") return { libelle: "Soldé", classe: "etat-paye" };
+  if (s === "partiel") return { libelle: "Partiel", classe: "etat-partiel" };
+  if (s === "en retard") return { libelle: "Échu", classe: "etat-retard" };
+  if (s === "non paye") return { libelle: "Non payé", classe: "etat-retard" };
+  return { libelle: "À échoir", classe: "etat-echoir" };
+}
+
 export function genererRecuHtml(data) {
+  const tiret = "—";
+  const e = (v) => echapperHtml(v || tiret);
+  const etablissement = data.etablissement || {};
+  const eleve = data.eleve || {};
+  const situation = data.situationGlobale;
+  const nomComplet = `${eleve.nom || ""} ${eleve.prenom || ""}`.trim();
+  const inscription = eleve.inscription_active;
+  const regime = { nouvelle: "Nouvelle admission", reinscription: "Réinscription" }[inscription?.type_inscription];
+
+  const resteAnnee = situation ? Math.max(0, situation.resteGlobal) : null;
+  const ton = data.estSolde ? "vert" : "ambre";
+
+  const coordonnees = [
+    [etablissement.adresse, etablissement.ville].filter(Boolean).join(", "),
+    etablissement.telephone && `Tél : ${etablissement.telephone}`,
+    etablissement.email,
+  ].filter(Boolean);
+
+  const qr = qrCodeSvg(
+    [
+      "LAKOLI - Reçu de paiement",
+      etablissement.nom,
+      `Réf : ${data.reference}`,
+      `Élève : ${nomComplet}${eleve.matricule ? ` (${eleve.matricule})` : ""}`,
+      `Montant : ${montantTexte(data.total)} GNF`,
+      `Date : ${data.date} ${data.heure}`,
+      `Statut : ${data.estSolde ? "Soldé" : `Partiel, reste ${montantTexte(data.resteAPayer)} GNF`}`,
+    ].filter(Boolean).join("\n"),
+    64
+  );
+
+  const lignesPaiement = data.lignes
+    .map(
+      (l, i) => `<tr>
+        <td class="num">${i + 1}</td>
+        <td><strong>${echapperHtml(l.libelle)}</strong></td>
+        <td class="droite mono vert">${formaterMontant(l.montant)}</td>
+      </tr>`
+    )
+    .join("");
+
+  const lignesSituation = situation
+    ? [
+        ...(situation.inscription
+          ? [{ libelle: situation.inscription.libelle, date_limite: null, montant: situation.inscription.montant, montant_paye: situation.inscription.montant_paye, statut: situation.inscription.statut }]
+          : []),
+        ...(situation.echeances || []).map((ech) => ({ ...ech, libelle: `Scolarité · ${ech.libelle}` })),
+      ]
+        .map((l, i) => {
+          const etat = etatDepuisLibelle(l.statut);
+          return `<tr>
+            <td class="num">${i + 1}</td>
+            <td><strong>${echapperHtml(l.libelle)}</strong></td>
+            <td>${l.date_limite ? formaterDate(l.date_limite) : tiret}</td>
+            <td class="droite mono">${formaterMontant(l.montant)}</td>
+            <td class="droite mono vert">${formaterMontant(l.montant_paye)}</td>
+            <td class="droite mono">${formaterMontant(Math.max(0, l.montant - l.montant_paye))}</td>
+            <td class="centre"><span class="etat ${etat.classe}">${etat.libelle}</span></td>
+          </tr>`;
+        })
+        .join("")
+    : "";
+
+  const corps = `
+  <div class="doc-releve releve-a4 page-recu">
+    <div class="cadre-a4"><span class="coin hg"></span><span class="coin hd"></span><span class="coin bg"></span><span class="coin bd"></span></div>
+
+    <div class="entete-a4">
+      <div class="republique">
+        <div class="pays"><span class="drapeau"><i style="background:#CE1126"></i><i style="background:#FCD116"></i><i style="background:#009460"></i></span>RÉPUBLIQUE DE GUINÉE</div>
+        <div class="devise">Travail — Justice — Solidarité</div>
+        <div class="ministere">Ministère de l'Enseignement Pré-Universitaire et de l'Alphabétisation</div>
+      </div>
+      <div class="ecole">
+        <div class="logo-ecole">${LOGO_SVG_BLANC}</div>
+        <div class="nom-ecole">${echapperHtml(etablissement.nom || "LAKOLI")}</div>
+        ${coordonnees.length ? `<div class="coord">${coordonnees.map(echapperHtml).join(" · ")}</div>` : ""}
+      </div>
+      <div class="reference">
+        <div class="boite-ref">
+          <span class="lib">Reçu N°</span>
+          <span class="val">${e(data.reference)}</span>
+          <span class="date">Payé le <strong>${e(data.date)}</strong> à ${e(data.heure)}</span>
+        </div>
+        <div class="qr">${qr}</div>
+      </div>
+    </div>
+
+    <div class="bandeau-titre">
+      <h1>REÇU DE PAIEMENT</h1>
+      <p>${data.session && data.session !== tiret ? `Année scolaire ${echapperHtml(data.session)} · ` : ""}Paiement encaissé à la caisse de l'établissement</p>
+    </div>
+
+    <div class="cartouche">
+      <div class="col">
+        <span class="titre-col">1. Élève</span>
+        <span class="lib">Nom &amp; prénoms</span><strong class="maj">${e(nomComplet)}</strong>
+        <span class="lib">Matricule</span><span class="mono bleu">${e(eleve.matricule)}</span>
+        <span class="lib">Né(e) le / à</span><span>${eleve.date_naissance ? formaterDate(eleve.date_naissance) : tiret}${eleve.lieu_naissance ? ` à ${echapperHtml(eleve.lieu_naissance)}` : ""}</span>
+      </div>
+      <div class="col">
+        <span class="titre-col">2. Scolarité</span>
+        <span class="lib">Classe</span><strong class="bleu">${e(eleve.classe)}</strong>
+        <span class="lib">Année scolaire</span><span>${e(data.session)}</span>
+        <span class="lib">Régime d'inscription</span><span>${e(regime)}</span>
+      </div>
+      <div class="col">
+        <span class="titre-col">3. Règlement</span>
+        <span class="lib">Moyen de paiement</span><strong>${e(data.moyen)}</strong>
+        <span class="lib">Date et heure</span><span>${e(data.date)} à ${e(data.heure)}</span>
+        <span class="lib">Caissier</span><span>${e(data.caissier)}</span>
+      </div>
+    </div>
+
+    <div class="paves">
+      <div class="pave vert"><span class="lib">Montant encaissé</span><span class="val">${formaterMontant(data.total)} GNF</span></div>
+      <div class="pave ${ton}"><span class="lib">Reste sur l'échéance</span><span class="val">${formaterMontant(data.estSolde ? 0 : data.resteAPayer)} GNF</span></div>
+      <div class="pave gris"><span class="lib">Reste scolarité (année)</span><span class="val">${resteAnnee === null ? tiret : `${formaterMontant(resteAnnee)} GNF`}</span></div>
+      <div class="pave blanc"><span class="lib">Statut</span><span class="pastille ${ton}">${data.estSolde ? "✓ Payé en intégralité" : "⏳ Paiement partiel"}</span></div>
+    </div>
+
+    <div class="titre-livre">
+      <span>Détail du paiement</span>
+      <span class="devise-legale">Montants en francs guinéens (GNF)</span>
+    </div>
+    <table class="livre">
+      <thead><tr><th class="num">N°</th><th>Désignation</th><th class="droite">Montant</th></tr></thead>
+      <tbody>${lignesPaiement}</tbody>
+      <tfoot><tr><td colspan="2">Total encaissé</td><td class="droite mono">${formaterMontant(data.total)}</td></tr></tfoot>
+    </table>
+    <div class="arrete">
+      <strong>Arrêté le présent reçu à la somme de :</strong>
+      <em>${echapperHtml(montantEnLettres(data.total))}</em>
+    </div>
+
+    ${situation ? `
+    <div class="titre-livre espace">
+      <span>Situation globale de l'élève</span>
+      <span class="devise-legale">Scolarité annuelle : ${formaterMontant(situation.totalScolarite)} GNF</span>
+    </div>
+    <table class="livre">
+      <thead><tr><th class="num">N°</th><th>Rubrique</th><th>Échéance</th><th class="droite">Exigible</th><th class="droite">Payé</th><th class="droite">Reste</th><th class="centre">État</th></tr></thead>
+      <tbody>${lignesSituation}</tbody>
+      <tfoot><tr><td colspan="3">Scolarité</td><td class="droite mono">${formaterMontant(situation.totalScolarite)}</td><td class="droite mono">${formaterMontant(situation.totalPaye)}</td><td class="droite mono">${formaterMontant(resteAnnee)}</td><td></td></tr></tfoot>
+    </table>` : ""}
+
+    <div class="signatures-a4">
+      <div class="sig">
+        <span class="role">Le Caissier</span>
+        <span class="note">Signature et cachet</span>
+        <span class="ligne-sig"></span>
+      </div>
+      <div class="sig centre">
+        <span class="note">Document généré par LAKOLI</span>
+      </div>
+      <div class="sig droite">
+        <span class="role">Le Chef d'Établissement</span>
+        <span class="note">${etablissement.ville ? `${echapperHtml(etablissement.ville)}, le ` : "Le "}${e(data.date)}</span>
+        <span class="ligne-sig"></span>
+      </div>
+    </div>
+
+    <div class="coupon">
+      <div class="coupon-titre"><span>✂ Coupon détachable — talon de caisse</span><span>À conserver par le parent</span></div>
+      <div class="coupon-corps">
+        <div>
+          <div><strong class="maj">${e(nomComplet)}</strong>
+            ${eleve.classe ? `<span class="pill">${echapperHtml(eleve.classe)}</span>` : ""}
+            <span class="mono">${e(eleve.matricule)}</span></div>
+          <div class="petit">Reçu : <strong class="mono">${e(data.reference)}</strong> · ${e(data.date)} · ${e(data.moyen)} · Encaissé : <strong class="vert">${formaterMontant(data.total)} GNF</strong></div>
+        </div>
+        <div class="coupon-etat"><span class="petit">Statut</span><span class="pastille ${ton}">${data.estSolde ? "SOLDÉ" : "PARTIEL"}</span></div>
+      </div>
+    </div>
+  </div>`;
+
   return `<!DOCTYPE html>
-<html>
+<html lang="fr">
 <head>
-  <meta charset="UTF-8">
-  <title>Reçu de Paiement LAKOLI</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 12px; background: #f8fafc; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    .recu { max-width: 680px; margin: 20px auto; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.12); }
-    .bande-top { height: 4px; background: linear-gradient(90deg, #0C447C 0%, #10b981 100%); }
-
-    /* EN-TÊTE */
-    .header { background: linear-gradient(135deg, #0C447C 0%, #1a6bb5 100%); color: white; padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; position: relative; overflow: hidden; }
-    .header::before { content: ''; position: absolute; top: -30px; right: -30px; width: 120px; height: 120px; background: rgba(255,255,255,0.06); border-radius: 50%; }
-    .header::after { content: ''; position: absolute; bottom: -40px; right: 80px; width: 90px; height: 90px; background: rgba(255,255,255,0.04); border-radius: 50%; }
-    .header-left { display: flex; align-items: center; gap: 10px; position: relative; z-index: 1; }
-    .logo-box, .header-icon { width: 48px; height: 48px; background: linear-gradient(135deg, rgba(255,255,255,0.30) 0%, rgba(255,255,255,0.08) 100%); border-radius: 12px; border: 1px solid rgba(255,255,255,0.25); box-shadow: inset 0 1px 2px rgba(255,255,255,0.40), inset 0 -3px 8px rgba(0,0,0,0.18); display: flex; align-items: center; justify-content: center; font-size: 24px; }
-    .logo-name, .header-title { font-size: 22px; font-weight: 800; letter-spacing: 2px; }
-    .logo-sub, .header-sub { font-size: 11px; opacity: 0.7; margin-top: 2px; }
-    .header-right { text-align: right; position: relative; z-index: 1; }
-    .recu-titre { font-size: 18px; font-weight: 700; letter-spacing: 1.5px; }
-    .recu-num { display: inline-block; font-size: 12px; margin-top: 6px; font-family: monospace; background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.25); padding: 2px 10px; border-radius: 12px; }
-
-    /* CORPS */
-    .body { padding: 0; background: white; }
-
-    /* SECTIONS */
-    .section { padding: 14px 20px; border-bottom: 1px solid #f1f5f9; }
-    .section:last-child { border-bottom: none; }
-    .section-label, .section-title { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: #94a3b8; margin-bottom: 8px; }
-
-    /* ÉLÈVE */
-    .eleve-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0; }
-    .eleve-item label { font-size: 10px; color: #94a3b8; display: block; margin-bottom: 2px; font-weight: 500; }
-    .eleve-item span { font-size: 13px; font-weight: 600; color: #1e293b; }
-
-    /* PAIEMENT DU JOUR */
-    .ligne-paiement { display: flex; justify-content: space-between; align-items: center; padding: 7px 0; border-bottom: 1px dashed #e2e8f0; }
-    .ligne-paiement:last-child { border-bottom: none; }
-    .ligne-libelle { font-size: 13px; color: #334155; }
-    .ligne-montant { font-size: 14px; font-weight: 700; color: #1e293b; font-family: monospace; }
-
-    /* TOTAL */
-    .total-box { margin: 0 20px 0; background: linear-gradient(135deg, #f0fdf4, #dcfce7); border: 1px solid #86efac; border-radius: 10px; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; }
-    .total-label { display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #15803d; }
-    .total-check { width: 20px; height: 20px; border-radius: 50%; background: #16a34a; color: white; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; box-shadow: 0 0 0 3px rgba(22,163,74,0.18); animation: check-pop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
-    @keyframes check-pop { 0% { transform: scale(0) rotate(-45deg); opacity: 0; } 100% { transform: scale(1) rotate(0); opacity: 1; } }
-    .total-montant { font-size: 20px; font-weight: 800; color: #15803d; font-family: monospace; }
-
-    /* STATUT */
-    .statut-box { margin: 11px 20px; text-align: center; padding: 8px; border-radius: 8px; font-weight: 700; font-size: 12px; letter-spacing: 0.5px; }
-    .statut-paye { background: #f0fdf4; color: #15803d; border: 1px solid #86efac; }
-    .statut-partiel { background: #fffbeb; color: #d97706; border: 1px solid #fcd34d; }
-
-    /* SITUATION GLOBALE */
-    .situation-header { background: #f8fafc; padding: 7px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; color: #475569; margin-bottom: 8px; display: flex; justify-content: space-between; }
-    .ligne-situation { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid #f1f5f9; font-size: 12px; }
-    .ligne-situation:last-child { border-bottom: none; }
-    .ligne-sit-libelle, .ligne-situation > span:first-child { color: #475569; flex: 1; }
-    .ligne-sit-montant, .ligne-situation > span:last-child { color: #334155; font-weight: 600; font-family: monospace; font-size: 12px; margin-left: 12px; }
-    .badge, .badge-paye, .badge-partiel, .badge-echoir, .badge-retard { padding: 1px 6px; border-radius: 10px; font-size: 10px; font-weight: 700; margin: 0 8px; white-space: nowrap; }
-    .badge-paye { background: #dcfce7; color: #15803d; }
-    .badge-partiel { background: #fef9c3; color: #a16207; }
-    .badge-echoir { background: #f1f5f9; color: #64748b; }
-    .badge-retard { background: #fee2e2; color: #dc2626; }
-    .reste-global, .reste-box { display: flex; justify-content: space-between; align-items: center; background: #fff7ed; border: 1px solid #fed7aa; border-radius: 8px; padding: 10px 14px; margin-top: 10px; }
-    .reste-global-label, .reste-box > span:first-child { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #ea580c; }
-    .reste-global-montant, .reste-montant { font-size: 16px; font-weight: 800; color: #ea580c; font-family: monospace; }
-
-    /* RÈGLEMENT */
-    .reglement-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-    .reg-item label { font-size: 10px; color: #94a3b8; display: block; margin-bottom: 2px; font-weight: 500; }
-    .reg-item span { font-size: 13px; font-weight: 600; color: #1e293b; }
-
-    /* SIGNATURES */
-    .signature-zone { display: flex; justify-content: space-between; gap: 20px; padding: 12px 20px 0; }
-    .signature-box { text-align: center; padding-top: 28px; }
-    .signature-line { border-top: 1.5px dashed #94a3b8; width: 200px; padding-top: 4px; }
-    .signature-label { font-size: 10px; color: #64748b; }
-
-    /* PIED DE PAGE */
-    .footer { background: #f8fafc; padding: 10px 20px; display: flex; align-items: center; gap: 12px; border-top: 1px solid #e2e8f0; margin-top: 14px; }
-    .qr-code { width: 80px; height: 80px; flex-shrink: 0; }
-    .qr-code svg { display: block; }
-    .footer-texte { flex: 1; text-align: center; padding-right: 92px; }
-    .footer p { font-size: 10px; color: #94a3b8; line-height: 1.6; }
-
-    /* BOUTONS */
-    .btn-group { display: flex; gap: 10px; justify-content: center; padding: 11px; background: white; border-top: 1px solid #e2e8f0; }
-    .btn { padding: 6px 15px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; border: none; transition: opacity 0.15s; }
-    .btn:hover { opacity: 0.85; }
-    .btn-print { background: #0C447C; color: white; }
-    .btn-close { background: #e2e8f0; color: #475569; }
-
-    @media print {
-      body { background: white; }
-      .recu { box-shadow: none; margin: 0; border-radius: 0; }
-      .total-check { animation: none; }
-      .btn-group { display: none !important; }
-      /* Un peu plus compact a l'impression : le recu doit tenir sur une seule page A4. */
-      .section { padding-top: 10px; padding-bottom: 10px; }
-      .statut-box { margin-top: 8px; margin-bottom: 8px; }
-      .signature-box { padding-top: 22px; }
-      .footer { margin-top: 10px; }
-      .page-recu { break-inside: avoid; }
-      @page { margin: 8mm; size: A4; }
-    }
-  </style>
+<meta charset="utf-8">
+<title>Reçu de paiement ${echapperHtml(data.reference || "")}</title>
+<style>${STYLES}
+  .releve-a4 .titre-livre.espace { margin-top: 12px; }
+  @media print { @page { margin: 8mm; size: A4; } }
+</style>
 </head>
 <body>
-  <div class="page-recu">
-  <div class="bande-top"></div>
-  <div class="header">
-    <div class="header-left">
-      <div class="header-icon">🎓</div>
-      <div>
-        <div class="header-title">LAKOLI</div>
-        <div class="header-sub">Gestion Scolaire · Guinée</div>
-      </div>
-    </div>
-    <div class="header-right">
-      <div class="recu-titre">REÇU DE PAIEMENT</div>
-      <div class="recu-num">N° ${echapperHtml(data.reference)}</div>
-    </div>
+<div class="page">
+  <div class="actions no-print">
+    <button class="primaire" onclick="window.print()">Imprimer</button>
+    <button onclick="window.close()">Fermer</button>
   </div>
-
-  <div class="body">
-    <div class="section">
-      <div class="section-title">👤 Élève</div>
-      <div class="eleve-grid">
-        <div class="eleve-item"><label>Nom complet</label><span>${echapperHtml(data.eleve?.nom)} ${echapperHtml(data.eleve?.prenom)}</span></div>
-        <div class="eleve-item"><label>Matricule</label><span>${echapperHtml(data.eleve?.matricule)}</span></div>
-        <div class="eleve-item"><label>Classe</label><span>${echapperHtml(data.eleve?.classe)}</span></div>
-        <div class="eleve-item"><label>Session scolaire</label><span>${echapperHtml(data.session)}</span></div>
-      </div>
-    </div>
-
-    <div class="section">
-      <div class="section-title">💳 Détail du paiement</div>
-      ${data.lignes.map((l) => `
-        <div class="ligne-paiement">
-          <span class="ligne-libelle">${echapperHtml(l.libelle)}</span>
-          <span class="ligne-montant">${Number(l.montant).toLocaleString("fr-FR")} GNF</span>
-        </div>
-      `).join("")}
-    </div>
-
-    <div class="total-box">
-      <span class="total-label"><span class="total-check">✓</span>Total encaissé</span>
-      <span class="total-montant">${Number(data.total).toLocaleString("fr-FR")} GNF</span>
-    </div>
-
-    <div class="statut-box ${data.estSolde ? "statut-paye" : "statut-partiel"}">
-      ${data.estSolde ? "✓ PAYÉ EN INTÉGRALITÉ" : `PAIEMENT PARTIEL · Reste à payer : ${Number(data.resteAPayer).toLocaleString("fr-FR")} GNF`}
-    </div>
-
-    <div class="section">
-      <div class="section-title">🧾 Règlement</div>
-      <div class="reglement-grid">
-        <div class="reg-item"><label>Moyen de paiement</label><span>${echapperHtml(data.moyen)}</span></div>
-        <div class="reg-item"><label>Référence</label><span>${echapperHtml(data.reference)}</span></div>
-        <div class="reg-item"><label>Date et heure</label><span>${echapperHtml(data.date)} à ${echapperHtml(data.heure)}</span></div>
-        <div class="reg-item"><label>Caissier</label><span>${echapperHtml(data.caissier)}</span></div>
-      </div>
-    </div>
-
-    ${situationGlobaleHtml(data.situationGlobale)}
-
-    <div class="signature-zone">
-      <div class="signature-box">
-        <div class="signature-line">
-          <div class="signature-label">Signature et cachet du caissier</div>
-        </div>
-      </div>
-      <div class="signature-box">
-        <div class="signature-line">
-          <div class="signature-label">Signature et cachet du directeur</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="footer">
-      <div class="qr-code">${qrCodeSvg([
-        "LAKOLI - Reçu de paiement",
-        `Réf : ${data.reference}`,
-        `Élève : ${data.eleve?.nom ?? ""} ${data.eleve?.prenom ?? ""}${data.eleve?.matricule ? ` (${data.eleve.matricule})` : ""}`,
-        `Montant : ${montantTexte(data.total)} GNF`,
-        `Date : ${data.date} ${data.heure}`,
-        `Statut : ${data.estSolde ? "Soldé" : `Partiel, reste ${montantTexte(data.resteAPayer)} GNF`}`,
-      ].join("\n"), 80)}</div>
-      <div class="footer-texte">
-        <p>Document officiel LAKOLI · Certifié conforme aux normes scolaires de la République de Guinée</p>
-        <p>Imprimé le ${new Date().toLocaleDateString("fr-FR")} à ${new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}</p>
-      </div>
-    </div>
-  </div>
-  </div>
-
-  <div class="btn-group">
-    <button class="btn btn-print" onclick="window.print()">🖨️ Imprimer</button>
-    <button class="btn btn-close" onclick="window.close()">✕ Fermer</button>
-  </div>
-  <script>
-    // Le recu doit toujours tenir sur UNE page A4 (QR code compris) : juste avant l'impression, on
-    // mesure sa hauteur et, s'il depasse la zone imprimable (A4 moins 2 x 8 mm, soit ~1062 px CSS),
-    // on le reduit proportionnellement. Taille normale retablie apres l'impression.
-    (function () {
-      var HAUTEUR_MAX = 1030;
-      var recu = document.querySelector(".page-recu");
-      function ajuster() {
-        recu.style.zoom = "";
-        var hauteur = recu.getBoundingClientRect().height;
-        if (hauteur > HAUTEUR_MAX) recu.style.zoom = String(Math.floor((HAUTEUR_MAX / hauteur) * 1000) / 1000);
-      }
-      window.addEventListener("beforeprint", ajuster);
-      window.addEventListener("afterprint", function () { recu.style.zoom = ""; });
-      if (window.matchMedia) {
-        window.matchMedia("print").addEventListener("change", function (m) { if (m.matches) ajuster(); });
-      }
-    })();
-  </script>
+  ${corps}
+</div>
+<script>
+  // Le recu doit toujours tenir sur UNE page A4 : juste avant l'impression, s'il depasse la zone
+  // imprimable, on le reduit proportionnellement. Taille normale retablie apres l'impression.
+  (function () {
+    var HAUTEUR_MAX = 1030;
+    var recu = document.querySelector(".page-recu");
+    function ajuster() {
+      recu.style.zoom = "";
+      var hauteur = recu.getBoundingClientRect().height;
+      if (hauteur > HAUTEUR_MAX) recu.style.zoom = String(Math.floor((HAUTEUR_MAX / hauteur) * 1000) / 1000);
+    }
+    window.addEventListener("beforeprint", ajuster);
+    window.addEventListener("afterprint", function () { recu.style.zoom = ""; });
+    if (window.matchMedia) {
+      window.matchMedia("print").addEventListener("change", function (m) { if (m.matches) ajuster(); });
+    }
+  })();
+</script>
 </body>
 </html>`;
 }
@@ -701,16 +661,6 @@ export function genererRecuHtml(data) {
 // Minuscules et sans accents : reconnait "Inscription"/"Réinscription" quel que soit le cas.
 function normaliserTexte(texte) {
   return (texte || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
-}
-
-// "Payé" -> badge-paye, "En retard" -> badge-retard, etc. ; "À échoir" (et tout statut
-// inconnu) retombe sur le badge neutre par defaut.
-function classeBadgeStatut(statut) {
-  const s = normaliserTexte(statut);
-  if (s === "paye") return "badge-paye";
-  if (s === "partiel") return "badge-partiel";
-  if (s === "en retard") return "badge-retard";
-  return "badge-echoir";
 }
 
 // ---------------------------------------------------------------------------

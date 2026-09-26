@@ -135,7 +135,7 @@ function AppContent() {
         <Route path="/bulletins/:id" element={<BulletinApercu />} />
         <Route
           path="/frais-scolarite"
-          element={<RouteProtegee permissions={permissions} requiert="frais.voir"><FraisScolarite permissions={permissions} /></RouteProtegee>}
+          element={<RouteProtegee permissions={permissions} requiert="frais.voir"><FraisScolarite permissions={permissions} etablissement={etablissement} /></RouteProtegee>}
         />
         <Route path="/classes" element={<Classes />} />
         <Route path="/periodes" element={<Periodes />} />

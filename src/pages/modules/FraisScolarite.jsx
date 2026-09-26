@@ -53,6 +53,7 @@ function situationGlobaleDepuisSuivi(suivi) {
     montant: Number(e.montant),
     montant_paye: Number(e.montant_paye),
     reste: Math.max(0, Number(e.montant) - Number(e.montant_paye)),
+    date_limite: e.date_limite,
     statut: STATUTS_ECHEANCE[calculerStatutEcheance(e)].libelle,
   }));
 
@@ -122,7 +123,7 @@ function lireClasseFiltre() {
 const MESSAGE_POPUP_BLOQUE =
   "Le navigateur a bloqué la fenêtre du reçu. Autorisez les pop-ups pour ce site, puis cliquez sur « Réimprimer le reçu ».";
 
-export default function FraisScolarite({ permissions = [] }) {
+export default function FraisScolarite({ permissions = [], etablissement = null }) {
   const peutInscrire = permissions.includes("frais.creer");
   const peutImprimer = permissions.includes("frais.voir");
 
@@ -387,6 +388,7 @@ export default function FraisScolarite({ permissions = [] }) {
         heure: resInscription.data.heure,
         caissier: resInscription.data.caissier || localStorage.getItem("user_name") || "",
         situationGlobale: situationGlobaleDepuisSuivi(suiviMaj),
+        etablissement,
       };
       setDernierRecu(recu);
       if (peutImprimer && !genererEtImprimerRecu(recu, fenetre)) {
@@ -439,6 +441,7 @@ export default function FraisScolarite({ permissions = [] }) {
         heure: formaterHeure(res.data.created_at),
         caissier: localStorage.getItem("user_name") || "",
         situationGlobale: situationGlobaleDepuisSuivi(suiviMaj),
+        etablissement,
       };
       setDernierRecu(recu);
       if (peutImprimer && !genererEtImprimerRecu(recu, fenetre)) {
