@@ -122,9 +122,9 @@ function AppContent() {
           element={<RouteProtegee permissions={permissions} requiert="eleves.importer"><ImporterExcel /></RouteProtegee>}
         />
 
-        <Route path="/enseignants" element={<Enseignants />} />
-        <Route path="/enseignants/:id" element={<EnseignantFiche />} />
-        <Route path="/enseignants-ajouter" element={<AjouterEnseignant />} />
+        <Route path="/enseignants" element={<Enseignants permissions={permissions} />} />
+        <Route path="/enseignants/:id" element={<EnseignantFiche permissions={permissions} etablissement={etablissement} />} />
+        <Route path="/enseignants-ajouter" element={<RouteProtegee permissions={permissions} requiert="enseignants.creer"><AjouterEnseignant /></RouteProtegee>} />
         <Route path="/matieres" element={<Matieres />} />
         <Route path="/affectations" element={<Affectations />} />
         <Route path="/emploi-du-temps" element={<EmploiDuTemps />} />
