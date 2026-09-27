@@ -19,6 +19,7 @@ export function regrouperVersements(paiements) {
         moyen_paiement: p.moyen_paiement,
         date_paiement: p.date_paiement,
         heure: p.heure,
+        caissier: p.caissier,
         montant: 0,
         details: [],
       });
@@ -26,7 +27,14 @@ export function regrouperVersements(paiements) {
     const v = parId.get(cle);
     v.montant += parseFloat(p.montant) || 0;
     v.reference = v.reference || p.reference;
-    v.details.push({ id: p.id, type_frais: p.type_frais, libelle: p.libelle, montant: parseFloat(p.montant) || 0 });
+    v.caissier = v.caissier || p.caissier;
+    v.details.push({
+      id: p.id,
+      echeance_eleve_id: p.echeance_eleve_id,
+      type_frais: p.type_frais,
+      libelle: p.libelle,
+      montant: parseFloat(p.montant) || 0,
+    });
   }
 
   return [...parId.values()].map((v) => {

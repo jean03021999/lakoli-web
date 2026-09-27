@@ -236,6 +236,16 @@ const STYLES = `
   .doc-releve.rapport .note { margin: 6px 0 0; color: #64748b; font-size: 11px; }
   .doc-releve.rapport .gris { color: #64748b; font-size: 11px; }
 
+  table.tableau-premium.journal { table-layout: fixed; }
+  table.tableau-premium.journal th, table.tableau-premium.journal td { padding: 6px 6px; font-size: 10.5px; word-break: break-word; }
+  table.tableau-premium.journal th:nth-child(1) { width: 26px; }
+  table.tableau-premium.journal th:nth-child(2) { width: 68px; }
+  table.tableau-premium.journal th:nth-child(3) { width: 118px; }
+  table.tableau-premium.journal th:nth-child(8) { width: 82px; }
+  .doc-releve .repartitions { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px; }
+  .doc-releve .tuile-repartition { border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 12px; background: #f8fafc; font-size: 12px; break-inside: avoid; }
+  .doc-releve .tuile-repartition strong { display: block; color: #0C447C; margin-bottom: 6px; text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px; }
+  .doc-releve .tuile-repartition div { display: flex; justify-content: space-between; padding: 2px 0; }
   .doc-releve .pied-premium {
     margin-top: 24px; padding-top: 12px; border-top: 1px solid #e2e8f0;
     text-align: center; font-size: 11px; color: #475569;
@@ -1060,6 +1070,99 @@ export function genererListeEnseignantsHtml({ etablissement, session, enseignant
 
     <div class="pied-premium">
       Document officiel LAKOLI · Liste arrêtée à ${tries.length} enseignant${tries.length > 1 ? "s" : ""}<br>
+      Imprimé le ${echapperHtml(dateImpression())}
+    </div>
+  </div>`;
+}
+
+// ---------------------------------------------------------------------------
+// Journal de caisse imprimable — meme gabarit que les listes. `versements` : lignes deja
+// filtrees et formatees ({ date, heure, reference, eleve, matricule, classe, detail, moyen,
+// montant }). `parMoyen` / `parType` : [{ libelle, montant }]. A passer a imprimerDocument().
+// ---------------------------------------------------------------------------
+export function genererJournalCaisseHtml({ etablissement, filtres = [], versements, parMoyen = [], parType = [] }) {
+  const tiret = "—";
+  const total = versements.reduce((s, v) => s + (Number(v.montant) || 0), 0);
+  const repartition = (titre, lignes) =>
+    lignes.length
+      ? `<div class="tuile-repartition"><strong>${echapperHtml(titre)}</strong>${lignes
+          .map((l) => `<div><span>${echapperHtml(l.libelle)}</span><span>${formaterMontant(l.montant)} GNF</span></div>`)
+          .join("")}</div>`
+      : "";
+
+  const lignes = versements
+    .map(
+      (v, i) => `<tr>
+      <td class="num">${i + 1}</td>
+      <td style="white-space:nowrap">${echapperHtml(v.date || tiret)}<br><span style="color:#64748b;font-size:11px">${echapperHtml(v.heure || "")}</span></td>
+      <td class="mono" style="word-break:break-all;font-size:9.5px">${echapperHtml(v.reference || tiret)}</td>
+      <td><strong>${echapperHtml(v.eleve || tiret)}</strong><br><span class="mono" style="color:#64748b;font-size:11px">${echapperHtml(v.matricule || "")}</span></td>
+      <td>${echapperHtml(v.classe || tiret)}</td>
+      <td>${echapperHtml(v.detail || tiret)}</td>
+      <td>${echapperHtml(v.moyen || tiret)}</td>
+      <td class="droite" style="white-space:nowrap">${formaterMontant(v.montant)}</td>
+    </tr>`
+    )
+    .join("");
+
+  return `
+  <div class="doc-releve liste-classe">
+    <div class="entete-premium">
+      <div class="logo">
+        ${LOGO_SVG_BLANC}
+        <div>
+          <div class="nom">LAKOLI</div>
+          ${etablissement ? `<span class="badge-etablissement">${echapperHtml(etablissement)}</span>` : ""}
+        </div>
+      </div>
+      <div class="titre">
+        <h1>JOURNAL DE CAISSE</h1>
+        <div class="classe">${formaterMontant(total)} GNF</div>
+        ${filtres.length ? `<div class="session">${echapperHtml(filtres.join(" · "))}</div>` : `<div class="session">Tous les encaissements</div>`}
+      </div>
+    </div>
+
+    <div class="resume-classe">
+      <span>Versements : <strong>${versements.length}</strong></span>
+      <span>Total encaissé : <strong>${formaterMontant(total)} GNF</strong></span>
+    </div>
+
+    <table class="tableau-premium journal">
+      <thead>
+        <tr>
+          <th>N°</th>
+          <th>Date</th>
+          <th>Référence</th>
+          <th>Élève</th>
+          <th>Classe</th>
+          <th>Frais réglés</th>
+          <th>Moyen</th>
+          <th class="droite">Montant (GNF)</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${lignes}
+        <tr class="total">
+          <td colspan="7">TOTAL</td>
+          <td class="droite">${formaterMontant(total)}</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="repartitions">
+      ${repartition("Par moyen de paiement", parMoyen)}
+      ${repartition("Par type de frais", parType)}
+    </div>
+
+    <div class="signature-zone">
+      <div class="cadre">
+        <div class="ligne"></div>
+        <div class="libelle">Signature du caissier / comptable</div>
+      </div>
+    </div>
+
+    <div class="pied-premium">
+      Document officiel LAKOLI · Journal arrêté à ${versements.length} versement${versements.length > 1 ? "s" : ""} pour ${formaterMontant(total)} GNF<br>
       Imprimé le ${echapperHtml(dateImpression())}
     </div>
   </div>`;

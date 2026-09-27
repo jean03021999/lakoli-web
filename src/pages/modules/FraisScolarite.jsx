@@ -2,82 +2,41 @@ import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import api from "../../services/api";
 import {
-  Plus,
-  RefreshCw,
+  CreditCard,
+  Download,
+  History,
+  ClipboardList,
   Layers,
   CheckCircle2,
   AlertTriangle,
-  Wallet,
   Users,
-  Tag,
-  FileSpreadsheet,
-  School,
+  Clock,
+  Calendar,
+  GraduationCap,
+  UserPlus,
+  UserCheck,
+  ChevronRight,
   Receipt,
   Search,
 } from "lucide-react";
-import { Card, Button, Input, Select, Badge } from "../../components/ui/LakoliDesignSystem";
-import { calculerStatutEcheance, STATUTS_ECHEANCE } from "../../constants/statutEcheance";
+import { calculerStatutEcheance } from "../../constants/statutEcheance";
+import { situationGlobaleDepuisSuivi } from "../../utils/situationFrais";
+import GrillesTarifaires from "../../components/frais/GrillesTarifaires";
+import {
+  STYLE_CARTE,
+  MOYENS,
+  statut,
+  configTypeFrais,
+  couleurAvatar,
+  formaterGNF,
+  formaterDateCourte,
+  normaliser,
+  telechargerCsv,
+} from "../../components/frais/configFrais";
 import { formaterDate, formaterHeure, referenceLocale, genererEtImprimerRecu, ouvrirFenetreVierge, MOYENS_PAIEMENT } from "../../utils/impression";
 
 function getInitiales(nom, prenom) {
   return `${nom?.[0] || ""}${prenom?.[0] || ""}`.toUpperCase();
-}
-
-function badgeStatutEcheance(ech) {
-  const statut = STATUTS_ECHEANCE[calculerStatutEcheance(ech)];
-  return <Badge variant="neutral" className={statut.badge}>{statut.libelle}</Badge>;
-}
-
-function formaterGNF(montant) {
-  return `${Number(montant).toLocaleString("fr-FR")} GNF`;
-}
-
-// Minuscules et sans accents, pour que "aminata" trouve "Aminata" et "helene" trouve "Hélène".
-function normaliser(texte) {
-  return (texte || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
-}
-
-// Situation globale de l'eleve (inscription + toutes les echeances de scolarite), envoyee au
-// recu pour que le caissier voie d'un coup d'oeil ce qui reste du sur l'annee. `suivi` doit
-// etre le suivi rechargé APRES le paiement (chargerSuivi renvoie les donnees a jour).
-function situationGlobaleDepuisSuivi(suivi) {
-  if (!suivi) return null;
-
-  const echeancesScolarite = (suivi.frais || [])
-    .filter((f) => normaliser(f.type_frais).startsWith("scolarit"))
-    .flatMap((f) => f.echeances);
-  const totalScolarite = echeancesScolarite.reduce((s, e) => s + Number(e.montant), 0);
-  const totalPaye = echeancesScolarite.reduce((s, e) => s + Number(e.montant_paye), 0);
-  const echeances = echeancesScolarite.map((e) => ({
-    libelle: e.libelle,
-    montant: Number(e.montant),
-    montant_paye: Number(e.montant_paye),
-    reste: Math.max(0, Number(e.montant) - Number(e.montant_paye)),
-    date_limite: e.date_limite,
-    statut: STATUTS_ECHEANCE[calculerStatutEcheance(e)].libelle,
-  }));
-
-  const fraisInscription = (suivi.frais || []).find((f) => normaliser(f.type_frais).includes("inscription"));
-  const echInscription = fraisInscription?.echeances?.[0];
-  const inscription = fraisInscription
-    ? {
-        libelle: fraisInscription.type_frais,
-        montant: Number(echInscription?.montant || 0),
-        montant_paye: Number(echInscription?.montant_paye || 0),
-        statut:
-          Number(echInscription?.montant_paye || 0) > 0 && Number(echInscription?.montant_paye || 0) >= Number(echInscription?.montant || 0)
-            ? "Payé"
-            : "Non payé",
-      }
-    : null;
-
-  return {
-    totalScolarite,
-    totalPaye,
-    resteGlobal: totalScolarite - totalPaye,
-    echeances,
-    inscription,
-  };
 }
 
 // Reste a payer sur l'ensemble du frais (toutes tranches) auquel appartient l'echeance : c'est le
@@ -91,23 +50,16 @@ function resteTotalDuFrais(suivi, echeanceId) {
 // renvoye par POST /frais/paiements et de l'etat des echeances AVANT le paiement (suivi au clic).
 function detailPaiementScolarite(resPaiement, suiviAvant) {
   const echeancesAvant = (suiviAvant?.frais || []).flatMap((f) => f.echeances);
+  const typeDe = (echeanceId) =>
+    (suiviAvant?.frais || []).find((f) => f.echeances.some((e) => String(e.id) === String(echeanceId)))?.type_frais || "Scolarité";
   const details = resPaiement.paiements || [];
-  const lignes = details.map((p) => ({ libelle: `Scolarité - ${p.libelle}`, montant: Number(p.montant) }));
+  const lignes = details.map((p) => ({ libelle: `${typeDe(p.echeance_eleve_id)} - ${p.libelle}`, montant: Number(p.montant) }));
   const resteAPayer = details.reduce((s, p) => {
     const avant = echeancesAvant.find((e) => String(e.id) === String(p.echeance_eleve_id));
     return s + (avant ? Math.max(0, Number(avant.montant) - Number(avant.montant_paye) - Number(p.montant)) : 0);
   }, 0);
   return { lignes, resteAPayer, estSolde: resteAPayer <= 0 };
 }
-
-// Statut de paiement global de l'eleve (Eleve::statut_paiement cote backend), affiche en pastille
-// coloree dans la liste — memes couleurs que le badge d'echeance pour rester coherent.
-const STATUTS_PAIEMENT_ELEVE = {
-  a_jour: { libelle: "À jour", dot: "bg-emerald-500", texte: "text-emerald-600" },
-  partiel: { libelle: "Partiel", dot: "bg-orange-500", texte: "text-orange-600" },
-  a_echoir: { libelle: "À échoir", dot: "bg-slate-400", texte: "text-slate-500" },
-  en_retard: { libelle: "En retard", dot: "bg-rose-500", texte: "text-rose-600" },
-};
 
 // Memorise la classe choisie pour la retrouver au retour sur la page.
 const CLE_CLASSE_FILTRE = "frais_classe_filtre";
@@ -120,12 +72,55 @@ function lireClasseFiltre() {
   }
 }
 
+// 5 compteurs du suivi (cliquables : filtrent la liste des eleves).
+const COMPTEURS = [
+  { id: "tous", libelle: "Total élèves", detail: "Effectif affiché", icone: Users, couleur: "text-[#0C447C]", fond: "bg-blue-50", anneau: "ring-2 ring-[#0C447C] border-transparent" },
+  { id: "a_jour", libelle: "Paiements à jour", detail: "Scolarité réglée à date", icone: CheckCircle2, couleur: "text-emerald-600", fond: "bg-emerald-50", anneau: "ring-2 ring-emerald-600 border-transparent" },
+  { id: "partiel", libelle: "Paiements partiels", detail: "Avances perçues", icone: Clock, couleur: "text-amber-600", fond: "bg-amber-50", anneau: "ring-2 ring-amber-600 border-transparent" },
+  { id: "a_echoir", libelle: "À échoir", detail: "Prochaine échéance à venir", icone: Calendar, couleur: "text-slate-500", fond: "bg-slate-100", anneau: "ring-2 ring-slate-600 border-transparent" },
+  { id: "en_retard", libelle: "En retard", detail: "Relances nécessaires", icone: AlertTriangle, couleur: "text-rose-600", fond: "bg-rose-50", anneau: "ring-2 ring-rose-600 border-transparent" },
+];
+
+const LABEL = "block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1";
+const CHAMP = "w-full bg-white border border-slate-200 text-slate-800 text-xs font-semibold rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#0C447C]/20 focus:border-[#0C447C]";
+
+// Choix du moyen de paiement en boutons (Especes / Mobile Money / Virement / Cheque).
+function SelecteurMoyen({ valeur, onChange }) {
+  return (
+    <div className="grid grid-cols-2 gap-1.5">
+      {Object.entries(MOYENS).map(([cle, m]) => (
+        <button
+          key={cle}
+          type="button"
+          onClick={() => onChange(cle)}
+          className={`px-2 py-1.5 rounded-lg text-[11px] font-semibold border transition-all cursor-pointer flex items-center gap-1.5 ${
+            valeur === cle ? "border-[#0C447C] bg-white text-[#0C447C] ring-1 ring-[#0C447C]" : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+          }`}
+        >
+          <span>{m.emoji}</span>
+          {m.libelle}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// Statut d'un frais complet : paye si tout est regle, sinon le pire statut de ses echeances.
+function statutFrais(frais) {
+  const statuts = frais.echeances.map((e) => calculerStatutEcheance(e));
+  if (statuts.length && statuts.every((s) => s === "paye")) return "paye";
+  if (statuts.includes("en_retard")) return "en_retard";
+  if (statuts.includes("partiel")) return "partiel";
+  return statuts.length ? "a_echoir" : null;
+}
+
 const MESSAGE_POPUP_BLOQUE =
   "Le navigateur a bloqué la fenêtre du reçu. Autorisez les pop-ups pour ce site, puis cliquez sur « Réimprimer le reçu ».";
 
 export default function FraisScolarite({ permissions = [], etablissement = null }) {
   const peutInscrire = permissions.includes("frais.creer");
   const peutImprimer = permissions.includes("frais.voir");
+  const peutPayer = permissions.includes("frais.paiement.enregistrer");
 
   const [onglet, setOnglet] = useState("suivi");
 
@@ -143,6 +138,7 @@ export default function FraisScolarite({ permissions = [], etablissement = null 
   const [afficherSuggestions, setAfficherSuggestions] = useState(false);
   const [chargementEleves, setChargementEleves] = useState(false);
   const [eleveSelectionne, setEleveSelectionne] = useState(null);
+  const [filtreStatut, setFiltreStatut] = useState(null);
 
   // Colonne droite : detail de l'eleve selectionne.
   const [eleveInfos, setEleveInfos] = useState(null);
@@ -158,17 +154,12 @@ export default function FraisScolarite({ permissions = [], etablissement = null 
 
   const [erreur, setErreur] = useState("");
   const [succes, setSucces] = useState("");
-
-  // Onglet Grilles tarifaires : etat et logique conserves a l'identique.
-  const [nouveauType, setNouveauType] = useState("");
-  const [grille, setGrille] = useState({ classe_id: "", type_frais_id: "", montant: "" });
-  const [echeances, setEcheances] = useState([{ libelle: "Trimestre 1", montant: "", date_limite: "" }]);
   const [grillesExistantes, setGrillesExistantes] = useState([]);
-  const [synchronisationEnCours, setSynchronisationEnCours] = useState(null);
+
 
   useEffect(() => {
     api.get("/classes").then((res) => setClasses(res.data));
-    api.get("/frais/types").then((res) => setTypesFrais(res.data));
+    chargerTypes();
     chargerGrilles();
   }, []);
 
@@ -182,12 +173,13 @@ export default function FraisScolarite({ permissions = [], etablissement = null 
 
   // Une classe supprimee depuis la derniere visite ne doit pas rester selectionnee.
   useEffect(() => {
-    if (classeId && classes.length > 0 && !classes.some((c) => String(c.id) === String(classeId))) {
+    if (classeId && classeId !== "tous" && classes.length > 0 && !classes.some((c) => String(c.id) === String(classeId))) {
       setClasseId("");
     }
   }, [classes, classeId]);
 
-  // Les eleves ne sont charges que pour la classe choisie (pas toute l'ecole d'un coup).
+  // Les eleves ne sont charges que pour la classe choisie, ou pour toute l'ecole sur demande
+  // ("Toutes les classes").
   useEffect(() => {
     if (!classeId) {
       setEleves([]);
@@ -199,7 +191,7 @@ export default function FraisScolarite({ permissions = [], etablissement = null 
     setChargementEleves(true);
     setErreur("");
     api
-      .get("/eleves", { params: { classe_id: classeId } })
+      .get("/eleves", { params: classeId === "tous" ? {} : { classe_id: classeId } })
       .then((res) => {
         if (!annule) setEleves(res.data.eleves);
       })
@@ -219,26 +211,21 @@ export default function FraisScolarite({ permissions = [], etablissement = null 
     };
   }, [classeId]);
 
+  const chargerTypes = async () => {
+    try {
+      const res = await api.get("/frais/types");
+      setTypesFrais(res.data);
+    } catch {
+      setTypesFrais([]);
+    }
+  };
+
   const chargerGrilles = async () => {
     try {
       const res = await api.get("/frais/grilles");
       setGrillesExistantes(res.data);
     } catch (err) {
       setGrillesExistantes([]);
-    }
-  };
-
-  const synchroniserGrille = async (id) => {
-    setSynchronisationEnCours(id);
-    setErreur(""); setSucces("");
-    try {
-      const res = await api.post(`/frais/grilles/${id}/synchroniser`);
-      setSucces(res.data.message);
-      chargerGrilles();
-    } catch (err) {
-      setErreur(err.response?.data?.message || "Erreur lors de la synchronisation.");
-    } finally {
-      setSynchronisationEnCours(null);
     }
   };
 
@@ -252,37 +239,6 @@ export default function FraisScolarite({ permissions = [], etablissement = null 
     } catch (err) {
       setErreur("Impossible de charger le suivi de cet élève.");
       return null;
-    }
-  };
-
-  const ajouterTypeFrais = async (e) => {
-    e.preventDefault();
-    try {
-      await api.post("/frais/types", { nom: nouveauType });
-      setNouveauType("");
-      const res = await api.get("/frais/types");
-      setTypesFrais(res.data);
-    } catch (err) { setErreur("Erreur lors de l'ajout du type de frais."); }
-  };
-
-  const ajouterEcheance = () => setEcheances([...echeances, { libelle: "", montant: "", date_limite: "" }]);
-  const modifierEcheance = (i, champ, valeur) => {
-    const copie = [...echeances];
-    copie[i][champ] = valeur;
-    setEcheances(copie);
-  };
-
-  const creerGrille = async (e) => {
-    e.preventDefault();
-    setErreur(""); setSucces("");
-    try {
-      await api.post("/frais/grilles", { ...grille, echeances });
-      setSucces("Grille tarifaire créée et appliquée aux élèves de la classe.");
-      setGrille({ classe_id: "", type_frais_id: "", montant: "" });
-      setEcheances([{ libelle: "Trimestre 1", montant: "", date_limite: "" }]);
-      chargerGrilles();
-    } catch (err) {
-      setErreur(err.response?.data?.message || "Erreur lors de la création de la grille.");
     }
   };
 
@@ -457,8 +413,8 @@ export default function FraisScolarite({ permissions = [], etablissement = null 
   // apparaissent des la premiere lettre tapee.
   const termes = normaliser(recherche).split(/\s+/).filter(Boolean);
   const elevesFiltres = eleves.filter((e) => {
-    const cible = normaliser(`${e.nom} ${e.prenom}`);
-    return termes.every((t) => cible.includes(t));
+    const cible = normaliser(`${e.nom} ${e.prenom} ${e.matricule}`);
+    return termes.every((t) => cible.includes(t)) && (!filtreStatut || e.statut_paiement === filtreStatut);
   });
   const suggestions = termes.length > 0 ? elevesFiltres.slice(0, 6) : [];
 
@@ -468,7 +424,7 @@ export default function FraisScolarite({ permissions = [], etablissement = null 
   };
 
   const selectionnerEleve = (e) => {
-    setEleveInfos({ ...e, classe_id: classeId });
+    setEleveInfos({ ...e, classe_id: e.classe_id ?? classeId });
     setFormInscription(null);
     setPaiement(null);
     chargerSuivi(e.id);
@@ -512,6 +468,34 @@ export default function FraisScolarite({ permissions = [], etablissement = null 
     ? Number(formInscription.montantInscription || 0) + (formInscription.echeanceId ? Number(formInscription.montantEcheance || 0) : 0)
     : 0;
 
+  // Frais a echeances de l'eleve : scolarite d'abord, puis les autres (cantine, transport...).
+  const fraisAEcheances = (suivi?.frais || [])
+    .filter((f) => !normaliser(f.type_frais).includes("inscription"))
+    .sort((a, b) => Number(!normaliser(a.type_frais).startsWith("scolarit")) - Number(!normaliser(b.type_frais).startsWith("scolarit")));
+  const inscriptionReglee = !!fraisInscription?.echeances?.length && fraisInscription.echeances.every((e) => Number(e.solde) <= 0);
+  const estAncien = eleveInfos?.inscription_active?.type_inscription === "reinscription" || eleveInfos?.inscription_reglee === "reinscription";
+  const totalDuGlobal = (suivi?.frais || []).reduce((s, f) => s + f.echeances.reduce((t, e) => t + Number(e.montant), 0), 0);
+  const totalPayeGlobal = (suivi?.frais || []).reduce((s, f) => s + f.echeances.reduce((t, e) => t + Number(e.montant_paye), 0), 0);
+  const resteGlobal = Math.max(0, totalDuGlobal - totalPayeGlobal);
+  const pctGlobal = totalDuGlobal > 0 ? Math.round((totalPayeGlobal / totalDuGlobal) * 100) : 0;
+
+  // Export de la liste affichee (classe choisie ou toutes les classes) pour Excel.
+  const exporter = () => {
+    const nomClasse = classeId === "tous" ? "toutes-classes" : classes.find((c) => String(c.id) === String(classeId))?.nom || "classe";
+    telechargerCsv(
+      `suivi-paiements-${normaliser(nomClasse).replace(/[^a-z0-9]+/g, "-")}-${new Date().toISOString().slice(0, 10)}.csv`,
+      ["Matricule", "Nom", "Prénom", "Classe", "Statut de paiement", "Inscription réglée"],
+      elevesFiltres.map((e) => [
+        e.matricule,
+        e.nom,
+        e.prenom,
+        e.classe || "",
+        statut(e.statut_paiement).libelle,
+        e.inscription_reglee === "reinscription" ? "Réinscription" : e.inscription_reglee === "inscription" ? "Inscription" : "Non",
+      ])
+    );
+  };
+
   // Inscription ou reinscription deja payee (au moins un versement) : les boutons Inscrire /
   // Réinscrire n'ont plus lieu d'etre, tant qu'un paiement de scolarite se fait autrement.
   const dejaInscrit = (suivi?.frais || []).some(
@@ -520,48 +504,62 @@ export default function FraisScolarite({ permissions = [], etablissement = null 
 
   return (
     <div className="space-y-6">
-      <div className="relative overflow-hidden rounded-2xl p-5 sm:p-6 flex items-center justify-center gap-4" style={{ background: "linear-gradient(135deg, #0C447C, #1a5a9e)" }}>
-        <div
-          className="absolute -top-8 -right-8 h-32 w-32 rounded-full pointer-events-none"
-          style={{ background: "rgba(255,255,255,0.08)" }}
-        />
-        <div
-          className="absolute -bottom-10 right-16 h-20 w-20 rounded-full pointer-events-none"
-          style={{ background: "rgba(255,255,255,0.06)" }}
-        />
-        <div
-          className="h-14 w-14 rounded-2xl flex items-center justify-center shrink-0 relative z-10"
-          style={{ background: "rgba(255,255,255,0.15)", boxShadow: "0 8px 20px rgba(0,0,0,0.15)" }}
-        >
-          <Wallet className="h-7 w-7 text-white" />
-        </div>
-        <div className="relative z-10 min-w-0 text-center">
-          <h1 className="text-xl sm:text-2xl font-extrabold text-white tracking-tight">Frais de Scolarité & Facturation</h1>
-          <p className="text-xs sm:text-sm text-white/70 mt-1 max-w-2xl mx-auto">
-            Suivez les paiements des élèves et gérez les grilles tarifaires de l'établissement.
-          </p>
+      {/* Banniere */}
+      <div className="relative overflow-hidden rounded-2xl p-6 sm:p-7 text-white shadow-md" style={{ background: "linear-gradient(90deg, #0C447C, #1a6bb5)" }}>
+        <div className="absolute -top-10 -right-10 h-40 w-40 rounded-full bg-white/10 pointer-events-none" />
+        <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-5">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center shrink-0 border border-white/20">
+              <CreditCard className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <h1 className="text-xl sm:text-2xl font-black tracking-tight">Frais de Scolarité & Facturation</h1>
+              <p className="text-xs sm:text-sm text-white/70 font-medium mt-0.5">Suivi des paiements · Inscriptions · Grilles tarifaires</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => navigate("/paiements")}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white/15 border border-white/20 text-white hover:bg-white/25 text-xs font-bold transition-all cursor-pointer whitespace-nowrap"
+            >
+              <History className="w-4 h-4" />
+              Journal de caisse
+            </button>
+            {onglet === "suivi" && (
+              <button
+                type="button"
+                onClick={exporter}
+                disabled={eleves.length === 0}
+                title={eleves.length === 0 ? "Choisissez d'abord une classe" : "Exporter la liste affichée (CSV pour Excel)"}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-white text-white hover:bg-white/10 text-xs font-bold transition-all cursor-pointer whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Download className="w-4 h-4" />
+                Exporter
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
-      <div className="inline-flex items-center gap-1 p-1 bg-slate-100 rounded-xl w-fit">
-        <button
-          onClick={() => setOnglet("suivi")}
-          className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-            onglet === "suivi" ? "bg-white text-[#0C447C] shadow-sm" : "text-slate-500 hover:text-slate-700"
-          }`}
-        >
-          <Wallet className="h-3.5 w-3.5" />
-          Suivi des paiements
-        </button>
-        <button
-          onClick={() => setOnglet("grilles")}
-          className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-            onglet === "grilles" ? "bg-white text-[#0C447C] shadow-sm" : "text-slate-500 hover:text-slate-700"
-          }`}
-        >
-          <Layers className="h-3.5 w-3.5" />
-          Grilles tarifaires
-        </button>
+      {/* Onglets */}
+      <div className="flex items-center gap-2 p-1.5 bg-slate-200/60 rounded-xl w-fit">
+        {[
+          { id: "suivi", libelle: "Suivi des paiements", icone: ClipboardList },
+          { id: "grilles", libelle: "Grilles tarifaires", icone: Layers },
+        ].map((o) => (
+          <button
+            key={o.id}
+            type="button"
+            onClick={() => setOnglet(o.id)}
+            className={`px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+              onglet === o.id ? "bg-white text-[#0C447C] shadow-xs" : "text-slate-500 hover:text-slate-800"
+            }`}
+          >
+            <o.icone className="w-3.5 h-3.5" />
+            {o.libelle}
+          </button>
+        ))}
       </div>
 
       {erreur && (
@@ -574,7 +572,7 @@ export default function FraisScolarite({ permissions = [], etablissement = null 
         <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-50 border border-emerald-100 text-sm text-emerald-600 font-medium">
           <CheckCircle2 className="h-4 w-4 shrink-0" />
           {succes}
-          {peutImprimer && dernierRecu && (
+          {peutImprimer && dernierRecu && onglet === "suivi" && (
             <button
               onClick={() => genererEtImprimerRecu(dernierRecu)}
               className="ml-auto px-3 py-1 rounded-lg border border-emerald-200 bg-white text-emerald-700 text-xs font-semibold hover:bg-emerald-100 transition-colors cursor-pointer"
@@ -586,510 +584,586 @@ export default function FraisScolarite({ permissions = [], etablissement = null 
       )}
 
       {onglet === "suivi" && (
-        <div className="flex flex-col lg:flex-row gap-4">
-          {/* Colonne gauche (~30%) */}
-          <div className="lg:w-[30%] shrink-0 space-y-3">
-            <Select
-              value={classeId}
-              onChange={(e) => {
-                setClasseId(e.target.value);
-                setRecherche("");
-              }}
-              aria-label="Filtrer par classe"
-              className="w-full"
-            >
-              <option value="">Filtrer par classe...</option>
-              {classes.map((c) => <option key={c.id} value={c.id}>{c.nom}</option>)}
-            </Select>
-
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-              <Input
-                type="text"
-                placeholder="Rechercher un élève par nom ou prénom..."
-                value={recherche}
-                disabled={!classeId}
-                onChange={(e) => {
-                  setRecherche(e.target.value);
-                  setAfficherSuggestions(true);
-                }}
-                onFocus={() => setAfficherSuggestions(true)}
-                // Delai pour laisser le clic sur une suggestion se faire avant de fermer la liste
-                onBlur={() => setTimeout(() => setAfficherSuggestions(false), 200)}
-                autoComplete="off"
-                className="pl-9 disabled:bg-slate-50 disabled:cursor-not-allowed"
-              />
-              {afficherSuggestions && suggestions.length > 0 && (
-                <ul className="absolute left-0 right-0 top-full mt-1 z-20 bg-white border border-slate-200 rounded-lg shadow-lg overflow-hidden">
-                  {suggestions.map((e) => (
-                    <li key={e.id}>
-                      <button
-                        type="button"
-                        onClick={() => choisirSuggestion(e)}
-                        className="w-full text-left px-3.5 py-2 text-sm text-slate-700 hover:bg-blue-50 transition-colors cursor-pointer"
-                      >
-                        {e.nom} {e.prenom}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-
-            <Card className="p-0 overflow-hidden max-h-[520px] overflow-y-auto">
-              <div className="flex items-center gap-2 px-4 py-3.5 border-b border-slate-100 bg-slate-50/60">
-                <div className="h-7 w-7 rounded-lg bg-blue-50 text-[#2563EB] flex items-center justify-center shrink-0">
-                  <Users className="h-3.5 w-3.5" />
-                </div>
-                <p className="text-xs font-bold text-slate-700 uppercase tracking-wider m-0">
-                  Élèves{classeId ? ` (${elevesFiltres.length})` : ""}
-                </p>
-              </div>
-              <div className="p-2">
-                {!classeId && (
-                  <p className="text-sm text-slate-400 text-center px-3 py-8 m-0">Sélectionnez une classe pour voir les élèves</p>
-                )}
-                {classeId && chargementEleves && (
-                  <p className="text-sm text-slate-400 text-center px-3 py-8 m-0">Chargement...</p>
-                )}
-                {classeId && !chargementEleves && elevesFiltres.length === 0 && (
-                  <p className="text-sm text-slate-400 text-center px-3 py-8 m-0">Aucun élève trouvé</p>
-                )}
-                {classeId && !chargementEleves && elevesFiltres.map((e) => {
-                  const statut = STATUTS_PAIEMENT_ELEVE[e.statut_paiement] || STATUTS_PAIEMENT_ELEVE.a_echoir;
-                  return (
-                    <div
-                      key={e.id}
-                      onClick={() => selectionnerEleve(e)}
-                      className={`flex items-center gap-2.5 p-2.5 rounded-xl cursor-pointer mb-1 transition-colors ${
-                        eleveSelectionne === e.id ? "bg-blue-50" : "hover:bg-slate-50"
-                      }`}
-                    >
-                      <div className="relative shrink-0">
-                        <div
-                          className={`h-8 w-8 rounded-full flex items-center justify-center font-bold text-[11px] ${
-                            eleveSelectionne === e.id ? "bg-[#2563EB] text-white" : "bg-slate-100 text-slate-500"
-                          }`}
-                        >
-                          {getInitiales(e.nom, e.prenom)}
-                        </div>
-                        <span className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full ring-2 ring-white ${statut.dot}`} />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold text-slate-800 m-0 truncate">{e.nom} {e.prenom}</p>
-                        <p className={`text-[10px] font-bold uppercase tracking-wide m-0 ${statut.texte}`}>{statut.libelle}</p>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </Card>
+        <div className="space-y-6">
+          {/* 5 compteurs (cliquables = filtre de la liste) */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5 sm:gap-4">
+            {COMPTEURS.map((c) => {
+              const valeur = c.id === "tous" ? eleves.length : eleves.filter((e) => e.statut_paiement === c.id).length;
+              const choisi = (filtreStatut ?? "tous") === c.id;
+              const pct = eleves.length ? Math.round((valeur / eleves.length) * 100) : 0;
+              return (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => setFiltreStatut(c.id === "tous" ? null : c.id)}
+                  disabled={!classeId}
+                  className={`bg-white p-4 text-left transition-all border relative group cursor-pointer disabled:cursor-default ${choisi && classeId ? `${c.anneau} shadow-md` : "border-slate-100/90 hover:shadow-md"}`}
+                  style={STYLE_CARTE}
+                >
+                  <div className="flex items-center justify-between mb-2.5">
+                    <span className={`w-9 h-9 rounded-xl ${c.fond} flex items-center justify-center ${c.couleur} transition-transform group-hover:scale-105`}>
+                      <c.icone className="w-5 h-5" />
+                    </span>
+                    <span className="font-mono text-xs text-slate-400 font-medium tabular-nums">{classeId ? `${pct}%` : ""}</span>
+                  </div>
+                  <div className="text-2xl font-black text-slate-900 font-mono tracking-tight tabular-nums mb-0.5">{classeId ? valeur : "—"}</div>
+                  <div className="text-xs font-semibold text-slate-700 truncate">{c.libelle}</div>
+                  <div className="text-[11px] text-slate-400 truncate mt-0.5">{c.detail}</div>
+                </button>
+              );
+            })}
           </div>
 
-          {/* Colonne droite (~70%) */}
-          <div className="flex-1 space-y-4">
-            {!eleveInfos && (
-              <Card className="flex flex-col items-center justify-center text-center py-14 gap-3">
-                <div className="h-12 w-12 rounded-2xl bg-blue-50 text-[#2563EB] flex items-center justify-center">
-                  <Receipt className="h-6 w-6" />
+          <div className="grid grid-cols-1 lg:grid-cols-10 gap-6 items-start">
+            {/* Liste des eleves */}
+            <div className="lg:col-span-3 bg-white p-4 flex flex-col lg:h-[78vh] border border-slate-100/80" style={STYLE_CARTE}>
+              <div className="space-y-3 pb-3.5 border-b border-slate-100 shrink-0">
+                <div className="flex items-center justify-between gap-2">
+                  <select
+                    value={classeId}
+                    onChange={(e) => {
+                      setClasseId(e.target.value);
+                      setRecherche("");
+                      setFiltreStatut(null);
+                    }}
+                    aria-label="Filtrer par classe"
+                    className="flex-1 min-w-0 bg-slate-50 border border-slate-200 text-slate-800 text-xs font-semibold rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#0C447C]/20 focus:border-[#0C447C] cursor-pointer"
+                  >
+                    <option value="">Choisir une classe...</option>
+                    <option value="tous">Toutes les classes</option>
+                    {classes.map((c) => (
+                      <option key={c.id} value={c.id}>{c.nom}</option>
+                    ))}
+                  </select>
+                  {classeId && (
+                    <span className="inline-flex items-center px-2.5 py-1.5 rounded-lg bg-blue-50 text-[#0C447C] text-[11px] font-bold shrink-0 border border-blue-100">
+                      {elevesFiltres.length} élève{elevesFiltres.length > 1 ? "s" : ""}
+                    </span>
+                  )}
                 </div>
-                <p className="text-sm text-slate-400 m-0">Sélectionnez un élève pour voir son suivi de paiement.</p>
-              </Card>
-            )}
 
-            {eleveInfos && (
-              <>
-                {/* Section 1 — En-tete eleve */}
-                <Card className="p-0 overflow-hidden border-blue-100">
-                  <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="h-14 w-14 rounded-2xl bg-[#2563EB] text-white flex items-center justify-center font-bold text-lg shrink-0">
-                        {getInitiales(eleveInfos.nom, eleveInfos.prenom)}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-base font-bold text-slate-900 m-0 truncate">{eleveInfos.nom} {eleveInfos.prenom}</p>
-                        <p className="text-xs text-slate-500 m-0 mt-0.5">
-                          <span className="font-mono">{eleveInfos.matricule}</span> · {eleveInfos.classe || "—"}
-                        </p>
-                      </div>
-                    </div>
-                    {peutInscrire && !dejaInscrit && (
-                      <div className="flex flex-wrap gap-2">
-                        <Button
-                          variant="secondary"
-                          disabled={inscriptionEnCours !== null}
-                          onClick={() => ouvrirFormulaireInscription(false)}
-                        >
-                          📋 Inscrire{libelleMontant(montantGrille(typeInscription))}
-                        </Button>
-                        <Button
-                          variant="secondary"
-                          disabled={inscriptionEnCours !== null}
-                          onClick={() => ouvrirFormulaireInscription(true)}
-                        >
-                          🔄 Réinscrire{libelleMontant(montantGrille(typeReinscription))}
-                        </Button>
-                      </div>
-                    )}
+                <div className="relative">
+                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <input
+                    type="text"
+                    placeholder="Rechercher par nom, prénom ou matricule..."
+                    value={recherche}
+                    disabled={!classeId}
+                    onChange={(e) => {
+                      setRecherche(e.target.value);
+                      setAfficherSuggestions(true);
+                    }}
+                    onFocus={() => setAfficherSuggestions(true)}
+                    // Delai pour laisser le clic sur une suggestion se faire avant de fermer la liste
+                    onBlur={() => setTimeout(() => setAfficherSuggestions(false), 200)}
+                    autoComplete="off"
+                    className="w-full bg-slate-50 border border-slate-200 text-slate-800 text-xs rounded-xl pl-8 pr-7 py-2 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0C447C]/20 focus:border-[#0C447C] disabled:cursor-not-allowed"
+                  />
+                  {recherche && (
+                    <button onClick={() => setRecherche("")} className="text-xs text-slate-400 hover:text-slate-600 absolute right-2.5 top-1/2 -translate-y-1/2 cursor-pointer">
+                      ×
+                    </button>
+                  )}
+                  {afficherSuggestions && suggestions.length > 0 && (
+                    <ul className="absolute left-0 right-0 top-full mt-1 z-20 bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden">
+                      {suggestions.map((e) => (
+                        <li key={e.id}>
+                          <button type="button" onClick={() => choisirSuggestion(e)} className="w-full text-left px-3.5 py-2 text-xs text-slate-700 hover:bg-blue-50 transition-colors cursor-pointer">
+                            {e.nom} {e.prenom}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+                {filtreStatut && (
+                  <button onClick={() => setFiltreStatut(null)} className="text-[11px] font-semibold text-[#0C447C] hover:underline cursor-pointer">
+                    Filtre : {statut(filtreStatut).libelle} · retirer
+                  </button>
+                )}
+              </div>
+
+              <div className="flex-1 overflow-y-auto divide-y divide-slate-100 mt-1 pr-1 max-h-[60vh] lg:max-h-none">
+                {!classeId && <p className="text-xs text-slate-400 text-center px-3 py-10">Choisissez une classe pour afficher ses élèves.</p>}
+                {classeId && chargementEleves && <p className="text-xs text-slate-400 text-center px-3 py-10">Chargement...</p>}
+                {classeId && !chargementEleves && elevesFiltres.length === 0 && (
+                  <div className="py-10 text-center">
+                    <p className="text-xs font-semibold text-slate-500">Aucun élève trouvé</p>
+                    <p className="text-[11px] text-slate-400 mt-1">Modifiez la recherche ou le filtre</p>
                   </div>
-
-                  {formInscription && (
-                    <form
-                      onSubmit={confirmerInscription}
-                      className="flex flex-col gap-4 px-5 py-4 border-t border-blue-100 bg-blue-50/40"
-                    >
-                      <div>
-                        <p className="text-xs font-bold text-slate-700 uppercase tracking-wider m-0 mb-2">
-                          {formInscription.reinscription ? "Réinscription" : "Inscription"}
-                        </p>
-                        <div className="grid grid-cols-2 gap-3">
-                          <div>
-                            <label className="block text-xs font-semibold text-slate-500 mb-1">Type</label>
-                            <Input type="text" value={formInscription.reinscription ? "Réinscription" : "Inscription"} disabled />
+                )}
+                {classeId &&
+                  !chargementEleves &&
+                  elevesFiltres.map((e) => {
+                    const choisi = eleveSelectionne === e.id;
+                    const st = statut(e.statut_paiement);
+                    return (
+                      <button
+                        key={e.id}
+                        type="button"
+                        onClick={() => selectionnerEleve(e)}
+                        className={`w-full text-left p-3 rounded-xl flex items-center justify-between gap-3 transition-colors cursor-pointer ${
+                          choisi ? "bg-[#eff6ff] border-l-[3px] border-[#0C447C]" : "hover:bg-[#f8fafc]"
+                        }`}
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className={`w-[38px] h-[38px] rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0 ${couleurAvatar(`${e.nom}${e.prenom}`)}`}>
+                            {getInitiales(e.nom, e.prenom)}
                           </div>
+                          <div className="min-w-0">
+                            <div className="text-[13px] font-bold text-slate-900 truncate leading-snug">
+                              {e.nom} {e.prenom}
+                            </div>
+                            <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
+                              <span className="font-mono text-[10px] text-slate-500 font-semibold">{e.matricule}</span>
+                              {classeId === "tous" && e.classe && (
+                                <>
+                                  <span className="text-[10px] text-slate-400">·</span>
+                                  <span className="text-[10px] font-medium text-slate-500 truncate">{e.classe}</span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        <span className={`shrink-0 inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full ${st.badge}`}>
+                          <span className="w-1.5 h-1.5 rounded-full bg-current" />
+                          {st.libelle}
+                        </span>
+                      </button>
+                    );
+                  })}
+              </div>
+            </div>
+
+            {/* Detail de l'eleve */}
+            <div className="lg:col-span-7 space-y-6">
+              {!eleveInfos && (
+                <div className="bg-white p-12 flex flex-col items-center justify-center text-center lg:h-[78vh] border border-slate-100/80" style={STYLE_CARTE}>
+                  <div className="w-16 h-16 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center text-[#0C447C] mb-4">
+                    <GraduationCap className="w-8 h-8 opacity-80" />
+                  </div>
+                  <h3 className="text-base font-bold text-slate-800 mb-1">Aucun élève sélectionné</h3>
+                  <p className="text-xs text-slate-400 max-w-sm">
+                    Sélectionnez un élève dans la liste pour consulter son dossier financier, suivre ses échéances et enregistrer des encaissements.
+                  </p>
+                </div>
+              )}
+
+              {eleveInfos && (
+                <>
+                  {/* 1. En-tete de l'eleve */}
+                  <div className="bg-white p-5 border border-slate-100/90" style={STYLE_CARTE}>
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                      <div className="flex items-center gap-4 min-w-0">
+                        <div className={`w-[52px] h-[52px] rounded-2xl flex items-center justify-center text-white text-base font-extrabold shadow-sm shrink-0 ${couleurAvatar(`${eleveInfos.nom}${eleveInfos.prenom}`)}`}>
+                          {getInitiales(eleveInfos.nom, eleveInfos.prenom)}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h2 className="text-lg font-extrabold text-slate-900 tracking-tight">
+                              {eleveInfos.nom} {eleveInfos.prenom}
+                            </h2>
+                            {eleveInfos.classe && (
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-[#0C447C]/10 text-[#0C447C] border border-[#0C447C]/20">{eleveInfos.classe}</span>
+                            )}
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${statut(eleveInfos.statut_paiement).badge}`}>
+                              {statut(eleveInfos.statut_paiement).libelle}
+                            </span>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-3 mt-1 text-xs text-slate-500">
+                            <span className="font-mono font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded">{eleveInfos.matricule}</span>
+                            {eleveInfos.inscription_active?.session_scolaire?.libelle && <span>Session {eleveInfos.inscription_active.session_scolaire.libelle}</span>}
+                            <span>{estAncien ? "Ancien élève" : "Nouvel élève"}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {peutInscrire && !dejaInscrit && (
+                        <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                          <button
+                            type="button"
+                            disabled={inscriptionEnCours !== null}
+                            onClick={() => ouvrirFormulaireInscription(false)}
+                            className={`px-4 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50 ${
+                              !estAncien ? "bg-[#0C447C] hover:bg-[#093663] text-white shadow-xs" : "border border-[#0C447C] text-[#0C447C] hover:bg-[#0C447C]/5"
+                            }`}
+                          >
+                            <UserPlus className="w-3.5 h-3.5" />
+                            Inscrire{libelleMontant(montantGrille(typeInscription))}
+                          </button>
+                          <button
+                            type="button"
+                            disabled={inscriptionEnCours !== null}
+                            onClick={() => ouvrirFormulaireInscription(true)}
+                            className={`px-4 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50 ${
+                              estAncien ? "bg-[#0C447C] hover:bg-[#093663] text-white shadow-xs" : "border border-[#0C447C] text-[#0C447C] hover:bg-[#0C447C]/5"
+                            }`}
+                          >
+                            <UserCheck className="w-3.5 h-3.5" />
+                            Réinscrire{libelleMontant(montantGrille(typeReinscription))}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {formInscription && (
+                      <form onSubmit={confirmerInscription} className="mt-4 p-4 rounded-xl border border-blue-200 bg-blue-50/50 space-y-4">
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs font-extrabold text-[#0C447C] uppercase tracking-wider">
+                            {formInscription.reinscription ? "Réinscription" : "Inscription"} · encaissement
+                          </p>
+                          <span className="text-[11px] text-slate-500">Reçu imprimé à l'enregistrement</span>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           <div>
-                            <label className="block text-xs font-semibold text-slate-500 mb-1">Montant inscription (GNF)</label>
-                            <Input
+                            <label className={LABEL}>Montant {formInscription.reinscription ? "réinscription" : "inscription"} (GNF)</label>
+                            <input
                               type="number"
                               min="1"
                               value={formInscription.montantInscription}
                               onChange={(e) => setFormInscription({ ...formInscription, montantInscription: e.target.value })}
-                              placeholder="Saisir le montant"
+                              placeholder={montantGrille(formInscription.reinscription ? typeReinscription : typeInscription)?.toString() || "Saisir le montant"}
+                              className={CHAMP}
                               required
                             />
                           </div>
-                        </div>
-                      </div>
-
-                      <div className="border-t border-blue-100 pt-3">
-                        <p className="text-xs font-bold text-slate-700 uppercase tracking-wider m-0 mb-2">
-                          Paiement scolarité (optionnel)
-                        </p>
-                        <div className="grid grid-cols-2 gap-3">
                           <div>
-                            <label className="block text-xs font-semibold text-slate-500 mb-1">Échéance</label>
-                            <Select
-                              value={formInscription.echeanceId}
-                              onChange={(e) => setFormInscription({ ...formInscription, echeanceId: e.target.value, montantEcheance: "" })}
-                            >
-                              <option value="">Aucune</option>
-                              {echeancesScolariteDisponibles.map((ech) => (
-                                <option key={ech.id} value={ech.id}>{ech.libelle}</option>
-                              ))}
-                            </Select>
-                          </div>
-                          <div>
-                            <label className="block text-xs font-semibold text-slate-500 mb-1">Montant scolarité (GNF)</label>
-                            <Input
-                              type="number"
-                              min="1"
-                              max={formInscription.echeanceId ? resteTotalDuFrais(suivi, formInscription.echeanceId) : undefined}
-                              disabled={!formInscription.echeanceId}
-                              required={!!formInscription.echeanceId}
-                              value={formInscription.montantEcheance}
-                              onChange={(e) => setFormInscription({ ...formInscription, montantEcheance: e.target.value })}
-                            />
+                            <label className={LABEL}>Moyen de paiement</label>
+                            <SelecteurMoyen valeur={formInscription.moyenPaiement} onChange={(m) => setFormInscription({ ...formInscription, moyenPaiement: m })} />
                           </div>
                         </div>
-                        {formInscription.echeanceId && (
-                          <p className="text-xs text-slate-400 m-0 mt-2">
-                            Un montant supérieur à l'échéance est reporté sur les tranches suivantes (jusqu'à {formaterGNF(resteTotalDuFrais(suivi, formInscription.echeanceId))}).
-                          </p>
-                        )}
-                        {echeancesScolariteDisponibles.length === 0 && (
-                          <p className="text-xs text-slate-400 m-0 mt-2">Aucune échéance de scolarité en attente pour cet élève.</p>
-                        )}
-                      </div>
 
-                      <div className="border-t border-blue-100 pt-3">
-                        <p className="text-xs font-bold text-slate-700 uppercase tracking-wider m-0 mb-2">Règlement</p>
-                        <div className="grid grid-cols-2 gap-3 items-end">
-                          <div>
-                            <label className="block text-xs font-semibold text-slate-500 mb-1">Montant total à encaisser</label>
-                            <p className="m-0 text-lg font-bold text-[#0C447C]">{formaterGNF(totalEncaisser)}</p>
-                          </div>
-                          <div>
-                            <label className="block text-xs font-semibold text-slate-500 mb-1">Moyen de paiement</label>
-                            <Select
-                              value={formInscription.moyenPaiement}
-                              onChange={(e) => setFormInscription({ ...formInscription, moyenPaiement: e.target.value })}
-                            >
-                              <option value="especes">Espèces</option>
-                              <option value="mobile_money">Mobile Money</option>
-                              <option value="virement">Virement</option>
-                              <option value="cheque">Chèque</option>
-                            </Select>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="flex gap-3">
-                        <Button type="submit" variant="primary" disabled={inscriptionEnCours !== null}>
-                          Enregistrer et imprimer le reçu
-                        </Button>
-                        <Button type="button" variant="ghost" onClick={() => setFormInscription(null)}>
-                          Annuler
-                        </Button>
-                      </div>
-                    </form>
-                  )}
-                </Card>
-
-                {/* Section 2 — Frais d'inscription */}
-                {fraisInscription && (
-                  <Card className="p-0 overflow-hidden">
-                    <div className="flex items-center justify-between px-5 py-4">
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <div className="h-8 w-8 rounded-lg bg-[#0C447C]/10 text-[#0C447C] flex items-center justify-center shrink-0">
-                          <School className="h-4 w-4" />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-sm font-bold text-slate-900 m-0">{fraisInscription.type_frais}</p>
-                          <p className="text-xs text-slate-500 m-0 mt-0.5">{formaterGNF(fraisInscription.montant_total)}</p>
-                        </div>
-                      </div>
-                      {fraisInscription.echeances[0] && badgeStatutEcheance(fraisInscription.echeances[0])}
-                    </div>
-                  </Card>
-                )}
-
-                {/* Section 3 — Scolarite */}
-                {suivi && suivi.frais
-                  .filter((f) => normaliser(f.type_frais).startsWith("scolarit"))
-                  .map((f) => (
-                    <Card key={f.id} className="p-0 overflow-hidden">
-                      <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 bg-slate-50/60">
-                        <div className="flex items-center gap-2.5">
-                          <div className="h-8 w-8 rounded-lg bg-[#0C447C]/10 text-[#0C447C] flex items-center justify-center shrink-0">
-                            <Wallet className="h-4 w-4" />
-                          </div>
-                          <p className="text-sm font-bold text-slate-900 m-0">{f.type_frais}</p>
-                        </div>
-                        <span className="text-xs font-bold text-[#0C447C] bg-blue-50 px-3 py-1.5 rounded-full">
-                          {formaterGNF(f.montant_total)}
-                        </span>
-                      </div>
-                      <div className="divide-y divide-slate-100 px-5">
-                        {f.echeances.map((ech) => (
-                          <div key={ech.id} className="flex items-center justify-between py-3.5">
+                        <div className="pt-3 border-t border-blue-100">
+                          <p className="text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-2">Paiement de scolarité en même temps (optionnel)</p>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <div>
-                              <p className="text-sm font-semibold text-slate-800 m-0">{ech.libelle}</p>
-                              <p className="text-xs text-slate-400 m-0 mt-0.5">Échéance : {ech.date_limite}</p>
+                              <label className={LABEL}>Échéance</label>
+                              <select
+                                value={formInscription.echeanceId}
+                                onChange={(e) => setFormInscription({ ...formInscription, echeanceId: e.target.value, montantEcheance: "" })}
+                                className={CHAMP}
+                              >
+                                <option value="">Aucune</option>
+                                {echeancesScolariteDisponibles.map((ech) => (
+                                  <option key={ech.id} value={ech.id}>
+                                    {ech.libelle} — reste {formaterGNF(ech.solde)}
+                                  </option>
+                                ))}
+                              </select>
                             </div>
-                            <div className="text-right space-y-1.5">
-                              {badgeStatutEcheance(ech)}
-                              <p className="text-xs text-slate-500 m-0 font-medium">{formaterGNF(ech.montant_paye)} / {formaterGNF(ech.montant)}</p>
-                              {peutInscrire && ech.solde > 0 && (
-                                <button
-                                  onClick={() => ouvrirFormulairePaiement(ech)}
-                                  className="px-2.5 py-1 rounded-lg border border-blue-200 text-[#2563EB] text-xs font-semibold hover:bg-blue-50 transition-colors cursor-pointer"
-                                >
-                                  Payer
-                                </button>
-                              )}
+                            <div>
+                              <label className={LABEL}>Montant scolarité (GNF)</label>
+                              <input
+                                type="number"
+                                min="1"
+                                max={formInscription.echeanceId ? resteTotalDuFrais(suivi, formInscription.echeanceId) : undefined}
+                                disabled={!formInscription.echeanceId}
+                                required={!!formInscription.echeanceId}
+                                value={formInscription.montantEcheance}
+                                onChange={(e) => setFormInscription({ ...formInscription, montantEcheance: e.target.value })}
+                                className={`${CHAMP} disabled:opacity-50`}
+                              />
                             </div>
                           </div>
-                        ))}
-                      </div>
-                      <div className="h-2" />
-                    </Card>
-                  ))}
+                          {formInscription.echeanceId && (
+                            <p className="text-[11px] text-slate-400 mt-2">
+                              Un montant supérieur à l'échéance est reporté sur les tranches suivantes (jusqu'à {formaterGNF(resteTotalDuFrais(suivi, formInscription.echeanceId))}).
+                            </p>
+                          )}
+                          {echeancesScolariteDisponibles.length === 0 && <p className="text-[11px] text-slate-400 mt-2">Aucune échéance de scolarité en attente pour cet élève.</p>}
+                        </div>
 
-                {/* Formulaire "Payer" une echeance de scolarite */}
-                {paiement && (
-                  <Card className="p-0 overflow-hidden border-blue-100">
-                    <div className="flex items-center gap-2.5 px-5 py-4 border-b border-blue-100 bg-blue-50/60">
-                      <div className="h-8 w-8 rounded-lg bg-[#2563EB] text-white flex items-center justify-center shrink-0">
-                        <CheckCircle2 className="h-4 w-4" />
+                        <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-blue-100">
+                          <div>
+                            <span className="text-[11px] font-bold text-slate-500 uppercase">Total à encaisser</span>
+                            <p className="text-lg font-black text-[#0C447C] font-mono">{formaterGNF(totalEncaisser)}</p>
+                          </div>
+                          <div className="flex gap-2">
+                            <button type="button" onClick={() => setFormInscription(null)} className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-white border border-slate-200 cursor-pointer">
+                              Annuler
+                            </button>
+                            <button
+                              type="submit"
+                              disabled={inscriptionEnCours !== null}
+                              className="px-4 py-2 bg-[#0C447C] hover:bg-[#093663] text-white text-xs font-bold rounded-xl shadow-xs cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+                            >
+                              <Receipt className="w-3.5 h-3.5" />
+                              {inscriptionEnCours ? "Enregistrement..." : "Enregistrer et imprimer le reçu"}
+                            </button>
+                          </div>
+                        </div>
+                      </form>
+                    )}
+                  </div>
+
+                  {/* 2. Frais d'inscription */}
+                  {fraisInscription ? (
+                    <div className="bg-white p-4 border border-slate-100/90" style={STYLE_CARTE}>
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <span className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${inscriptionReglee ? "bg-emerald-50 text-emerald-600" : "bg-amber-50 text-amber-600"}`}>
+                            {normaliser(fraisInscription.type_frais) === "reinscription" ? <UserCheck className="w-4 h-4" /> : <UserPlus className="w-4 h-4" />}
+                          </span>
+                          <div>
+                            <span className="text-sm font-bold text-slate-900">Frais de {fraisInscription.type_frais}</span>
+                            <div className="text-xs text-slate-500 mt-0.5">
+                              Montant : <strong className="font-mono text-slate-800">{formaterGNF(fraisInscription.montant_total)}</strong>
+                            </div>
+                          </div>
+                        </div>
+                        {fraisInscription.echeances[0] && (
+                          <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${statut(calculerStatutEcheance(fraisInscription.echeances[0])).badge}`}>
+                            {inscriptionReglee ? <CheckCircle2 className="w-3.5 h-3.5" /> : <AlertTriangle className="w-3.5 h-3.5" />}
+                            {inscriptionReglee
+                              ? "Réglé"
+                              : `${formaterGNF(fraisInscription.echeances[0].montant_paye)} / ${formaterGNF(fraisInscription.echeances[0].montant)}`}
+                          </span>
+                        )}
                       </div>
-                      <p className="text-sm font-bold text-slate-900 m-0">Enregistrer un paiement</p>
                     </div>
-                    <form onSubmit={enregistrerPaiement} className="flex flex-wrap items-end gap-3 p-5">
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-500 mb-1">Échéance</label>
-                        <Input type="text" value={paiement.libelle} disabled />
+                  ) : (
+                    suivi && (
+                      <div className="p-4 rounded-2xl border bg-[#eff6ff] border-[#bfdbfe]">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                          <div className="flex items-center gap-3">
+                            <span className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 bg-blue-600 text-white">
+                              {estAncien ? <UserCheck className="w-4 h-4" /> : <UserPlus className="w-4 h-4" />}
+                            </span>
+                            <div>
+                              <span className="text-sm font-bold text-slate-900">{estAncien ? "Frais de réinscription" : "Frais d'inscription"}</span>
+                              <div className="text-xs text-slate-500 mt-0.5">
+                                {montantGrille(estAncien ? typeReinscription : typeInscription) != null
+                                  ? <>Tarif de la classe : <strong className="font-mono text-slate-800">{formaterGNF(montantGrille(estAncien ? typeReinscription : typeInscription))}</strong></>
+                                  : "Aucun tarif défini pour cette classe"}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800">
+                              <AlertTriangle className="w-3.5 h-3.5" />
+                              Non réglé
+                            </span>
+                            {peutInscrire && !formInscription && (
+                              <button
+                                type="button"
+                                onClick={() => ouvrirFormulaireInscription(estAncien)}
+                                className="px-3 py-1 bg-[#0C447C] text-white text-xs font-bold rounded-lg hover:bg-[#093663] transition-colors cursor-pointer"
+                              >
+                                Régler
+                              </button>
+                            )}
+                          </div>
+                        </div>
                       </div>
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-500 mb-1">Montant (GNF)</label>
-                        <Input
-                          type="number"
-                          min="1"
-                          max={resteTotalDuFrais(suivi, paiement.echeanceId)}
-                          value={paiement.montant}
-                          onChange={(e) => setPaiement({ ...paiement, montant: e.target.value })}
-                          required
-                        />
+                    )
+                  )}
+
+                  {/* 3. Frais a echeances (scolarite, puis autres) */}
+                  {fraisAEcheances.map((f) => {
+                    const cfg = configTypeFrais(f.type_frais);
+                    return (
+                      <div key={f.id} className="bg-white p-5 border border-slate-100/90" style={STYLE_CARTE}>
+                        <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-4 gap-3">
+                          <div className="flex items-center gap-3">
+                            <span className="w-10 h-10 rounded-xl bg-blue-50 text-[#0C447C] flex items-center justify-center">
+                              <GraduationCap className="w-5 h-5" />
+                            </span>
+                            <div>
+                              <h3 className="text-sm font-extrabold text-slate-900">Frais de {f.type_frais}</h3>
+                              <p className="text-xs text-slate-400">
+                                Paiement échelonné en {f.echeances.length} échéance{f.echeances.length > 1 ? "s" : ""}
+                              </p>
+                            </div>
+                          </div>
+                          <span className={`inline-block px-3 py-1 rounded-xl text-xs font-mono font-bold ${cfg.classe}`}>{formaterGNF(f.montant_total)}</span>
+                        </div>
+
+                        <div className="space-y-3">
+                          {f.echeances.map((ech) => {
+                            const cle = calculerStatutEcheance(ech);
+                            const st = statut(cle);
+                            const progression = Number(ech.montant) > 0 ? Math.min(100, Math.round((Number(ech.montant_paye) / Number(ech.montant)) * 100)) : 0;
+                            const ouvert = paiement?.echeanceId === ech.id;
+                            return (
+                              <div key={ech.id} className="bg-slate-50/70 border border-slate-200/80 rounded-xl p-3.5">
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                                  <div className="sm:min-w-44">
+                                    <div className="text-xs font-bold text-slate-800 flex items-center gap-2">
+                                      {ech.libelle}
+                                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${st.badge}`}>{st.libelle}</span>
+                                    </div>
+                                    <div className="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5">
+                                      <Calendar className="w-3 h-3" />
+                                      Date limite : {formaterDateCourte(ech.date_limite)}
+                                    </div>
+                                  </div>
+                                  <div className="flex-1 sm:max-w-md sm:px-2">
+                                    <div className="flex items-center justify-between text-xs font-mono mb-1.5">
+                                      <span className="font-bold text-slate-800 tabular-nums">{formaterGNF(ech.montant_paye)}</span>
+                                      <span className="text-slate-400 tabular-nums">sur {formaterGNF(ech.montant)}</span>
+                                    </div>
+                                    <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
+                                      <div className={`h-full rounded-full transition-all duration-300 ${st.barre}`} style={{ width: `${cle === "en_retard" && progression === 0 ? 100 : progression}%`, opacity: cle === "en_retard" && progression === 0 ? 0.35 : 1 }} />
+                                    </div>
+                                  </div>
+                                  <div className="shrink-0 text-right">
+                                    {ech.solde > 0 ? (
+                                      peutPayer && (
+                                        <button
+                                          type="button"
+                                          onClick={() => (ouvert ? setPaiement(null) : ouvrirFormulairePaiement(ech))}
+                                          className="px-3.5 py-1.5 bg-[#0C447C] hover:bg-[#093663] text-white text-xs font-bold rounded-lg transition-colors cursor-pointer flex items-center gap-1.5"
+                                        >
+                                          {ouvert ? "Fermer" : "Payer"}
+                                          <ChevronRight className={`w-3.5 h-3.5 transition-transform ${ouvert ? "rotate-90" : ""}`} />
+                                        </button>
+                                      )
+                                    ) : (
+                                      <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700">
+                                        <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                                        Soldé
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+
+                                {ouvert && (
+                                  <form onSubmit={enregistrerPaiement} className="mt-3 pt-3 border-t border-slate-200 space-y-3">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                      <div>
+                                        <label className={LABEL}>Montant encaissé (GNF)</label>
+                                        <input
+                                          type="number"
+                                          min="1"
+                                          max={resteTotalDuFrais(suivi, paiement.echeanceId)}
+                                          value={paiement.montant}
+                                          onChange={(e) => setPaiement({ ...paiement, montant: e.target.value })}
+                                          placeholder={`Reste : ${Number(ech.solde).toLocaleString("fr-FR")}`}
+                                          className={CHAMP}
+                                          required
+                                        />
+                                        <div className="flex gap-1.5 mt-1.5">
+                                          <button type="button" onClick={() => setPaiement({ ...paiement, montant: String(ech.solde) })} className="px-2 py-0.5 rounded-md bg-white border border-slate-200 text-[10px] font-semibold text-slate-600 hover:bg-slate-100 cursor-pointer">
+                                            Solde de l'échéance
+                                          </button>
+                                          <button type="button" onClick={() => setPaiement({ ...paiement, montant: String(resteTotalDuFrais(suivi, paiement.echeanceId)) })} className="px-2 py-0.5 rounded-md bg-white border border-slate-200 text-[10px] font-semibold text-slate-600 hover:bg-slate-100 cursor-pointer">
+                                            Tout le reste
+                                          </button>
+                                        </div>
+                                      </div>
+                                      <div>
+                                        <label className={LABEL}>Moyen de paiement</label>
+                                        <SelecteurMoyen valeur={paiement.moyenPaiement} onChange={(m) => setPaiement({ ...paiement, moyenPaiement: m })} />
+                                      </div>
+                                    </div>
+                                    <p className="text-[11px] text-slate-400">
+                                      Un montant supérieur à l'échéance est reporté sur les tranches suivantes (jusqu'à {formaterGNF(resteTotalDuFrais(suivi, paiement.echeanceId))}).
+                                    </p>
+                                    <div className="flex justify-end gap-2">
+                                      <button type="button" onClick={() => setPaiement(null)} className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-white border border-slate-200 cursor-pointer">
+                                        Annuler
+                                      </button>
+                                      <button type="submit" className="px-4 py-2 bg-[#0C447C] hover:bg-[#093663] text-white text-xs font-bold rounded-xl cursor-pointer flex items-center gap-1.5">
+                                        <Receipt className="w-3.5 h-3.5" />
+                                        Enregistrer et imprimer le reçu
+                                      </button>
+                                    </div>
+                                  </form>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
                       </div>
-                      <p className="basis-full order-last text-xs text-slate-400 m-0">
-                        Un montant supérieur à l'échéance est reporté sur les tranches suivantes (jusqu'à {formaterGNF(resteTotalDuFrais(suivi, paiement.echeanceId))}, soit toute la scolarité restante).
-                      </p>
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-500 mb-1">Moyen de paiement</label>
-                        <Select value={paiement.moyenPaiement} onChange={(e) => setPaiement({ ...paiement, moyenPaiement: e.target.value })}>
-                          <option value="especes">Espèces</option>
-                          <option value="mobile_money">Mobile Money</option>
-                          <option value="virement">Virement</option>
-                          <option value="cheque">Chèque</option>
-                        </Select>
+                    );
+                  })}
+
+                  {suivi && fraisAEcheances.length === 0 && (
+                    <div className="bg-white p-8 text-center border border-slate-100/90" style={STYLE_CARTE}>
+                      <p className="text-sm font-semibold text-slate-600">Aucun frais de scolarité appliqué à cet élève</p>
+                      <p className="text-xs text-slate-400 mt-1">Créez ou synchronisez la grille tarifaire de sa classe dans l'onglet Grilles tarifaires.</p>
+                    </div>
+                  )}
+
+                  {/* 4. Situation financiere globale */}
+                  {suivi && suivi.frais.length > 0 && (
+                    <div className="bg-white p-5 border border-slate-100/90" style={STYLE_CARTE}>
+                      <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100 gap-3">
+                        <div>
+                          <h3 className="text-sm font-extrabold text-slate-900 uppercase tracking-wider">Situation financière globale</h3>
+                          <p className="text-xs text-slate-400">Synthèse de tous les frais de l'élève</p>
+                        </div>
+                        <span className="font-mono text-xs font-bold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-lg shrink-0">Progression : {pctGlobal}%</span>
                       </div>
-                      <Button type="submit" variant="primary">Enregistrer et imprimer le reçu</Button>
-                      <Button type="button" variant="ghost" onClick={() => setPaiement(null)}>
-                        Annuler
-                      </Button>
-                    </form>
-                  </Card>
-                )}
-              </>
-            )}
+
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 mb-5">
+                        <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80">
+                          <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Total dû</span>
+                          <div className="text-xl font-black text-slate-900 font-mono tabular-nums">{formaterGNF(totalDuGlobal)}</div>
+                          <span className="text-[11px] text-slate-400">Tous frais confondus</span>
+                        </div>
+                        <div className="p-3.5 rounded-xl bg-[#dcfce7]/60 border border-[#bbf7d0]">
+                          <span className="text-[11px] font-bold text-[#15803d] uppercase tracking-wider block mb-1">Total encaissé</span>
+                          <div className="text-xl font-black text-[#15803d] font-mono tabular-nums">{formaterGNF(totalPayeGlobal)}</div>
+                          <span className="text-[11px] text-[#15803d]/70 font-medium">Paiements enregistrés</span>
+                        </div>
+                        <div className={`p-3.5 rounded-xl border ${resteGlobal > 0 ? "bg-amber-50/70 border-amber-200" : "bg-emerald-50/50 border-emerald-200"}`}>
+                          <span className={`text-[11px] font-bold uppercase tracking-wider block mb-1 ${resteGlobal > 0 ? "text-amber-800" : "text-emerald-800"}`}>Reste à percevoir</span>
+                          <div className={`text-xl font-black font-mono tabular-nums ${resteGlobal > 0 ? "text-amber-700" : "text-emerald-700"}`}>{formaterGNF(resteGlobal)}</div>
+                          <span className="text-[11px] text-slate-400">{resteGlobal === 0 ? "Tout est réglé" : "Échéances en cours"}</span>
+                        </div>
+                      </div>
+
+                      <div className="border border-slate-200 rounded-xl overflow-hidden">
+                        <div className="bg-slate-50 px-4 py-2.5 text-[11px] font-bold text-slate-600 uppercase tracking-wider grid grid-cols-12 gap-2 border-b border-slate-200">
+                          <span className="col-span-4">Rubrique</span>
+                          <span className="col-span-3 text-right">Montant dû</span>
+                          <span className="col-span-3 text-right">Montant réglé</span>
+                          <span className="col-span-2 text-right">Statut</span>
+                        </div>
+                        <div className="divide-y divide-slate-100 text-xs">
+                          {suivi.frais.map((f, i) => {
+                            const paye = f.echeances.reduce((s, e) => s + Number(e.montant_paye), 0);
+                            const du = f.echeances.reduce((s, e) => s + Number(e.montant), 0);
+                            const st = statut(statutFrais(f));
+                            return (
+                              <div key={f.id} className={`px-4 py-3 grid grid-cols-12 gap-2 items-center ${i % 2 ? "bg-slate-50/40" : ""}`}>
+                                <div className="col-span-4 font-semibold text-slate-800">
+                                  {f.type_frais}
+                                  {f.echeances.length > 1 && <span className="text-slate-400 font-normal"> ({f.echeances.length} échéances)</span>}
+                                </div>
+                                <div className="col-span-3 text-right font-mono text-slate-700 tabular-nums">{formaterGNF(du)}</div>
+                                <div className="col-span-3 text-right font-mono font-bold text-emerald-700 tabular-nums">{formaterGNF(paye)}</div>
+                                <div className="col-span-2 text-right">
+                                  <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${st.badge}`}>{st.libelle}</span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
           </div>
         </div>
       )}
 
       {onglet === "grilles" && (
-        <>
-          <Card className="p-0 overflow-hidden">
-            <div className="flex items-center gap-2.5 px-5 py-4 border-b border-slate-100 bg-slate-50/60">
-              <div className="h-8 w-8 rounded-lg bg-[#0C447C]/10 text-[#0C447C] flex items-center justify-center shrink-0">
-                <Layers className="h-4 w-4" />
-              </div>
-              <p className="text-sm font-bold text-slate-900 m-0">
-                Grilles tarifaires existantes <span className="text-slate-400 font-semibold">({grillesExistantes.length})</span>
-              </p>
-            </div>
-
-            {grillesExistantes.length === 0 ? (
-              <p className="text-sm text-slate-400 px-5 py-8 text-center">Aucune grille tarifaire n'a encore été créée.</p>
-            ) : (
-              <div className="divide-y divide-slate-100 px-5">
-                {grillesExistantes.map((g) => {
-                  const couverture = g.nombre_eleves_classe > 0
-                    ? Math.round((g.nombre_eleves_couverts / g.nombre_eleves_classe) * 100)
-                    : 100;
-                  const complet = g.nombre_eleves_couverts >= g.nombre_eleves_classe;
-                  const fraisParEleve = ["inscription", "reinscription"].includes(normaliser(g.type_frais?.nom));
-
-                  return (
-                    <div key={g.id} className="py-3.5 flex flex-wrap items-center justify-between gap-3">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="h-10 w-10 rounded-xl bg-blue-50 text-[#2563EB] flex items-center justify-center shrink-0">
-                          <School className="h-4.5 w-4.5" />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-sm font-bold text-slate-900 m-0">
-                            {g.classe?.nom || '—'} · {g.type_frais?.nom || "—"}
-                          </p>
-                          <p className="text-xs text-slate-400 m-0 mt-0.5">
-                            {formaterGNF(g.montant)} · {g.echeances?.length || 0} échéance{(g.echeances?.length || 0) > 1 ? "s" : ""}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-3">
-                        {complet ? (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-600">
-                            <CheckCircle2 className="h-3.5 w-3.5" />
-                            {g.nombre_eleves_couverts}/{g.nombre_eleves_classe} élèves à jour
-                          </span>
-                        ) : (
-                          <>
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-600">
-                              <AlertTriangle className="h-3.5 w-3.5" />
-                              {g.nombre_eleves_couverts}/{g.nombre_eleves_classe} élèves ({couverture}%)
-                            </span>
-                            {/* title sur le <span> : un bouton desactive n'affiche pas toujours son infobulle */}
-                            <span title={fraisParEleve ? "Les frais d'inscription se gèrent élève par élève" : undefined}>
-                              <button
-                                onClick={() => synchroniserGrille(g.id)}
-                                disabled={synchronisationEnCours === g.id || fraisParEleve}
-                                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-blue-200 text-[#2563EB] text-xs font-semibold hover:bg-blue-50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                              >
-                                <RefreshCw className={`h-3.5 w-3.5 ${synchronisationEnCours === g.id ? "animate-spin" : ""}`} />
-                                Synchroniser
-                              </button>
-                            </span>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-            <div className="h-1" />
-          </Card>
-
-          <Card className="p-0 overflow-hidden">
-            <div className="flex items-center gap-2.5 px-5 py-4 border-b border-slate-100 bg-slate-50/60">
-              <div className="h-8 w-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
-                <Tag className="h-4 w-4" />
-              </div>
-              <p className="text-sm font-bold text-slate-900 m-0">Nouveau type de frais</p>
-            </div>
-            <form onSubmit={ajouterTypeFrais} className="flex gap-3 p-5">
-              <Input
-                type="text"
-                placeholder="ex: Scolarité, Cantine, Transport..."
-                value={nouveauType}
-                onChange={(e) => setNouveauType(e.target.value)}
-                className="flex-1"
-                required
-              />
-              <Button type="submit" variant="secondary">Ajouter</Button>
-            </form>
-          </Card>
-
-          <Card className="p-0 overflow-hidden">
-            <div className="flex items-center gap-2.5 px-5 py-4 border-b border-slate-100 bg-slate-50/60">
-              <div className="h-8 w-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-                <FileSpreadsheet className="h-4 w-4" />
-              </div>
-              <p className="text-sm font-bold text-slate-900 m-0">Créer une grille tarifaire</p>
-            </div>
-            <form onSubmit={creerGrille} className="space-y-4 p-5">
-              <div className="flex flex-wrap gap-3">
-                <Select value={grille.classe_id} onChange={(e) => setGrille({ ...grille, classe_id: e.target.value })} required>
-                  <option value="">Classe...</option>
-                  {classes.map((c) => <option key={c.id} value={c.id}>{c.nom}</option>)}
-                </Select>
-                <Select value={grille.type_frais_id} onChange={(e) => setGrille({ ...grille, type_frais_id: e.target.value })} required>
-                  <option value="">Type de frais...</option>
-                  {typesFrais.map((t) => <option key={t.id} value={t.id}>{t.nom}</option>)}
-                </Select>
-                <Input
-                  type="number"
-                  placeholder="Montant total (GNF)"
-                  value={grille.montant}
-                  onChange={(e) => setGrille({ ...grille, montant: e.target.value })}
-                  required
-                />
-              </div>
-
-              <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-4 space-y-3">
-                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider m-0">Échéances</p>
-                <div className="space-y-2">
-                  {echeances.map((ech, i) => (
-                    <div key={i} className="flex flex-wrap gap-3">
-                      <Input type="text" placeholder="Libellé" value={ech.libelle} onChange={(e) => modifierEcheance(i, "libelle", e.target.value)} required />
-                      <Input type="number" placeholder="Montant" value={ech.montant} onChange={(e) => modifierEcheance(i, "montant", e.target.value)} required />
-                      <Input type="date" value={ech.date_limite} onChange={(e) => modifierEcheance(i, "date_limite", e.target.value)} required />
-                    </div>
-                  ))}
-                </div>
-                <button
-                  type="button"
-                  onClick={ajouterEcheance}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-dashed border-slate-300 bg-white text-xs text-slate-500 hover:bg-slate-50 transition-colors cursor-pointer"
-                >
-                  <Plus className="h-3.5 w-3.5" /> Ajouter une échéance
-                </button>
-              </div>
-
-              <div>
-                <Button type="submit" variant="primary" size="lg">Créer la grille</Button>
-              </div>
-            </form>
-          </Card>
-        </>
+        <GrillesTarifaires
+          classes={classes}
+          typesFrais={typesFrais}
+          grilles={grillesExistantes}
+          peutCreer={peutInscrire}
+          onGrillesModifiees={chargerGrilles}
+          onTypesModifies={chargerTypes}
+          onMessage={(type, texte) => {
+            setErreur(type === "erreur" ? texte : "");
+            setSucces(type === "succes" ? texte : "");
+          }}
+        />
       )}
     </div>
   );

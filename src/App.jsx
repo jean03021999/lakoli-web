@@ -140,7 +140,7 @@ function AppContent() {
         <Route path="/classes" element={<Classes />} />
         <Route path="/periodes" element={<Periodes />} />
         <Route path="/utilisateurs" element={<Utilisateurs />} />
-        <Route path="/paiements" element={<PaiementsCaisse />} />
+        <Route path="/paiements" element={<RouteProtegee permissions={permissions} requiert="frais.voir"><PaiementsCaisse etablissement={etablissement} /></RouteProtegee>} />
         <Route
           path="/salaires"
           element={<RouteProtegee permissions={permissions} requiert="enseignants.salaires.voir"><Salaires permissions={permissions} /></RouteProtegee>}
