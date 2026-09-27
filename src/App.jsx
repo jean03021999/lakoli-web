@@ -127,7 +127,7 @@ function AppContent() {
         <Route path="/enseignants-ajouter" element={<RouteProtegee permissions={permissions} requiert="enseignants.creer"><AjouterEnseignant /></RouteProtegee>} />
         <Route path="/matieres" element={<Matieres />} />
         <Route path="/affectations" element={<Affectations />} />
-        <Route path="/emploi-du-temps" element={<EmploiDuTemps />} />
+        <Route path="/emploi-du-temps" element={<RouteProtegee permissions={permissions} requiert="emploi_du_temps.voir"><EmploiDuTemps permissions={permissions} /></RouteProtegee>} />
         <Route path="/notes" element={<Notes role={role} />} />
         <Route path="/notes/:id/saisie" element={<SaisieNotes />} />
         <Route path="/notes/validation/:id" element={<ValidationNotes />} />

@@ -6,7 +6,10 @@ import { PageHeader, Card, Button, Select, Input } from "../../components/ui/Lak
 const JOURS = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"];
 const COULEURS_MATIERES = ["#DBEAFE", "#D1FAE5", "#FEF3C7", "#FEE2E2", "#EDE9FE", "#FCE7F3"];
 
-export default function EmploiDuTemps() {
+// Consultation pour tous ceux qui ont emploi_du_temps.voir (ex. Comptable) ; ajout et suppression
+// de cours reserves a emploi_du_temps.gerer (le serveur applique la meme regle).
+export default function EmploiDuTemps({ permissions = [] }) {
+  const peutGerer = permissions.includes("emploi_du_temps.gerer");
   const [classes, setClasses] = useState([]);
   const [classeId, setClasseId] = useState("");
   const [creneaux, setCreneaux] = useState([]);
@@ -18,9 +21,10 @@ export default function EmploiDuTemps() {
 
   useEffect(() => {
     api.get("/classes").then((res) => setClasses(res.data));
-    api.get("/matieres").then((res) => setMatieres(res.data.matieres));
-    api.get("/enseignants").then((res) => setEnseignants(res.data.enseignants));
-  }, []);
+    api.get("/matieres").then((res) => setMatieres(res.data.matieres)).catch(() => {});
+    // Liste des enseignants : utile seulement au formulaire d'ajout.
+    if (peutGerer) api.get("/enseignants").then((res) => setEnseignants(res.data.enseignants)).catch(() => {});
+  }, [peutGerer]);
 
   const chargerCreneaux = async (id) => {
     setClasseId(id);
@@ -50,8 +54,13 @@ export default function EmploiDuTemps() {
   };
 
   const supprimerCreneau = async (id) => {
-    await api.delete(`/emploi-du-temps/${id}`);
-    chargerCreneaux(classeId);
+    setErreur("");
+    try {
+      await api.delete(`/emploi-du-temps/${id}`);
+      chargerCreneaux(classeId);
+    } catch (err) {
+      setErreur(err.response?.data?.message || "Impossible de supprimer ce cours.");
+    }
   };
 
   const telecharger = async () => {
@@ -78,8 +87,8 @@ export default function EmploiDuTemps() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Gestion des Emplois du Temps"
-        description="Planifiez les cours par classe, jour et créneau horaire."
+        title={peutGerer ? "Gestion des Emplois du Temps" : "Emplois du Temps"}
+        description={peutGerer ? "Planifiez les cours par classe, jour et créneau horaire." : "Consultation des cours par classe, jour et créneau horaire."}
       />
 
       <Card className="flex flex-wrap items-center justify-between gap-3">
@@ -90,9 +99,11 @@ export default function EmploiDuTemps() {
 
         {classeId && (
           <div className="flex gap-2">
-            <Button variant="primary" icon={Plus} onClick={() => setFormulaireOuvert(!formulaireOuvert)}>
-              Ajouter un cours
-            </Button>
+            {peutGerer && (
+              <Button variant="primary" icon={Plus} onClick={() => setFormulaireOuvert(!formulaireOuvert)}>
+                Ajouter un cours
+              </Button>
+            )}
             <Button variant="secondary" icon={Download} onClick={telecharger}>
               Télécharger
             </Button>
@@ -102,7 +113,7 @@ export default function EmploiDuTemps() {
 
       {erreur && <p className="text-sm text-rose-600">{erreur}</p>}
 
-      {formulaireOuvert && (
+      {peutGerer && formulaireOuvert && (
         <Card>
           <form onSubmit={ajouterCreneau} className="flex flex-wrap items-end gap-3">
             <div>
@@ -142,7 +153,7 @@ export default function EmploiDuTemps() {
         <Card className="overflow-x-auto">
           {horaires.length === 0 ? (
             <p className="text-sm text-slate-400 text-center py-8">
-              Aucun cours planifié. Cliquez sur "Ajouter un cours" pour commencer.
+              {peutGerer ? 'Aucun cours planifié. Cliquez sur "Ajouter un cours" pour commencer.' : "Aucun cours planifié pour cette classe."}
             </p>
           ) : (
             <table className="w-full border-collapse min-w-[700px]">
@@ -172,12 +183,15 @@ export default function EmploiDuTemps() {
                             <div className="relative">
                               <p className="text-[11px] font-bold text-slate-800 m-0">{c.matiere}</p>
                               <p className="text-[10px] text-slate-500 m-0">{c.enseignant}</p>
-                              <button
-                                onClick={() => supprimerCreneau(c.id)}
-                                className="absolute -top-0.5 -right-0.5 text-rose-500 hover:text-rose-700 cursor-pointer"
-                              >
-                                <X className="h-3 w-3" />
-                              </button>
+                              {peutGerer && (
+                                <button
+                                  onClick={() => supprimerCreneau(c.id)}
+                                  title="Supprimer ce cours"
+                                  className="absolute -top-0.5 -right-0.5 text-rose-500 hover:text-rose-700 cursor-pointer"
+                                >
+                                  <X className="h-3 w-3" />
+                                </button>
+                              )}
                             </div>
                           )}
                         </td>
