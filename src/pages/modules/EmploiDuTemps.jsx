@@ -6,8 +6,9 @@ import { PageHeader, Card, Button, Select, Input } from "../../components/ui/Lak
 const JOURS = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"];
 const COULEURS_MATIERES = ["#DBEAFE", "#D1FAE5", "#FEF3C7", "#FEE2E2", "#EDE9FE", "#FCE7F3"];
 
-// Consultation pour tous ceux qui ont emploi_du_temps.voir (ex. Comptable) ; ajout et suppression
-// de cours reserves a emploi_du_temps.gerer (le serveur applique la meme regle).
+// Consultation seule pour ceux qui ont uniquement emploi_du_temps.voir (ex. Comptable) : ils ne
+// voient que les classes dont l'emploi du temps est elabore, sans ajout, suppression ni export.
+// Tout le reste est reserve a emploi_du_temps.gerer (le serveur applique la meme regle).
 export default function EmploiDuTemps({ permissions = [] }) {
   const peutGerer = permissions.includes("emploi_du_temps.gerer");
   const [classes, setClasses] = useState([]);
@@ -16,11 +17,24 @@ export default function EmploiDuTemps({ permissions = [] }) {
   const [matieres, setMatieres] = useState([]);
   const [enseignants, setEnseignants] = useState([]);
   const [erreur, setErreur] = useState("");
+  const [classesChargees, setClassesChargees] = useState(false);
   const [formulaireOuvert, setFormulaireOuvert] = useState(false);
   const [form, setForm] = useState({ jour: "lundi", matiere_id: "", enseignant_id: "", heure_debut: "", heure_fin: "" });
 
   useEffect(() => {
-    api.get("/classes").then((res) => setClasses(res.data));
+    if (peutGerer) {
+      api.get("/classes").then((res) => setClasses(res.data));
+    } else {
+      // Seulement les emplois du temps deja elabores ; le premier s'ouvre directement.
+      api
+        .get("/emploi-du-temps")
+        .then((res) => {
+          setClasses(res.data);
+          if (res.data.length > 0) chargerCreneaux(String(res.data[0].id));
+        })
+        .catch(() => setErreur("Impossible de charger les emplois du temps."))
+        .finally(() => setClassesChargees(true));
+    }
     api.get("/matieres").then((res) => setMatieres(res.data.matieres)).catch(() => {});
     // Liste des enseignants : utile seulement au formulaire d'ajout.
     if (peutGerer) api.get("/enseignants").then((res) => setEnseignants(res.data.enseignants)).catch(() => {});
@@ -91,27 +105,37 @@ export default function EmploiDuTemps({ permissions = [] }) {
         description={peutGerer ? "Planifiez les cours par classe, jour et créneau horaire." : "Consultation des cours par classe, jour et créneau horaire."}
       />
 
-      <Card className="flex flex-wrap items-center justify-between gap-3">
-        <Select value={classeId} onChange={(e) => chargerCreneaux(e.target.value)}>
-          <option value="">Sélectionner une classe...</option>
-          {classes.map((c) => <option key={c.id} value={c.id}>{c.nom}</option>)}
-        </Select>
+      {(peutGerer || classes.length > 0) && (
+        <Card className="flex flex-wrap items-center justify-between gap-3">
+          <Select value={classeId} onChange={(e) => chargerCreneaux(e.target.value)}>
+            <option value="">{peutGerer ? "Sélectionner une classe..." : "Choisir un emploi du temps..."}</option>
+            {classes.map((c) => <option key={c.id} value={c.id}>{c.nom}</option>)}
+          </Select>
 
-        {classeId && (
-          <div className="flex gap-2">
-            {peutGerer && (
-              <Button variant="primary" icon={Plus} onClick={() => setFormulaireOuvert(!formulaireOuvert)}>
-                Ajouter un cours
-              </Button>
-            )}
-            <Button variant="secondary" icon={Download} onClick={telecharger}>
-              Télécharger
-            </Button>
-          </div>
-        )}
-      </Card>
+          {classeId && (
+            <div className="flex gap-2">
+              {peutGerer && (
+                <Button variant="primary" icon={Plus} onClick={() => setFormulaireOuvert(!formulaireOuvert)}>
+                  Ajouter un cours
+                </Button>
+              )}
+              {peutGerer && (
+                <Button variant="secondary" icon={Download} onClick={telecharger}>
+                  Télécharger
+                </Button>
+              )}
+            </div>
+          )}
+        </Card>
+      )}
 
       {erreur && <p className="text-sm text-rose-600">{erreur}</p>}
+
+      {!peutGerer && classesChargees && classes.length === 0 && !erreur && (
+        <Card>
+          <p className="text-sm text-slate-400 text-center py-8">Aucun emploi du temps n'a encore été élaboré.</p>
+        </Card>
+      )}
 
       {peutGerer && formulaireOuvert && (
         <Card>
