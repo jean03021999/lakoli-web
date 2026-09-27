@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../../services/api";
-import { Users, FileCheck, Clock, Wallet, Search, Plus, Phone, Eye, CreditCard, BookOpen, Filter, UserCheck } from "lucide-react";
+import { Users, FileCheck, Clock, Wallet, Search, Plus, Phone, Eye, CreditCard, BookOpen, Filter, UserCheck, Printer } from "lucide-react";
+import { imprimerDocument, genererListeEnseignantsHtml } from "../../utils/impression";
 import BadgeContrat from "../../components/enseignants/BadgeContrat";
 import { degradeEnseignant, initialesEnseignant, libelleAnciennete, formaterGNF, normaliser } from "../../components/enseignants/theme";
 
@@ -27,7 +28,7 @@ function Compteur({ libelle, valeur, detail, icone: Icone, couleur, fond, detail
   );
 }
 
-export default function Enseignants({ permissions = [] }) {
+export default function Enseignants({ permissions = [], etablissement = null, session = null }) {
   const peutCreer = permissions.includes("enseignants.creer");
   const peutVoirSalaires = permissions.includes("enseignants.salaires.voir");
   const [enseignants, setEnseignants] = useState([]);
@@ -76,6 +77,20 @@ export default function Enseignants({ permissions = [] }) {
   };
 
   const avecCompte = enseignants.filter((e) => e.a_un_compte).length;
+
+  // Liste imprimable : les enseignants affiches, avec les filtres appliques dans l'en-tete.
+  const imprimerListe = () => {
+    const libellesFiltres = [
+      matiere !== "tous" && `Matière : ${matiere}`,
+      contrat !== "tous" && `Contrat : ${{ cdi: "CDI", cdd: "CDD", vacataire: "Vacataire" }[contrat]}`,
+      statut !== "tous" && (statut === "actif" ? "Contrat actif" : "Sans contrat actif"),
+      recherche.trim() && `Recherche : « ${recherche.trim()} »`,
+    ].filter(Boolean);
+    const html = genererListeEnseignantsHtml({ etablissement: etablissement?.nom, session, enseignants: filtres, filtres: libellesFiltres });
+    if (!imprimerDocument("Liste des enseignants", html)) {
+      setErreur("Le navigateur a bloqué la fenêtre d'impression. Autorisez les pop-ups pour ce site.");
+    }
+  };
   const selectClasse = "bg-transparent text-xs font-medium text-slate-700 focus:outline-none cursor-pointer";
 
   return (
@@ -204,6 +219,15 @@ export default function Enseignants({ permissions = [] }) {
                 Réinitialiser
               </button>
             )}
+            <button
+              onClick={imprimerListe}
+              disabled={chargement || filtres.length === 0}
+              title={filtreActif ? "Imprime les enseignants affichés (filtres appliqués)" : "Imprime la liste de tous les enseignants"}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-[#0C447C] bg-blue-50 border border-blue-200 hover:bg-blue-100 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
+            >
+              <Printer className="w-4 h-4" />
+              Imprimer la liste
+            </button>
           </div>
         </div>
       </div>

@@ -972,6 +972,100 @@ export function genererListeElevesHtml({ etablissement, session, classes, filtre
 }
 
 // ---------------------------------------------------------------------------
+// Liste des enseignants — meme gabarit que la liste des eleves. `enseignants` : lignes de
+// GET /enseignants (deja filtrees). `filtres` : libelles des filtres appliques (ex. ["CDI"]),
+// affiches dans l'en-tete. A passer a imprimerDocument().
+// ---------------------------------------------------------------------------
+const CONTRATS_ENSEIGNANT = { cdi: "CDI", cdd: "CDD", vacataire: "Vacataire" };
+
+export function genererListeEnseignantsHtml({ etablissement, session, enseignants, filtres = [] }) {
+  const tiret = "—";
+  const collator = new Intl.Collator("fr", { sensitivity: "base" });
+  const tries = [...enseignants].sort(
+    (a, b) => collator.compare(a.nom || "", b.nom || "") || collator.compare(a.prenom || "", b.prenom || "")
+  );
+  const totalHeures = tries.reduce((s, e) => s + (Number(e.volume_horaire) || 0), 0);
+  const heures = (h) => `${Number(h || 0).toLocaleString("fr-FR")}&nbsp;h`;
+
+  const lignes = tries
+    .map(
+      (e, i) => `<tr>
+      <td class="num">${i + 1}</td>
+      <td class="mono" style="white-space:nowrap">${echapperHtml(e.matricule || tiret)}</td>
+      <td><strong>${echapperHtml((e.nom || "").toUpperCase())}</strong></td>
+      <td>${echapperHtml(e.prenom || tiret)}</td>
+      <td>${echapperHtml(e.matieres?.length ? e.matieres.join(", ") : tiret)}</td>
+      <td>${echapperHtml(e.classes?.length ? e.classes.map((c) => c.nom).join(", ") : tiret)}</td>
+      <td>${echapperHtml(CONTRATS_ENSEIGNANT[e.type_contrat] || "Sans contrat")}</td>
+      <td class="droite">${heures(e.volume_horaire)}</td>
+      <td class="mono" style="white-space:nowrap">${echapperHtml(e.telephone || tiret)}</td>
+    </tr>`
+    )
+    .join("");
+
+  return `
+  <div class="doc-releve liste-classe">
+    <div class="entete-premium">
+      <div class="logo">
+        ${LOGO_SVG_BLANC}
+        <div>
+          <div class="nom">LAKOLI</div>
+          ${etablissement ? `<span class="badge-etablissement">${echapperHtml(etablissement)}</span>` : ""}
+        </div>
+      </div>
+      <div class="titre">
+        <h1>LISTE DES ENSEIGNANTS</h1>
+        <div class="classe">Corps enseignant</div>
+        ${filtres.length ? `<div class="session">${echapperHtml(filtres.join(" · "))}</div>` : ""}
+        ${session ? `<div class="session">Année scolaire ${echapperHtml(session)}</div>` : ""}
+      </div>
+    </div>
+
+    <div class="resume-classe">
+      <span>Effectif : <strong>${tries.length}</strong> enseignant${tries.length > 1 ? "s" : ""}</span>
+      <span>Volume horaire : <strong>${heures(totalHeures)}</strong> / semaine</span>
+      ${filtres.length ? `<span>Filtres : <strong>${echapperHtml(filtres.join(", "))}</strong></span>` : ""}
+    </div>
+
+    <table class="tableau-premium">
+      <thead>
+        <tr>
+          <th>N°</th>
+          <th>Matricule</th>
+          <th>Nom</th>
+          <th>Prénom(s)</th>
+          <th>Matière(s)</th>
+          <th>Classes</th>
+          <th>Contrat</th>
+          <th class="droite">Heures / sem.</th>
+          <th>Téléphone</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${lignes}
+        <tr class="total">
+          <td colspan="7">TOTAL</td>
+          <td class="droite">${heures(totalHeures)}</td>
+          <td></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="signature-zone">
+      <div class="cadre">
+        <div class="ligne"></div>
+        <div class="libelle">Signature et cachet du directeur</div>
+      </div>
+    </div>
+
+    <div class="pied-premium">
+      Document officiel LAKOLI · Liste arrêtée à ${tries.length} enseignant${tries.length > 1 ? "s" : ""}<br>
+      Imprimé le ${echapperHtml(dateImpression())}
+    </div>
+  </div>`;
+}
+
+// ---------------------------------------------------------------------------
 // Rapport comptable — synthese imprimable (ou enregistrable en PDF) du tableau de bord comptable,
 // avec les donnees reelles. Une section dont la source n'a pas pu etre chargee est signalee
 // « indisponible » plutot que remplie de zeros. A passer a imprimerDocument().
