@@ -148,7 +148,20 @@ function AppContent() {
           element={<RouteProtegee permissions={permissions} requiert="enseignants.salaires.voir"><Salaires permissions={permissions} /></RouteProtegee>}
         />
         <Route path="/abonnement" element={<Abonnement />} />
-        <Route path="/parametres" element={<Parametres />} />
+        <Route
+          path="/parametres"
+          element={
+            <Parametres
+              permissions={permissions}
+              onUtilisateurMaj={(u) => {
+                setUtilisateur((actuel) => ({ ...actuel, ...u }));
+                if (u.name) localStorage.setItem("user_name", u.name);
+              }}
+              onEtablissementMaj={(e) => setEtablissement((actuel) => ({ ...actuel, nom: e.nom, ville: e.ville, adresse: e.adresse, telephone: e.telephone, email: e.email }))}
+              onSessionMaj={setSession}
+            />
+          }
+        />
         <Route path="*" element={<Navigate to="/tableau-de-bord" />} />
       </Routes>
     </Layout>

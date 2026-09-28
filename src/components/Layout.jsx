@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import api from "../services/api";
 import EnTete from "./EnTete";
+import { lireApparence, cssFond, chargerPolice, POLICES, EVENEMENT_APPARENCE, lireAlertes, EVENEMENT_ALERTES } from "./parametres/outils";
 import {
   GraduationCap,
   Users,
@@ -189,6 +190,8 @@ export default function Layout({ children, role, permissions = [], etablissement
   const [menuMobileOuvert, setMenuMobileOuvert] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [eleves, setEleves] = useState([]); // aussi utilises par la recherche de l'en-tete
+  const [apparence, setApparence] = useState(lireApparence);
+  const [alertes, setAlertes] = useState(lireAlertes);
   const [enLigne, setEnLigne] = useState(typeof navigator === "undefined" ? true : navigator.onLine);
 
   const modulesVisibles = MODULES.filter((m) => moduleVisible(m, permissions, role));
@@ -234,6 +237,25 @@ export default function Layout({ children, role, permissions = [], etablissement
     }
     if (role) chargerNotifications();
   }, [role, peutVoirEleves, peutVoirNotes]);
+
+  // Preferences de ce navigateur (module Parametres) : fond, police et alertes affichees.
+  useEffect(() => {
+    const majApparence = () => setApparence(lireApparence());
+    const majAlertes = () => setAlertes(lireAlertes());
+    window.addEventListener(EVENEMENT_APPARENCE, majApparence);
+    window.addEventListener(EVENEMENT_ALERTES, majAlertes);
+    return () => {
+      window.removeEventListener(EVENEMENT_APPARENCE, majApparence);
+      window.removeEventListener(EVENEMENT_ALERTES, majAlertes);
+    };
+  }, []);
+
+  useEffect(() => {
+    chargerPolice(apparence.police);
+    document.body.style.fontFamily = POLICES[apparence.police]?.famille || "";
+  }, [apparence.police]);
+
+  const notificationsAffichees = notifications.filter((n) => alertes[n.id] !== false);
 
   // Etat reel de la connexion : le badge "synchronise" ne doit pas s'afficher hors ligne.
   useEffect(() => {
@@ -295,7 +317,7 @@ export default function Layout({ children, role, permissions = [], etablissement
         utilisateur={utilisateur}
         libelleRole={LABELS_ROLES[role] || role}
         enLigne={enLigne}
-        notifications={notifications}
+        notifications={notificationsAffichees}
         eleves={eleves}
         modules={modulesVisibles}
         permissions={permissions}
@@ -305,7 +327,7 @@ export default function Layout({ children, role, permissions = [], etablissement
       />
 
         {/* Contenu principal (seule zone qui défile) */}
-        <main className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden min-w-0 px-4 sm:px-6 md:px-8 py-6 space-y-6">
+        <main className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden min-w-0 px-4 sm:px-6 md:px-8 py-6 space-y-6" style={{ background: cssFond(apparence) }}>
           {children}
         </main>
         </div>
