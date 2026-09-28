@@ -19,3 +19,35 @@ body {
   min-height: 100vh;
 }
 
+
+/* En-tete : ouverture des menus deroulants et pulsation du statut de connexion. */
+@keyframes dropdownFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-dropdown {
+  animation: dropdownFadeIn 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes beaconPing {
+  0% {
+    transform: scale(0.95);
+    opacity: 0.8;
+  }
+  70%,
+  100% {
+    transform: scale(2);
+    opacity: 0;
+  }
+}
+
+.animate-beacon {
+  animation: beaconPing 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+}

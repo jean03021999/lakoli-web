@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import api from "../services/api";
+import EnTete from "./EnTete";
 import {
   GraduationCap,
   Users,
@@ -12,22 +13,16 @@ import {
   Wallet,
   LayoutDashboard,
   ClipboardCheck,
-  Settings,
   LogOut,
   School,
   Clock,
   CreditCard,
   UserCog,
   Sparkles,
-  Menu,
-  Bell,
-  ChevronDown,
   X,
   DollarSign,
   Building,
-  Calendar as CalendarIcon,
   AlertTriangle,
-  ArrowRight,
 } from "lucide-react";
 
 const COULEURS = {
@@ -188,13 +183,12 @@ function ContenuSidebar({ modules, estActif, onNaviguer, etablissement, session,
   );
 }
 
-export default function Layout({ children, role, permissions = [], etablissement = null, session = null }) {
+export default function Layout({ children, role, permissions = [], etablissement = null, session = null, utilisateur = null }) {
   const navigate = useNavigate();
   const location = useLocation();
-  const [menuCompteOuvert, setMenuCompteOuvert] = useState(false);
   const [menuMobileOuvert, setMenuMobileOuvert] = useState(false);
   const [notifications, setNotifications] = useState([]);
-  const [menuNotificationsOuvert, setMenuNotificationsOuvert] = useState(false);
+  const [eleves, setEleves] = useState([]); // aussi utilises par la recherche de l'en-tete
   const [enLigne, setEnLigne] = useState(typeof navigator === "undefined" ? true : navigator.onLine);
 
   const modulesVisibles = MODULES.filter((m) => moduleVisible(m, permissions, role));
@@ -211,6 +205,7 @@ export default function Layout({ children, role, permissions = [], etablissement
       ]);
 
       const liste = [];
+      if (eleves.status === "fulfilled") setEleves(eleves.value.data.eleves || []);
       const nbRetard = eleves.status === "fulfilled" ? eleves.value.data.stats.en_retard || 0 : 0;
       if (nbRetard > 0) {
         liste.push({
@@ -251,8 +246,6 @@ export default function Layout({ children, role, permissions = [], etablissement
     };
   }, []);
 
-  const nbNotifications = notifications.length;
-  const libelleEtablissement = [etablissement?.nom, etablissement?.ville].filter(Boolean).join(" · ");
 
   const allerA = (chemin) => {
     setMenuMobileOuvert(false);
@@ -272,7 +265,7 @@ export default function Layout({ children, role, permissions = [], etablissement
     navigate("/");
   };
 
-  const nomUtilisateur = localStorage.getItem("user_name") || "Utilisateur";
+  const nomUtilisateur = utilisateur?.name || localStorage.getItem("user_name") || "Utilisateur";
 
   return (
     <div className="h-screen overflow-hidden bg-[#F8FAFC] text-slate-800 flex font-sans selection:bg-[#0C447C] selection:text-white">
@@ -296,166 +289,20 @@ export default function Layout({ children, role, permissions = [], etablissement
         </aside>
 
         <div className="flex-1 min-w-0 h-full flex flex-col">
-      {/* En-tête */}
-      <header
-        className="sticky top-0 shrink-0 z-40 bg-white/80 backdrop-blur-md border-b border-slate-200/70"
-        style={{ boxShadow: "0 1px 3px rgba(15,23,42,0.04)" }}
-      >
-        <div className="px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-3 h-16">
-            {/* Icône menu hamburger (mobile : ouvre le menu complet) */}
-            <button
-              onClick={() => setMenuMobileOuvert(true)}
-              className="md:hidden p-2 -ml-2 rounded-xl text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer shrink-0"
-              title="Menu"
-            >
-              <Menu className="h-5 w-5" />
-            </button>
-
-            {/* Logo LAKOLI (retour au tableau de bord) */}
-            <button
-              onClick={() => navigate("/tableau-de-bord")}
-              className="md:hidden flex items-center gap-2.5 cursor-pointer select-none shrink-0"
-              title="Tableau de bord"
-            >
-              <span
-                className="h-9 w-9 rounded-xl flex items-center justify-center"
-                style={{ background: "linear-gradient(135deg, #0C447C 0%, #1a6bb5 100%)", boxShadow: "0 4px 14px rgba(12,68,124,0.3)" }}
-              >
-                <GraduationCap className="h-5 w-5 text-white" />
-              </span>
-              <span className="hidden lg:inline text-base font-bold tracking-[2px] text-[#0C447C]">LAKOLI</span>
-            </button>
-
-            {/* Etablissement et session active (GET /user) */}
-            <div className="flex items-center gap-2 min-w-0 flex-1">
-              {libelleEtablissement && (
-                <span className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-100 text-slate-700 text-xs font-semibold min-w-0">
-                  <Building className="h-3.5 w-3.5 text-slate-500 shrink-0" />
-                  <span className="truncate">{libelleEtablissement}</span>
-                </span>
-              )}
-              {session && (
-                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-blue-50 text-blue-700 text-xs font-bold whitespace-nowrap border border-blue-100">
-                  <CalendarIcon className="h-3.5 w-3.5" />
-                  {session}
-                </span>
-              )}
-            </div>
-
-            {/* Outils de droite */}
-            <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-              <span
-                className={`hidden xl:inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold border ${
-                  enLigne ? "bg-emerald-50 text-emerald-700 border-emerald-100" : "bg-rose-50 text-rose-700 border-rose-100"
-                }`}
-              >
-                <span className="relative flex h-2 w-2">
-                  {enLigne && <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75 animate-ping" />}
-                  <span className={`relative inline-flex h-2 w-2 rounded-full ${enLigne ? "bg-emerald-500" : "bg-rose-500"}`} />
-                </span>
-                {enLigne ? "Serveur Caisse Synchronisé" : "Hors ligne"}
-              </span>
-
-              {/* Notifications */}
-              <div className="relative">
-                <button
-                  onClick={() => setMenuNotificationsOuvert((v) => !v)}
-                  className="relative p-2 rounded-xl text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer"
-                  title={nbNotifications > 0 ? `${nbNotifications} notification(s)` : "Aucune notification"}
-                >
-                  <Bell className="h-5 w-5" />
-                  {nbNotifications > 0 && (
-                    <span className="absolute -top-0.5 -right-0.5 h-4 min-w-4 px-1 rounded-full bg-rose-500 text-white text-[10px] font-bold flex items-center justify-center ring-2 ring-white">
-                      {nbNotifications}
-                    </span>
-                  )}
-                </button>
-
-                {menuNotificationsOuvert && (
-                  <>
-                    <div className="fixed inset-0 z-40" onClick={() => setMenuNotificationsOuvert(false)} />
-                    <div className="absolute right-0 top-full mt-2 w-80 max-w-[calc(100vw-2rem)] bg-white rounded-2xl border border-slate-200 shadow-xl z-50 overflow-hidden">
-                      <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
-                        <p className="text-sm font-bold text-slate-900">Notifications</p>
-                        <span className="text-[11px] font-semibold text-slate-400">{nbNotifications} en attente</span>
-                      </div>
-                      {notifications.length === 0 ? (
-                        <p className="px-4 py-6 text-center text-xs text-slate-400">Aucune notification pour le moment.</p>
-                      ) : (
-                        notifications.map((n) => (
-                          <button
-                            key={n.id}
-                            onClick={() => {
-                              setMenuNotificationsOuvert(false);
-                              navigate(n.chemin);
-                            }}
-                            className="w-full flex items-start gap-3 px-4 py-3 text-left hover:bg-slate-50 transition-colors cursor-pointer"
-                          >
-                            <span className={`h-8 w-8 rounded-full flex items-center justify-center shrink-0 ${n.couleur}`}>
-                              <n.icone className="h-4 w-4" />
-                            </span>
-                            <span className="min-w-0 flex-1">
-                              <span className="block text-sm font-semibold text-slate-900">{n.titre}</span>
-                              <span className="block text-xs text-slate-500">{n.detail}</span>
-                            </span>
-                            <ArrowRight className="h-4 w-4 text-slate-300 mt-1 shrink-0" />
-                          </button>
-                        ))
-                      )}
-                    </div>
-                  </>
-                )}
-              </div>
-
-              {/* Compte utilisateur */}
-              <div className="relative">
-                <button
-                  onClick={() => setMenuCompteOuvert((v) => !v)}
-                  className="flex items-center gap-2.5 pl-1 pr-2 py-1 rounded-xl hover:bg-slate-100 transition-colors cursor-pointer"
-                >
-                  <div
-                    className="h-9 w-9 rounded-full text-white flex items-center justify-center font-bold text-xs shrink-0"
-                    style={{ background: "linear-gradient(135deg, #0C447C 0%, #1a6bb5 100%)" }}
-                  >
-                    {initiales(nomUtilisateur)}
-                  </div>
-                  <div className="hidden sm:block text-left leading-tight">
-                    <p className="text-sm font-semibold text-slate-900">{nomUtilisateur}</p>
-                    <p className="text-[11px] text-slate-500">{LABELS_ROLES[role] || role}</p>
-                  </div>
-                  <ChevronDown className="h-4 w-4 text-slate-400 hidden sm:block" />
-                </button>
-
-                {menuCompteOuvert && (
-                  <>
-                    <div className="fixed inset-0 z-40" onClick={() => setMenuCompteOuvert(false)} />
-                    <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-xl border border-slate-200 shadow-lg z-50 overflow-hidden py-1">
-                      <button
-                        onClick={() => {
-                          setMenuCompteOuvert(false);
-                          navigate("/parametres");
-                        }}
-                        className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
-                      >
-                        <Settings className="h-4 w-4 text-slate-400" />
-                        Paramètres
-                      </button>
-                      <button
-                        onClick={handleDeconnexion}
-                        className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-                      >
-                        <LogOut className="h-4 w-4" />
-                        Déconnexion
-                      </button>
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      </header>
+      <EnTete
+        etablissement={etablissement}
+        session={session}
+        utilisateur={utilisateur}
+        libelleRole={LABELS_ROLES[role] || role}
+        enLigne={enLigne}
+        notifications={notifications}
+        eleves={eleves}
+        modules={modulesVisibles}
+        permissions={permissions}
+        onMenu={() => setMenuMobileOuvert(true)}
+        onNaviguer={navigate}
+        onDeconnexion={handleDeconnexion}
+      />
 
         {/* Contenu principal (seule zone qui défile) */}
         <main className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden min-w-0 px-4 sm:px-6 md:px-8 py-6 space-y-6">
