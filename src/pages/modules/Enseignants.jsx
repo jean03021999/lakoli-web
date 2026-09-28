@@ -343,7 +343,7 @@ export default function Enseignants({ permissions = [], etablissement = null, se
                     </button>
                     {peutVoirSalaires && (
                       <button
-                        onClick={() => navigate("/salaires")}
+                        onClick={() => navigate(`/salaires?enseignant=${e.id}`)}
                         className="px-3 py-1.5 text-xs font-semibold text-emerald-700 border border-emerald-600 rounded-lg hover:bg-emerald-600 hover:text-white transition-all flex items-center gap-1 cursor-pointer"
                       >
                         <CreditCard className="w-3.5 h-3.5" />

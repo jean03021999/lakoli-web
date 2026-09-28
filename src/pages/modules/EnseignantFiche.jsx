@@ -228,7 +228,7 @@ export default function EnseignantFiche({ permissions = [], etablissement = null
             )}
             {peutVoirSalaires && (
               <button
-                onClick={() => navigate("/salaires")}
+                onClick={() => navigate(`/salaires?nouveau=${id}`)}
                 className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-xs sm:text-sm font-bold rounded-xl transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
               >
                 <CreditCard className="w-4 h-4" />

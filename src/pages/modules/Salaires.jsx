@@ -1,110 +1,95 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
+import { useSearchParams } from "react-router-dom";
 import api from "../../services/api";
-import { DollarSign, Plus, Users, CheckCircle2, Clock, Timer, Printer, Trash2, Banknote } from "lucide-react";
-import { Card, Button, Input, Select, Badge, StatCard, Modal } from "../../components/ui/LakoliDesignSystem";
-import { MOIS, MOYENS_PAIEMENT, ouvrirFenetreVierge, genererEtImprimerFichePaie } from "../../utils/impression";
+import { Plus, FileText, History, CheckCircle2, X, Banknote } from "lucide-react";
+import { ouvrirFenetreVierge, genererEtImprimerFichePaie } from "../../utils/impression";
+import { formaterGNF } from "../../components/enseignants/theme";
+import { MOYENS } from "../../components/frais/configFrais";
+import ListeSalaires from "../../components/salaires/ListeSalaires";
+import HistoriqueSalaires from "../../components/salaires/HistoriqueSalaires";
+import PanneauNouveauSalaire from "../../components/salaires/PanneauNouveauSalaire";
+import { MESSAGE_POPUP_BLOQUE, libellePeriode, messageErreur } from "../../components/salaires/configSalaires";
 
-function formaterGNF(montant) {
-  return `${Number(montant || 0).toLocaleString("fr-FR")} GNF`;
-}
-
-const MESSAGE_POPUP_BLOQUE =
-  "Le navigateur a bloqué la fenêtre de la fiche de paie. Autorisez les pop-ups pour ce site, puis cliquez sur l'icône d'impression.";
+// Gestion des salaires (design "Gestion des salaires") : liste filtrable, historique par
+// enseignant, panneau "Nouveau salaire" et fiche de paie imprimable, sur GET /salaires et
+// GET /enseignants. Tous les salaires sont charges une fois (volume d'un etablissement) :
+// filtres, compteurs et graphiques sont calcules cote client.
+//
+// Parametres d'URL : ?enseignant=ID ouvre l'historique de cet enseignant, ?nouveau=ID ouvre le
+// panneau "Nouveau salaire" pour lui (liens depuis le module Enseignants).
 
 const aujourdHui = new Date();
 const ANNEE_COURANTE = aujourdHui.getFullYear();
-const ANNEES = [ANNEE_COURANTE - 2, ANNEE_COURANTE - 1, ANNEE_COURANTE, ANNEE_COURANTE + 1];
-
-const FORMULAIRE_VIDE = {
-  enseignant_id: "",
-  mois: aujourdHui.getMonth() + 1,
-  annee: ANNEE_COURANTE,
-  type_remuneration: "fixe",
-  salaire_base: "",
-  nb_heures: "",
-  taux_horaire: "",
-  nb_heures_supp: "",
-  taux_heure_supp: "",
-  moyen_paiement: "especes",
-  observation: "",
-};
-
-// Meme formule que Salaire::getMontantCalculeAttribute cote backend (qui fait foi).
-function calculerMontant(f) {
-  const n = (v) => Number(v) || 0;
-  const supp = n(f.nb_heures_supp) * n(f.taux_heure_supp);
-  return f.type_remuneration === "horaire" ? n(f.nb_heures) * n(f.taux_horaire) + supp : n(f.salaire_base) + supp;
-}
-
-function Champ({ label, children }) {
-  return (
-    <label className="block space-y-1.5">
-      <span className="text-xs font-semibold text-slate-600">{label}</span>
-      {children}
-    </label>
-  );
-}
 
 export default function Salaires({ permissions = [] }) {
   const peutGerer = permissions.includes("enseignants.salaires.gerer");
+  const [parametres, setParametres] = useSearchParams();
+  const idUrl = (cle) => (parametres.get(cle) ? Number(parametres.get(cle)) : null);
 
   const [salaires, setSalaires] = useState([]);
   const [enseignants, setEnseignants] = useState([]);
-  const [filtres, setFiltres] = useState({ mois: aujourdHui.getMonth() + 1, annee: ANNEE_COURANTE, enseignant_id: "", statut: "" });
   const [chargement, setChargement] = useState(true);
   const [erreur, setErreur] = useState("");
-  const [succes, setSucces] = useState("");
+  const [toast, setToast] = useState("");
 
-  const [modalOuvert, setModalOuvert] = useState(false);
-  const [form, setForm] = useState(FORMULAIRE_VIDE);
-  const [envoi, setEnvoi] = useState(false);
-  const [erreurForm, setErreurForm] = useState("");
+  const [onglet, setOnglet] = useState(idUrl("enseignant") ? "historique" : "liste");
+  const [filtres, setFiltres] = useState({ mois: aujourdHui.getMonth() + 1, annee: ANNEE_COURANTE, enseignant: "tous", statut: "tous" });
+  const [historique, setHistorique] = useState({ enseignant: idUrl("enseignant"), annee: ANNEE_COURANTE });
+  const [panneau, setPanneau] = useState(null); // { enseignant } quand le panneau est ouvert
+  const [aPayer, setAPayer] = useState(null); // { salaire, moyen }
+  const [paiementEnCours, setPaiementEnCours] = useState(false);
+
+  // Incrementer `rechargement` relance le chargement des salaires (apres ajout, paiement...).
+  const [rechargement, setRechargement] = useState(0);
+  const recharger = () => setRechargement((n) => n + 1);
 
   useEffect(() => {
     api.get("/enseignants")
       .then((res) => setEnseignants(res.data.enseignants || []))
-      .catch(() => setEnseignants([]));
+      .catch(() => setErreur("Impossible de charger les enseignants."));
   }, []);
-
-  // Incrementer `rechargement` relance la requete avec les filtres courants (apres un ajout, paiement...).
-  const [rechargement, setRechargement] = useState(0);
-  const chargerSalaires = () => setRechargement((n) => n + 1);
-  const { mois: filtreMois, annee: filtreAnnee, enseignant_id: filtreEnseignant } = filtres;
 
   useEffect(() => {
     let annule = false;
-    setChargement(true);
-    api.get("/salaires", { params: { mois: filtreMois || undefined, annee: filtreAnnee || undefined, enseignant_id: filtreEnseignant || undefined } })
+    api.get("/salaires")
       .then((res) => { if (!annule) setSalaires(res.data); })
       .catch(() => { if (!annule) setErreur("Impossible de charger les salaires."); })
       .finally(() => { if (!annule) setChargement(false); });
     return () => { annule = true; };
-  }, [filtreMois, filtreAnnee, filtreEnseignant, rechargement]);
+  }, [rechargement]);
 
-  // Le statut est filtre cote client pour que les cartes stats restent calculees sur toute la periode.
-  const salairesAffiches = filtres.statut ? salaires.filter((s) => s.statut === filtres.statut) : salaires;
-  const totalPaye = salaires.filter((s) => s.statut === "paye").reduce((t, s) => t + Number(s.montant_net), 0);
-  const enAttente = salaires.filter((s) => s.statut === "en_attente");
-  const totalEnAttente = enAttente.reduce((t, s) => t + Number(s.montant_net), 0);
-  const totalHeuresSupp = salaires.reduce((t, s) => t + (Number(s.nb_heures_supp) || 0), 0);
+  // ?nouveau=ID : ouvre le panneau une fois les enseignants et salaires charges (pre-remplissage).
+  const nouveauUrl = idUrl("nouveau");
+  useEffect(() => {
+    if (!nouveauUrl || chargement || enseignants.length === 0) return;
+    if (peutGerer) setPanneau({ enseignant: nouveauUrl });
+    setParametres((p) => { p.delete("nouveau"); return p; }, { replace: true });
+  }, [nouveauUrl, chargement, enseignants.length, peutGerer, setParametres]);
 
-  function majFiltre(champ, valeur) {
-    setFiltres((f) => ({ ...f, [champ]: valeur }));
-  }
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(""), 4000);
+    return () => clearTimeout(t);
+  }, [toast]);
 
-  function majForm(champ, valeur) {
-    setForm((f) => ({ ...f, [champ]: valeur }));
-  }
+  // Annees proposees : celles des salaires enregistres, plus l'annee precedente, courante et suivante.
+  const annees = useMemo(
+    () => [...new Set([ANNEE_COURANTE - 1, ANNEE_COURANTE, ANNEE_COURANTE + 1, ...salaires.map((s) => s.annee)])].sort((a, b) => a - b),
+    [salaires]
+  );
 
-  function ouvrirNouveau() {
-    setForm({ ...FORMULAIRE_VIDE, mois: filtres.mois || FORMULAIRE_VIDE.mois, annee: filtres.annee || ANNEE_COURANTE });
-    setErreurForm("");
-    setModalOuvert(true);
-  }
+  // Enseignant affiche dans l'historique : celui choisi, sinon le premier qui a des salaires.
+  const enseignantHistorique =
+    historique.enseignant ?? salaires.find((s) => enseignants.some((e) => e.id === s.enseignant_id))?.enseignant_id ?? enseignants[0]?.id ?? null;
 
-  // Ouvre la fenetre pendant le clic (sinon le navigateur la bloque apres l'appel reseau).
-  async function imprimerFiche(id, fenetrePreouverte) {
-    const fenetre = fenetrePreouverte || ouvrirFenetreVierge();
+  const ouvrirHistorique = (id) => {
+    setHistorique((h) => ({ ...h, enseignant: id, annee: filtres.annee }));
+    setOnglet("historique");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  // `fenetre` doit etre ouverte pendant le clic (sinon le navigateur la bloque apres l'appel reseau).
+  async function imprimerFiche(id, fenetre) {
     if (!fenetre) {
       setErreur(MESSAGE_POPUP_BLOQUE);
       return;
@@ -118,305 +103,209 @@ export default function Salaires({ permissions = [] }) {
     }
   }
 
-  async function enregistrer(payer) {
-    setErreurForm("");
-    if (!form.enseignant_id) {
-      setErreurForm("Choisissez un enseignant.");
-      return;
-    }
+  // Appelee par le panneau ; rejette avec un message affichable en cas d'erreur.
+  async function enregistrer(donnees, payer) {
     const fenetre = payer ? ouvrirFenetreVierge() : null;
-    setEnvoi(true);
+    setErreur("");
     try {
-      const res = await api.post("/salaires", {
-        ...form,
-        salaire_base: form.salaire_base || null,
-        nb_heures: form.nb_heures || null,
-        taux_horaire: form.taux_horaire || null,
-        nb_heures_supp: form.nb_heures_supp || 0,
-        taux_heure_supp: form.taux_heure_supp || null,
-        observation: form.observation || null,
-        payer,
-      });
-      setModalOuvert(false);
-      setSucces(payer ? `Salaire ${res.data.reference} enregistré et payé.` : `Salaire ${res.data.reference} enregistré.`);
-      chargerSalaires();
-      if (payer) {
-        if (fenetre) await imprimerFiche(res.data.id, fenetre);
-        else setErreur(MESSAGE_POPUP_BLOQUE);
-      }
+      const res = await api.post("/salaires", { ...donnees, payer });
+      setPanneau(null);
+      const nom = `${res.data.enseignant?.prenom ?? ""} ${res.data.enseignant?.nom ?? ""}`.trim();
+      setToast(`Salaire ${payer ? "enregistré et payé" : "enregistré"} pour ${nom} (${libellePeriode(res.data)}).`);
+      recharger();
+      if (payer) await imprimerFiche(res.data.id, fenetre);
     } catch (err) {
       fenetre?.close();
-      const erreurs = err.response?.data?.errors;
-      setErreurForm(erreurs ? Object.values(erreurs).flat()[0] : err.response?.data?.message || "Erreur lors de l'enregistrement.");
-    } finally {
-      setEnvoi(false);
+      throw new Error(messageErreur(err, "Erreur lors de l'enregistrement."));
     }
   }
 
-  async function payer(salaire) {
-    if (!window.confirm(`Marquer le salaire de ${salaire.enseignant?.nom} ${salaire.enseignant?.prenom} comme payé (${formaterGNF(salaire.montant_net)}) ?`)) return;
+  async function confirmerPaiement() {
+    const { salaire, moyen } = aPayer;
     const fenetre = ouvrirFenetreVierge();
-    setErreur(""); setSucces("");
+    setPaiementEnCours(true);
+    setErreur("");
     try {
-      await api.post(`/salaires/${salaire.id}/payer`);
-      setSucces(`Salaire ${salaire.reference} payé.`);
-      chargerSalaires();
-      if (fenetre) await imprimerFiche(salaire.id, fenetre);
-      else setErreur(MESSAGE_POPUP_BLOQUE);
+      await api.post(`/salaires/${salaire.id}/payer`, { moyen_paiement: moyen });
+      setAPayer(null);
+      setToast(`Salaire ${salaire.reference} réglé : ${formaterGNF(salaire.montant_net)}.`);
+      recharger();
+      await imprimerFiche(salaire.id, fenetre);
     } catch (err) {
       fenetre?.close();
-      setErreur(err.response?.data?.message || "Erreur lors du paiement.");
+      setAPayer(null);
+      setErreur(messageErreur(err, "Erreur lors du paiement."));
+    } finally {
+      setPaiementEnCours(false);
     }
   }
 
   async function supprimer(salaire) {
-    if (!window.confirm(`Supprimer le salaire ${salaire.reference} ?`)) return;
-    setErreur(""); setSucces("");
+    if (!window.confirm(`Supprimer le salaire ${salaire.reference} (${libellePeriode(salaire)}) ?`)) return;
+    setErreur("");
     try {
       await api.delete(`/salaires/${salaire.id}`);
-      setSucces(`Salaire ${salaire.reference} supprimé.`);
-      chargerSalaires();
+      setToast(`Salaire ${salaire.reference} supprimé.`);
+      recharger();
     } catch (err) {
-      setErreur(err.response?.data?.message || "Erreur lors de la suppression.");
+      setErreur(messageErreur(err, "Erreur lors de la suppression."));
     }
   }
 
-  const montantCalcule = calculerMontant(form);
+  const ouvrirNouveau = (enseignantId = null) => setPanneau({ enseignant: enseignantId ?? (filtres.enseignant === "tous" ? null : filtres.enseignant) });
+  const imprimer = (s) => imprimerFiche(s.id, ouvrirFenetreVierge());
 
   return (
     <div className="space-y-6">
-      <div className="relative overflow-hidden rounded-2xl p-5 sm:p-6 flex flex-wrap items-center gap-4" style={{ background: "linear-gradient(135deg, #0C447C, #1a5a9e)" }}>
-        <div className="absolute -top-8 -right-8 h-32 w-32 rounded-full pointer-events-none" style={{ background: "rgba(255,255,255,0.08)" }} />
-        <div className="absolute -bottom-10 right-16 h-20 w-20 rounded-full pointer-events-none" style={{ background: "rgba(255,255,255,0.06)" }} />
-        <div
-          className="h-14 w-14 rounded-2xl flex items-center justify-center shrink-0 relative z-10"
-          style={{ background: "rgba(255,255,255,0.15)", boxShadow: "0 8px 20px rgba(0,0,0,0.15)" }}
-        >
-          <DollarSign className="h-7 w-7 text-white" />
+      {/* Banniere */}
+      <div className="relative overflow-hidden rounded-2xl p-6 sm:p-8 text-white shadow-xl" style={{ background: "linear-gradient(135deg, #0C447C 0%, #1a6bb5 100%)" }}>
+        <div className="absolute -right-12 -top-12 w-48 h-48 bg-white/5 rounded-full pointer-events-none" />
+        <div className="absolute right-36 -bottom-16 w-64 h-64 bg-white/5 rounded-full pointer-events-none" />
+        <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-5">
+          <div className="flex items-center gap-4 min-w-0">
+            <div className="w-14 h-14 rounded-2xl bg-white/15 flex items-center justify-center text-3xl border border-white/20 shrink-0">💰</div>
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="text-2xl sm:text-3xl font-black tracking-tight">Gestion des Salaires</h1>
+                <span className="text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-white/20 border border-white/25">LAKOLI · Guinée</span>
+              </div>
+              <p className="text-sm text-white/70 mt-1">Rémunérations · Fiches de paie · Historique du corps enseignant</p>
+            </div>
+          </div>
+          {peutGerer && (
+            <button
+              onClick={() => ouvrirNouveau()}
+              className="w-full sm:w-auto px-5 py-3 bg-white text-[#0C447C] hover:bg-slate-50 font-bold rounded-xl text-sm transition-all shadow-lg hover:-translate-y-px flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <Plus className="w-4 h-4 stroke-[3]" />
+              Nouveau salaire
+            </button>
+          )}
         </div>
-        <div className="relative z-10 min-w-0 flex-1">
-          <h1 className="text-xl sm:text-2xl font-extrabold text-white tracking-tight">Gestion des Salaires</h1>
-          <p className="text-xs sm:text-sm text-white/70 mt-1 max-w-2xl">
-            Calculez, payez et imprimez les fiches de paie des enseignants.
-          </p>
-        </div>
-        {peutGerer && (
+      </div>
+
+      {/* Onglets */}
+      <nav className="inline-flex items-center gap-1.5 p-1 bg-white rounded-xl border border-slate-200 text-xs sm:text-sm font-semibold shadow-sm">
+        {[
+          ["liste", "Liste des salaires", FileText],
+          ["historique", "Historique par enseignant", History],
+        ].map(([cle, libelle, Icone]) => (
           <button
-            onClick={ouvrirNouveau}
-            className="relative z-10 inline-flex items-center gap-2 bg-white text-[#0C447C] font-semibold text-sm px-4 py-2.5 rounded-xl shadow-sm hover:bg-blue-50 transition-colors cursor-pointer"
+            key={cle}
+            onClick={() => setOnglet(cle)}
+            className={`flex items-center gap-2 px-3 sm:px-4 py-1.5 rounded-lg transition-all cursor-pointer ${
+              onglet === cle ? "bg-[#0C447C] text-white shadow-sm" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+            }`}
           >
-            <Plus className="h-4 w-4" /> Nouveau salaire
+            <Icone className="w-4 h-4" />
+            {libelle}
           </button>
-        )}
-      </div>
+        ))}
+      </nav>
 
-      <Card className="!p-4">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <Select value={filtres.mois} onChange={(e) => majFiltre("mois", e.target.value)}>
-            <option value="">Tous les mois</option>
-            {MOIS.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
-          </Select>
-          <Select value={filtres.annee} onChange={(e) => majFiltre("annee", e.target.value)}>
-            <option value="">Toutes les années</option>
-            {ANNEES.map((a) => <option key={a} value={a}>{a}</option>)}
-          </Select>
-          <Select value={filtres.enseignant_id} onChange={(e) => majFiltre("enseignant_id", e.target.value)}>
-            <option value="">Tous les enseignants</option>
-            {enseignants.map((e) => <option key={e.id} value={e.id}>{e.nom} {e.prenom}</option>)}
-          </Select>
-          <Select value={filtres.statut} onChange={(e) => majFiltre("statut", e.target.value)}>
-            <option value="">Tous les statuts</option>
-            <option value="paye">Payé</option>
-            <option value="en_attente">En attente</option>
-          </Select>
+      {erreur && (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 flex items-start justify-between gap-3">
+          <span>{erreur}</span>
+          <button onClick={() => setErreur("")} className="text-red-400 hover:text-red-700 cursor-pointer" aria-label="Fermer"><X className="w-4 h-4" /></button>
         </div>
-      </Card>
+      )}
 
-      {erreur && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{erreur}</div>}
-      {succes && <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{succes}</div>}
+      {onglet === "liste" ? (
+        <ListeSalaires
+          salaires={salaires}
+          enseignants={enseignants}
+          chargement={chargement}
+          peutGerer={peutGerer}
+          annees={annees}
+          filtres={filtres}
+          setFiltres={setFiltres}
+          onNouveau={ouvrirNouveau}
+          onFiche={imprimer}
+          onPayer={(s) => setAPayer({ salaire: s, moyen: s.moyen_paiement })}
+          onSupprimer={supprimer}
+          onHistorique={ouvrirHistorique}
+        />
+      ) : (
+        <HistoriqueSalaires
+          salaires={salaires}
+          enseignants={enseignants}
+          enseignantId={enseignantHistorique}
+          setEnseignantId={(id) => setHistorique((h) => ({ ...h, enseignant: id }))}
+          annee={historique.annee}
+          setAnnee={(a) => setHistorique((h) => ({ ...h, annee: a }))}
+          annees={annees}
+          peutGerer={peutGerer}
+          onNouveau={ouvrirNouveau}
+          onFiche={imprimer}
+        />
+      )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard title="Total enseignants" value={enseignants.length} icon={Users} subtitle={`${salaires.length} salaire(s) sur la période`} />
-        <StatCard title="Total payé" value={formaterGNF(totalPaye)} icon={CheckCircle2} subtitle="Sur la période filtrée" />
-        <StatCard title="En attente" value={formaterGNF(totalEnAttente)} icon={Clock} subtitle={`${enAttente.length} salaire(s) à payer`} />
-        <StatCard title="Heures supp" value={`${totalHeuresSupp.toLocaleString("fr-FR")} h`} icon={Timer} subtitle="Sur la période filtrée" />
-      </div>
+      {panneau && (
+        <PanneauNouveauSalaire
+          enseignants={enseignants}
+          salaires={salaires}
+          enseignantInitial={panneau.enseignant}
+          moisInitial={filtres.mois === "tous" ? aujourdHui.getMonth() + 1 : filtres.mois}
+          anneeInitiale={filtres.annee}
+          annees={annees}
+          onFermer={() => setPanneau(null)}
+          onEnregistrer={enregistrer}
+        />
+      )}
 
-      <Card className="!p-0 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider">
-              <tr>
-                <th className="text-left font-semibold px-4 py-3">Enseignant</th>
-                <th className="text-left font-semibold px-4 py-3">Mois / Année</th>
-                <th className="text-left font-semibold px-4 py-3">Type</th>
-                <th className="text-right font-semibold px-4 py-3">Montant net</th>
-                <th className="text-left font-semibold px-4 py-3">Statut</th>
-                <th className="text-right font-semibold px-4 py-3">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {chargement ? (
-                <tr><td colSpan={6} className="px-4 py-10 text-center text-slate-400">Chargement...</td></tr>
-              ) : salairesAffiches.length === 0 ? (
-                <tr><td colSpan={6} className="px-4 py-10 text-center text-slate-400">Aucun salaire pour cette période.</td></tr>
-              ) : (
-                salairesAffiches.map((s) => (
-                  <tr key={s.id} className="hover:bg-slate-50/60">
-                    <td className="px-4 py-3">
-                      <div className="font-semibold text-slate-800">{s.enseignant?.nom} {s.enseignant?.prenom}</div>
-                      <div className="text-xs text-slate-400 font-mono">{s.reference}</div>
-                    </td>
-                    <td className="px-4 py-3 text-slate-600">{MOIS[s.mois - 1]} {s.annee}</td>
-                    <td className="px-4 py-3">
-                      <Badge variant="neutral">{s.type_remuneration === "horaire" ? "Horaire" : "Fixe"}</Badge>
-                    </td>
-                    <td className="px-4 py-3 text-right font-mono font-semibold text-slate-800 whitespace-nowrap">{formaterGNF(s.montant_net)}</td>
-                    <td className="px-4 py-3">
-                      {s.statut === "paye" ? (
-                        <Badge variant="neutral" className="!bg-emerald-50 !text-emerald-700 !border-emerald-200">✓ Payé</Badge>
-                      ) : (
-                        <Badge variant="neutral" className="!bg-amber-50 !text-amber-700 !border-amber-200">En attente</Badge>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center justify-end gap-1">
-                        {peutGerer && s.statut === "en_attente" && (
-                          <Button size="sm" variant="secondary" icon={Banknote} onClick={() => payer(s)}>Payer</Button>
-                        )}
-                        <button
-                          onClick={() => imprimerFiche(s.id)}
-                          title="Imprimer la fiche de paie"
-                          className="p-2 rounded-lg text-slate-500 hover:text-[#0C447C] hover:bg-blue-50 cursor-pointer"
-                        >
-                          <Printer className="h-4 w-4" />
-                        </button>
-                        {peutGerer && s.statut === "en_attente" && (
-                          <button
-                            onClick={() => supprimer(s)}
-                            title="Supprimer"
-                            className="p-2 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 cursor-pointer"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </Card>
-
-      <Modal
-        isOpen={modalOuvert}
-        onClose={() => !envoi && setModalOuvert(false)}
-        title="Nouveau salaire"
-        description="Le montant net est recalculé par le serveur à l'enregistrement."
-        maxWidth="xl"
-        footer={
-          <>
-            <Button variant="ghost" onClick={() => setModalOuvert(false)} disabled={envoi}>Annuler</Button>
-            <Button variant="secondary" onClick={() => enregistrer(false)} disabled={envoi}>Enregistrer</Button>
-            <Button onClick={() => enregistrer(true)} disabled={envoi} icon={Banknote}>Enregistrer et payer</Button>
-          </>
-        }
-      >
-        {erreurForm && <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{erreurForm}</div>}
-
-        <Champ label="Enseignant">
-          <Select className="w-full" value={form.enseignant_id} onChange={(e) => majForm("enseignant_id", e.target.value)}>
-            <option value="">— Choisir un enseignant —</option>
-            {enseignants.map((e) => <option key={e.id} value={e.id}>{e.nom} {e.prenom}{e.matricule ? ` (${e.matricule})` : ""}</option>)}
-          </Select>
-        </Champ>
-
-        <div className="grid grid-cols-2 gap-3">
-          <Champ label="Mois">
-            <Select className="w-full" value={form.mois} onChange={(e) => majForm("mois", Number(e.target.value))}>
-              {MOIS.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
-            </Select>
-          </Champ>
-          <Champ label="Année">
-            <Select className="w-full" value={form.annee} onChange={(e) => majForm("annee", Number(e.target.value))}>
-              {ANNEES.map((a) => <option key={a} value={a}>{a}</option>)}
-            </Select>
-          </Champ>
-        </div>
-
-        <div className="space-y-1.5">
-          <span className="text-xs font-semibold text-slate-600">Type de rémunération</span>
-          <div className="flex gap-2">
-            {[["fixe", "Fixe"], ["horaire", "Horaire"]].map(([valeur, libelle]) => (
-              <label
-                key={valeur}
-                className={`flex-1 flex items-center gap-2 rounded-xl border px-3 py-2.5 text-sm cursor-pointer transition-colors ${
-                  form.type_remuneration === valeur ? "border-[#2563EB] bg-blue-50 text-[#2563EB] font-semibold" : "border-slate-200 text-slate-600"
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="type_remuneration"
-                  value={valeur}
-                  checked={form.type_remuneration === valeur}
-                  onChange={() => majForm("type_remuneration", valeur)}
-                  className="accent-[#2563EB]"
-                />
-                {libelle}
-              </label>
-            ))}
+      {/* Confirmation de paiement */}
+      {aPayer && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-[2px] p-4" onClick={() => !paiementEnCours && setAPayer(null)}>
+          <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl p-6 space-y-5" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0"><Banknote className="w-5 h-5" /></div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900">Régler ce salaire</h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  {aPayer.salaire.enseignant?.prenom} {aPayer.salaire.enseignant?.nom} · {libellePeriode(aPayer.salaire)} · {aPayer.salaire.reference}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center justify-between rounded-xl bg-[#eff6ff] border border-[#0C447C]/20 px-4 py-3">
+              <span className="text-xs font-bold uppercase tracking-wider text-[#0C447C]">Net à payer</span>
+              <span className="text-xl font-black font-mono text-[#0C447C]">{formaterGNF(aPayer.salaire.montant_net)}</span>
+            </div>
+            <div className="space-y-1.5">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Moyen de paiement</span>
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                {Object.entries(MOYENS).map(([cle, m]) => (
+                  <button
+                    key={cle}
+                    type="button"
+                    onClick={() => setAPayer((p) => ({ ...p, moyen: cle }))}
+                    className={`p-2.5 rounded-xl border flex items-center gap-2 font-medium transition-all cursor-pointer ${
+                      aPayer.moyen === cle ? "border-[#0C447C] bg-blue-50/70 text-[#0C447C] font-bold ring-1 ring-[#0C447C]" : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                    }`}
+                  >
+                    <span className="text-base">{m.emoji}</span>
+                    {m.libelle}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <button onClick={() => setAPayer(null)} disabled={paiementEnCours} className="px-4 py-2.5 border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-xl text-sm font-semibold cursor-pointer disabled:opacity-50">
+                Annuler
+              </button>
+              <button onClick={confirmerPaiement} disabled={paiementEnCours} className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-bold cursor-pointer disabled:opacity-50">
+                {paiementEnCours ? "Paiement..." : "Payer et imprimer"}
+              </button>
+            </div>
           </div>
         </div>
+      )}
 
-        {form.type_remuneration === "fixe" ? (
-          <Champ label="Salaire de base (GNF)">
-            <Input type="number" min="0" value={form.salaire_base} onChange={(e) => majForm("salaire_base", e.target.value)} placeholder="Ex. 2 500 000" />
-          </Champ>
-        ) : (
-          <div className="grid grid-cols-2 gap-3">
-            <Champ label="Nombre d'heures">
-              <Input type="number" min="0" step="0.5" value={form.nb_heures} onChange={(e) => majForm("nb_heures", e.target.value)} />
-            </Champ>
-            <Champ label="Taux horaire (GNF)">
-              <Input type="number" min="0" value={form.taux_horaire} onChange={(e) => majForm("taux_horaire", e.target.value)} />
-            </Champ>
-          </div>
-        )}
-
-        <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-3 space-y-2">
-          <div className="text-xs font-semibold text-slate-600">Heures supplémentaires <span className="font-normal text-slate-400">(optionnel)</span></div>
-          <div className="grid grid-cols-2 gap-3">
-            <Champ label="Nb heures supp">
-              <Input type="number" min="0" step="0.5" value={form.nb_heures_supp} onChange={(e) => majForm("nb_heures_supp", e.target.value)} />
-            </Champ>
-            <Champ label="Taux heure supp (GNF)">
-              <Input type="number" min="0" value={form.taux_heure_supp} onChange={(e) => majForm("taux_heure_supp", e.target.value)} />
-            </Champ>
-          </div>
+      {toast && (
+        <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-2xl flex items-center gap-2.5 text-xs sm:text-sm border border-slate-700">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+          <span>{toast}</span>
         </div>
-
-        <div className="flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
-          <span className="text-xs font-bold uppercase tracking-wider text-emerald-700">Montant net</span>
-          <span className="text-xl font-extrabold font-mono text-emerald-700">{formaterGNF(montantCalcule)}</span>
-        </div>
-
-        <Champ label="Moyen de paiement">
-          <Select className="w-full" value={form.moyen_paiement} onChange={(e) => majForm("moyen_paiement", e.target.value)}>
-            {Object.entries(MOYENS_PAIEMENT).map(([valeur, libelle]) => <option key={valeur} value={valeur}>{libelle}</option>)}
-          </Select>
-        </Champ>
-
-        <Champ label="Observation (optionnel)">
-          <textarea
-            rows={2}
-            value={form.observation}
-            onChange={(e) => majForm("observation", e.target.value)}
-            className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:outline-none focus:border-[#2563EB] focus:ring-1 focus:ring-[#2563EB]"
-          />
-        </Champ>
-      </Modal>
+      )}
     </div>
   );
 }

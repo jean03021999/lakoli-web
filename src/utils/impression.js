@@ -1388,169 +1388,227 @@ export const MOIS = [
   "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre",
 ];
 
-const POSTES_CONTRAT = { cdi: "Enseignant (CDI)", cdd: "Enseignant (CDD)", vacataire: "Enseignant vacataire" };
+const CONTRATS_FICHE = {
+  cdi: { libelle: "CDI", fond: "#dbeafe", texte: "#1d4ed8", detail: "Rémunération forfaitaire convenue au contrat (CDI)" },
+  cdd: { libelle: "CDD", fond: "#fef9c3", texte: "#a16207", detail: "Rémunération forfaitaire convenue au contrat (CDD)" },
+  vacataire: { libelle: "Vacataire", fond: "#f3e8ff", texte: "#7c3aed", detail: "Rémunération de vacation" },
+};
+const MOYENS_FICHE = {
+  especes: "💵 Espèces en caisse",
+  mobile_money: "📱 Mobile Money",
+  virement: "🏦 Virement bancaire",
+  cheque: "📝 Chèque",
+};
 
-// "6ème A (Maths, Physique)" — une entree par classe, avec les matieres enseignees.
-function classesEnseignees(affectations) {
-  const parClasse = new Map();
+// Classes enseignees (une fois chacune) et matieres, deduites des affectations.
+function classesEtMatieres(affectations) {
+  const classes = new Set();
+  const matieres = new Set();
   for (const a of affectations || []) {
-    const classe = a.classe?.nom;
-    if (!classe) continue;
-    if (!parClasse.has(classe)) parClasse.set(classe, new Set());
-    if (a.matiere?.nom) parClasse.get(classe).add(a.matiere.nom);
+    if (a.classe?.nom) classes.add(a.classe.nom);
+    if (a.matiere?.nom) matieres.add(a.matiere.nom);
   }
-  return [...parClasse].map(([classe, matieres]) => (matieres.size ? `${classe} (${[...matieres].join(", ")})` : classe));
+  return { classes: [...classes], matieres: [...matieres] };
 }
 
 // `salaire` : reponse de GET /salaires/{id} (avec enseignant.contrat_actif, enseignant.affectations
-// .classe/.matiere et etablissement). Retourne false si la fenetre est bloquee.
+// .classe/.matiere, etablissement et caissier). Design "Gestion des salaires" : en-tete bleu,
+// paves enseignant / remuneration / reglement, double signature. Retourne false si la fenetre
+// est bloquee.
 export function genererEtImprimerFichePaie(salaire, fenetrePreouverte) {
   const fenetre = fenetrePreouverte || window.open("", "_blank");
   if (!fenetre) return false;
 
   const ens = salaire.enseignant || {};
-  const classes = classesEnseignees(ens.affectations);
-  const poste = POSTES_CONTRAT[ens.contrat_actif?.type] || "Enseignant";
+  const { classes, matieres } = classesEtMatieres(ens.affectations);
+  const contrat = CONTRATS_FICHE[ens.contrat_actif?.type];
+  const poste = matieres.length ? `Professeur de ${matieres.join(", ")}` : "Enseignant";
   const periode = `${MOIS[salaire.mois - 1] || ""} ${salaire.annee}`;
+  const nomComplet = `${ens.prenom ?? ""} ${ens.nom ?? ""}`.trim();
   const heuresSupp = Number(salaire.nb_heures_supp) || 0;
+  const montantSupp = heuresSupp * (Number(salaire.taux_heure_supp) || 0);
+  const estHoraire = salaire.type_remuneration === "horaire";
+  const montantBase = estHoraire ? Number(salaire.nb_heures) * Number(salaire.taux_horaire) : Number(salaire.salaire_base);
   const estPaye = salaire.statut === "paye";
 
-  const ligneBase = salaire.type_remuneration === "horaire"
-    ? `<div class="ligne"><span>Heures effectuées : ${Number(salaire.nb_heures)} h × ${formaterMontant(salaire.taux_horaire)} GNF</span><span class="mt">${formaterMontant(Number(salaire.nb_heures) * Number(salaire.taux_horaire))} GNF</span></div>`
-    : `<div class="ligne"><span>Salaire de base</span><span class="mt">${formaterMontant(salaire.salaire_base)} GNF</span></div>`;
-  const ligneSupp = heuresSupp > 0
-    ? `<div class="ligne"><span>Heures supplémentaires : ${heuresSupp} h × ${formaterMontant(salaire.taux_heure_supp)} GNF</span><span class="mt">${formaterMontant(heuresSupp * Number(salaire.taux_heure_supp))} GNF</span></div>`
+  const ligneBase = estHoraire
+    ? `<div class="ligne"><div><div class="ligne-titre">Heures d'enseignement</div><div class="ligne-detail mono">${Number(salaire.nb_heures)} h × ${formaterMontant(salaire.taux_horaire)} GNF / heure</div></div><div class="mt">${formaterMontant(montantBase)} GNF</div></div>`
+    : `<div class="ligne"><div><div class="ligne-titre">Salaire de base mensuel</div><div class="ligne-detail">${echapperHtml(contrat?.detail || "Rémunération mensuelle fixe")}</div></div><div class="mt">${formaterMontant(montantBase)} GNF</div></div>`;
+  const ligneSupp = montantSupp > 0
+    ? `<div class="pointille"></div><div class="ligne supp"><div><div class="ligne-titre">⚡ Heures supplémentaires</div><div class="ligne-detail mono">${heuresSupp} h × ${formaterMontant(salaire.taux_heure_supp)} GNF / heure</div></div><div class="mt">+ ${formaterMontant(montantSupp)} GNF</div></div>`
     : "";
 
   const html = `<!DOCTYPE html>
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <title>Fiche de paie ${echapperHtml(ens.nom)} ${echapperHtml(ens.prenom)} - ${echapperHtml(periode)}</title>
+  <title>Fiche de paie ${echapperHtml(nomComplet)} - ${echapperHtml(periode)}</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 12px; color: #1e293b; background: #f8fafc; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    .doc { max-width: 680px; margin: 20px auto; background: white; box-shadow: 0 4px 24px rgba(0,0,0,0.12); }
-    .bande-top { height: 4px; background: linear-gradient(90deg, #0C447C 0%, #10b981 100%); }
-    .header { background: linear-gradient(135deg, #0C447C 0%, #1a6bb5 100%); color: white; padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; }
-    .header-left { display: flex; align-items: center; gap: 10px; }
-    .header-icon { width: 48px; height: 48px; background: linear-gradient(135deg, rgba(255,255,255,0.30), rgba(255,255,255,0.08)); border: 1px solid rgba(255,255,255,0.25); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 24px; }
-    .header-title { font-size: 22px; font-weight: 800; letter-spacing: 2px; }
-    .header-sub { font-size: 11px; opacity: 0.7; margin-top: 2px; }
-    .header-right { text-align: right; }
-    .doc-titre { font-size: 18px; font-weight: 700; letter-spacing: 1.5px; }
-    .doc-num { display: inline-block; margin-top: 6px; font-family: monospace; font-size: 12px; background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.25); padding: 2px 10px; border-radius: 12px; }
-    .section { padding: 14px 20px; border-bottom: 1px solid #f1f5f9; }
-    .section-title { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: #94a3b8; margin-bottom: 8px; }
-    .grille { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0; }
-    .grille.simple { background: none; border: none; padding: 0; }
-    .item label { font-size: 10px; color: #94a3b8; display: block; margin-bottom: 2px; font-weight: 500; }
-    .item span { font-size: 13px; font-weight: 600; }
-    .item.large { grid-column: 1 / -1; }
-    .ligne { display: flex; justify-content: space-between; align-items: center; padding: 7px 0; border-bottom: 1px dashed #e2e8f0; font-size: 13px; color: #334155; }
-    .mt { font-family: monospace; font-weight: 700; font-size: 14px; color: #1e293b; white-space: nowrap; margin-left: 12px; }
-    .separateur { border-top: 2px solid #1e293b; margin-top: 4px; }
-    .total { margin-top: 12px; background: linear-gradient(135deg, #f0fdf4, #dcfce7); border: 1px solid #86efac; border-radius: 10px; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; }
-    .total-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #15803d; }
-    .total-montant { font-size: 24px; font-weight: 800; color: #15803d; font-family: monospace; }
-    .statut { display: inline-block; padding: 2px 10px; border-radius: 10px; font-size: 11px; font-weight: 700; }
-    .statut.paye { background: #dcfce7; color: #15803d; }
-    .statut.attente { background: #fef9c3; color: #a16207; }
-    .obs { margin-top: 8px; font-size: 11px; color: #64748b; font-style: italic; }
-    .signature-zone { display: flex; justify-content: space-between; gap: 20px; padding: 12px 20px 0; }
-    .signature-box { text-align: center; padding-top: 36px; }
-    .signature-line { border-top: 1.5px dashed #94a3b8; width: 200px; padding-top: 4px; font-size: 10px; color: #64748b; }
-    .footer { background: #f8fafc; padding: 10px 20px; display: flex; align-items: center; gap: 12px; border-top: 1px solid #e2e8f0; margin-top: 16px; }
-    .qr-code { width: 80px; height: 80px; flex-shrink: 0; }
+    body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 12px; color: #1e293b; background: #f1f5f9; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .doc { max-width: 760px; margin: 20px auto; background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 40px rgba(0,0,0,0.15); border: 1px solid #e2e8f0; }
+    .mono { font-family: Consolas, 'Courier New', monospace; }
+    .header { position: relative; background: #0C447C; color: white; padding: 24px 28px 22px; display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+    .header::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 4px; background: linear-gradient(to right, #0C447C, #10b981); }
+    .marque { display: flex; align-items: center; gap: 12px; }
+    .logo { width: 48px; height: 48px; border-radius: 12px; background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; font-size: 24px; }
+    .marque-nom { font-size: 22px; font-weight: 900; letter-spacing: -0.5px; display: flex; align-items: center; gap: 8px; }
+    .marque-tag { font-size: 10px; text-transform: uppercase; font-weight: 700; padding: 2px 8px; border-radius: 4px; background: rgba(16,185,129,0.2); color: #6ee7b7; border: 1px solid rgba(52,211,153,0.3); }
+    .marque-sous { font-size: 11px; color: rgba(255,255,255,0.75); margin-top: 2px; }
+    .titre { text-align: right; }
+    .titre-sur { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: #bfdbfe; }
+    .titre-doc { font-size: 22px; font-weight: 900; letter-spacing: -0.3px; }
+    .titre-num { display: inline-block; margin-top: 4px; font-size: 11px; padding: 2px 10px; border-radius: 4px; background: rgba(255,255,255,0.2); font-weight: 600; }
+    .corps { padding: 24px 28px; }
+    .pave { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 18px; margin-bottom: 22px; }
+    .grille { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .etiquette { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: #94a3b8; }
+    .valeur { font-size: 15px; font-weight: 700; color: #0f172a; margin-top: 2px; }
+    .petit { font-size: 11px; color: #64748b; margin-top: 2px; }
+    .badge { display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 10px; border-radius: 999px; margin-left: 6px; vertical-align: middle; }
+    .periode { display: inline-block; margin-top: 4px; padding: 4px 12px; border-radius: 8px; background: #0C447C; color: white; font-size: 13px; font-weight: 700; }
+    .puces { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+    .puce { padding: 2px 8px; border-radius: 6px; background: white; border: 1px solid #e2e8f0; font-size: 11px; font-weight: 500; color: #334155; }
+    .section-titre { display: flex; justify-content: space-between; align-items: center; padding-bottom: 8px; border-bottom: 1px solid #e2e8f0; margin-bottom: 14px; }
+    .section-titre h2 { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #0C447C; }
+    .section-titre span { font-size: 11px; color: #94a3b8; }
+    .ligne { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 6px 12px; border-radius: 8px; }
+    .ligne-titre { font-size: 13px; font-weight: 600; color: #1e293b; }
+    .ligne-detail { font-size: 11px; color: #64748b; margin-top: 1px; }
+    .mt { font-family: Consolas, 'Courier New', monospace; font-size: 14px; font-weight: 700; color: #0f172a; white-space: nowrap; }
+    .pointille { border-top: 1px dashed #cbd5e1; margin: 8px 0; }
+    .ligne.supp { background: #ecfdf5; border: 1px solid #d1fae5; padding: 8px 12px; }
+    .ligne.supp .ligne-titre { color: #065f46; }
+    .ligne.supp .ligne-detail { color: #047857; }
+    .ligne.supp .mt { color: #047857; }
+    .separateur { border-top: 2px solid #e2e8f0; margin: 12px 0; }
+    .total { background: #ecfdf5; border: 2px solid #a7f3d0; border-radius: 12px; padding: 14px 16px; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+    .total-libelle { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #065f46; }
+    .total-montant { font-family: Consolas, 'Courier New', monospace; font-size: 28px; font-weight: 800; color: #047857; margin-top: 2px; }
+    .statut { display: inline-block; padding: 6px 12px; border-radius: 999px; font-size: 11px; font-weight: 700; white-space: nowrap; }
+    .statut.paye { background: #dcfce7; color: #15803d; border: 1px solid #86efac; }
+    .statut.attente { background: #fef9c3; color: #a16207; border: 1px solid #fcd34d; }
+    .lettres { margin-top: 8px; font-size: 11px; color: #64748b; font-style: italic; }
+    .reglement { margin-top: 22px; }
+    .reglement h2 { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #0C447C; margin-bottom: 12px; }
+    .reglement .etiquette { text-transform: none; letter-spacing: 0; font-size: 11px; font-weight: 500; }
+    .reglement .valeur { font-size: 13px; font-weight: 600; color: #1e293b; }
+    .obs { grid-column: 1 / -1; padding-top: 8px; border-top: 1px solid #e2e8f0; }
+    .obs p { font-style: italic; color: #334155; margin-top: 2px; }
+    .signatures { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; text-align: center; }
+    .signature { border: 1px dashed #cbd5e1; border-radius: 12px; padding: 14px; min-height: 120px; display: flex; flex-direction: column; justify-content: space-between; }
+    .signature-titre { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #475569; }
+    .signature-mention { font-size: 11px; color: #94a3b8; font-style: italic; }
+    .signature-nom { font-size: 11px; font-weight: 600; color: #1e293b; border-top: 1px solid #cbd5e1; padding-top: 6px; }
+    .pied { margin-top: 22px; padding-top: 14px; border-top: 1px solid #e2e8f0; display: flex; align-items: center; gap: 14px; }
+    .qr-code { width: 76px; height: 76px; flex-shrink: 0; }
     .qr-code svg { display: block; }
-    .footer-texte { flex: 1; text-align: center; padding-right: 92px; }
-    .footer p { font-size: 10px; color: #94a3b8; line-height: 1.6; }
-    .btn-group { display: flex; gap: 10px; justify-content: center; padding: 11px; border-top: 1px solid #e2e8f0; }
-    .btn { padding: 6px 15px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; border: none; }
+    .pied-texte { flex: 1; display: flex; justify-content: space-between; gap: 12px; font-size: 10px; color: #94a3b8; }
+    .btn-group { display: flex; gap: 10px; justify-content: center; padding: 12px; border-top: 1px solid #e2e8f0; background: #f8fafc; }
+    .btn { padding: 7px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; border: none; }
     .btn-print { background: #0C447C; color: white; }
     .btn-close { background: #e2e8f0; color: #475569; }
     @media print {
       body { background: white; }
-      .doc { box-shadow: none; margin: 0; max-width: none; }
+      .doc { box-shadow: none; margin: 0; max-width: none; border-radius: 0; border: none; }
       .btn-group { display: none !important; }
-      @page { margin: 8mm; size: A4; }
+      @page { size: A4 portrait; margin: 10mm; }
     }
   </style>
 </head>
 <body>
 <div class="doc">
-  <div class="bande-top"></div>
   <div class="header">
-    <div class="header-left">
-      <div class="header-icon">🎓</div>
+    <div class="marque">
+      <div class="logo">🎓</div>
       <div>
-        <div class="header-title">LAKOLI</div>
-        <div class="header-sub">${echapperHtml(salaire.etablissement?.nom || "Gestion Scolaire · Guinée")}</div>
+        <div class="marque-nom">LAKOLI <span class="marque-tag">Scolaire</span></div>
+        <div class="marque-sous">${echapperHtml(salaire.etablissement?.nom || "Gestion scolaire · République de Guinée")}</div>
       </div>
     </div>
-    <div class="header-right">
-      <div class="doc-titre">FICHE DE PAIE</div>
-      <div class="doc-num">N° ${echapperHtml(salaire.reference)}</div>
+    <div class="titre">
+      <div class="titre-sur">Rémunération du personnel</div>
+      <div class="titre-doc">FICHE DE PAIE</div>
+      <div class="titre-num mono">N° ${echapperHtml(salaire.reference)}</div>
     </div>
   </div>
 
-  <div class="section">
-    <div class="section-title">👤 Enseignant</div>
-    <div class="grille">
-      <div class="item"><label>Nom complet</label><span>${echapperHtml(ens.nom)} ${echapperHtml(ens.prenom)}</span></div>
-      <div class="item"><label>Matricule</label><span>${echapperHtml(ens.matricule || "—")}</span></div>
-      <div class="item"><label>Poste</label><span>${echapperHtml(poste)}</span></div>
-      <div class="item"><label>Période</label><span>${echapperHtml(periode)}</span></div>
-      <div class="item large"><label>Classes enseignées</label><span>${classes.length ? classes.map(echapperHtml).join(" · ") : "—"}</span></div>
+  <div class="corps">
+    <div class="pave grille">
+      <div>
+        <div class="etiquette">Nom & prénom de l'enseignant</div>
+        <div class="valeur">${echapperHtml(nomComplet)}</div>
+        <div class="petit">Matricule : <span class="mono">${echapperHtml(ens.matricule || "—")}</span></div>
+      </div>
+      <div>
+        <div class="etiquette">Poste & statut contractuel</div>
+        <div class="valeur">${echapperHtml(poste)}${contrat ? `<span class="badge" style="background:${contrat.fond};color:${contrat.texte}">${contrat.libelle}</span>` : ""}</div>
+      </div>
+      <div>
+        <div class="etiquette">Période concernée</div>
+        <div><span class="periode">📅 ${echapperHtml(periode)}</span></div>
+      </div>
+      <div>
+        <div class="etiquette">Classes assignées</div>
+        <div class="puces">${classes.length ? classes.map((c) => `<span class="puce">${echapperHtml(c)}</span>`).join("") : `<span class="petit">—</span>`}</div>
+      </div>
     </div>
-  </div>
 
-  <div class="section">
-    <div class="section-title">💰 Rémunération</div>
+    <div class="section-titre"><h2>Détail de la rémunération</h2><span class="mono">Devise : Franc guinéen (GNF)</span></div>
     ${ligneBase}
     ${ligneSupp}
     <div class="separateur"></div>
     <div class="total">
-      <span class="total-label">Total net à payer</span>
-      <span class="total-montant">${formaterMontant(salaire.montant_net)} GNF</span>
+      <div>
+        <div class="total-libelle">Total net à payer</div>
+        <div class="total-montant">${formaterMontant(salaire.montant_net)} GNF</div>
+      </div>
+      <span class="statut ${estPaye ? "paye" : "attente"}">${estPaye ? "✓ PAYÉ EN INTÉGRALITÉ" : "⏳ EN ATTENTE DE PAIEMENT"}</span>
     </div>
-    <div class="obs">Arrêtée la présente fiche à la somme de ${echapperHtml(montantEnLettres(salaire.montant_net))}.</div>
-  </div>
+    <div class="lettres">Arrêtée la présente fiche à la somme de ${echapperHtml(montantEnLettres(salaire.montant_net))}.</div>
 
-  <div class="section">
-    <div class="section-title">🧾 Règlement</div>
-    <div class="grille simple">
-      <div class="item"><label>Moyen de paiement</label><span>${echapperHtml(MOYENS_PAIEMENT[salaire.moyen_paiement] || salaire.moyen_paiement)}</span></div>
-      <div class="item"><label>Référence</label><span>${echapperHtml(salaire.reference)}</span></div>
-      <div class="item"><label>Date de paiement</label><span>${estPaye ? formaterDate(salaire.date_paiement) : "—"}</span></div>
-      <div class="item"><label>Mois concerné</label><span>${echapperHtml(periode)}</span></div>
-      <div class="item"><label>Statut</label><span><span class="statut ${estPaye ? "paye" : "attente"}">${estPaye ? "✓ Payé" : "En attente"}</span></span></div>
+    <div class="pave reglement">
+      <h2>Modalités de règlement</h2>
+      <div class="grille">
+        <div><div class="etiquette">Moyen de paiement</div><div class="valeur">${echapperHtml(MOYENS_FICHE[salaire.moyen_paiement] || salaire.moyen_paiement)}</div></div>
+        <div><div class="etiquette">Référence d'enregistrement</div><div class="valeur mono">${echapperHtml(salaire.reference)}</div></div>
+        <div><div class="etiquette">Date effective de versement</div><div class="valeur">${estPaye ? formaterDate(salaire.date_paiement) : "En attente de décaissement"}</div></div>
+        <div><div class="etiquette">Caissier / responsable</div><div class="valeur">${echapperHtml(salaire.caissier?.name || "—")}</div></div>
+        ${salaire.observation ? `<div class="obs"><div class="etiquette">Observation</div><p>${echapperHtml(salaire.observation)}</p></div>` : ""}
+      </div>
     </div>
-    ${salaire.observation ? `<div class="obs">Observation : ${echapperHtml(salaire.observation)}</div>` : ""}
-  </div>
 
-  <div class="signature-zone">
-    <div class="signature-box"><div class="signature-line">Signature de l'enseignant</div></div>
-    <div class="signature-box"><div class="signature-line">Signature et cachet du directeur</div></div>
-  </div>
+    <div class="signatures">
+      <div class="signature">
+        <div class="signature-titre">Signature de l'enseignant</div>
+        <div class="signature-mention">« Pour acquit »</div>
+        <div class="signature-nom">${echapperHtml(nomComplet)}</div>
+      </div>
+      <div class="signature">
+        <div class="signature-titre">Signature du directeur & cachet</div>
+        <div class="signature-mention">&nbsp;</div>
+        <div class="signature-nom">La Direction</div>
+      </div>
+    </div>
 
-  <div class="footer">
-    <div class="qr-code">${qrCodeSvg([
-      "LAKOLI - Fiche de paie",
-      `Réf : ${salaire.reference}`,
-      `Enseignant : ${ens.nom ?? ""} ${ens.prenom ?? ""}${ens.matricule ? ` (${ens.matricule})` : ""}`,
-      `Période : ${periode}`,
-      `Net à payer : ${montantTexte(salaire.montant_net)} GNF`,
-      `Statut : ${estPaye ? `Payé le ${formaterDate(salaire.date_paiement)}` : "En attente"}`,
-    ].join("\n"), 80)}</div>
-    <div class="footer-texte">
-      <p>Document officiel LAKOLI · Certifié conforme aux normes scolaires de la République de Guinée</p>
-      <p>Imprimé le ${echapperHtml(dateImpression())}</p>
+    <div class="pied">
+      <div class="qr-code">${qrCodeSvg([
+        "LAKOLI - Fiche de paie",
+        `Réf : ${salaire.reference}`,
+        `Enseignant : ${nomComplet}${ens.matricule ? ` (${ens.matricule})` : ""}`,
+        `Période : ${periode}`,
+        `Net à payer : ${montantTexte(salaire.montant_net)} GNF`,
+        `Statut : ${estPaye ? `Payé le ${formaterDate(salaire.date_paiement)}` : "En attente"}`,
+      ].join("\n"), 76)}</div>
+      <div class="pied-texte">
+        <span>Document officiel LAKOLI · Fiche de paie · République de Guinée</span>
+        <span class="mono">Édité le ${echapperHtml(dateImpression())}</span>
+      </div>
     </div>
   </div>
 
   <div class="btn-group">
-    <button class="btn btn-print" onclick="window.print()">🖨️ Imprimer</button>
+    <button class="btn btn-print" onclick="window.print()">🖨️ Imprimer (A4)</button>
     <button class="btn btn-close" onclick="window.close()">✕ Fermer</button>
   </div>
 </div>
