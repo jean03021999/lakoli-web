@@ -92,6 +92,13 @@ function initiales(nom) {
 // Contenu de la barre laterale (design Google AI Studio), commun au bureau et au tiroir mobile :
 // logo + drapeau guineen, etablissement/session reels, modules visibles selon les permissions,
 // carte utilisateur et deconnexion.
+// Fond de la barre laterale : photo de salle de classe sous un voile bleu (lisibilite du menu).
+const FOND_SIDEBAR = {
+  backgroundImage: "linear-gradient(180deg, rgba(12,68,124,0.88) 0%, rgba(10,45,90,0.95) 100%), url('/images/login-bg.jpeg')",
+  backgroundSize: "cover",
+  backgroundPosition: "center",
+};
+
 function ContenuSidebar({ modules, estActif, onNaviguer, etablissement, session, nomUtilisateur, libelleRole, enLigne, onDeconnexion }) {
   return (
     <div className="h-full flex flex-col">
@@ -273,7 +280,7 @@ export default function Layout({ children, role, permissions = [], etablissement
         {/* Sidebar (fixe, pleine hauteur jusqu'au logo, ne défile pas) */}
         <aside
           className="w-60 shrink-0 hidden md:block h-full"
-          style={{ background: "linear-gradient(180deg, #0C447C 0%, #0a2d5a 100%)" }}
+          style={FOND_SIDEBAR}
         >
           <ContenuSidebar
             modules={modulesVisibles}
@@ -487,7 +494,7 @@ export default function Layout({ children, role, permissions = [], etablissement
           />
           <div
             className="absolute inset-y-0 left-0 w-72 max-w-[80%] shadow-2xl"
-            style={{ background: "linear-gradient(180deg, #0C447C 0%, #0a2d5a 100%)" }}
+            style={FOND_SIDEBAR}
           >
             <button
               onClick={() => setMenuMobileOuvert(false)}
