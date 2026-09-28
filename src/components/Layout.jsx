@@ -94,7 +94,7 @@ function initiales(nom) {
 // carte utilisateur et deconnexion.
 // Fond de la barre laterale : photo de salle de classe sous un voile bleu (lisibilite du menu).
 const FOND_SIDEBAR = {
-  backgroundImage: "linear-gradient(180deg, rgba(12,68,124,0.88) 0%, rgba(10,45,90,0.95) 100%), url('/images/login-bg.jpeg')",
+  backgroundImage: "linear-gradient(180deg, rgba(12,68,124,0.75) 0%, rgba(10,45,90,0.85) 100%), url('/images/login-bg.jpeg')",
   backgroundSize: "cover",
   backgroundPosition: "center",
 };
