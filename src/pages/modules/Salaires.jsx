@@ -158,7 +158,9 @@ export default function Salaires({ permissions = [] }) {
   return (
     <div className="space-y-6">
       {/* Banniere */}
-      <div className="relative overflow-hidden rounded-2xl p-6 sm:p-8 text-white shadow-xl" style={{ background: "linear-gradient(135deg, #0C447C 0%, #1a6bb5 100%)" }}>
+      <div className="relative overflow-hidden rounded-2xl p-6 sm:p-8 text-white shadow-xl bg-cover bg-center" style={{ backgroundImage: "url('/images/login-bg.jpeg')" }}>
+        {/* Voile degrade pour la lisibilite du texte sur la photo */}
+        <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(135deg, rgba(12,68,124,0.92) 0%, rgba(26,107,181,0.72) 100%)" }} />
         <div className="absolute -right-12 -top-12 w-48 h-48 bg-white/5 rounded-full pointer-events-none" />
         <div className="absolute right-36 -bottom-16 w-64 h-64 bg-white/5 rounded-full pointer-events-none" />
         <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-5">
