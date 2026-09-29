@@ -8,6 +8,11 @@ const api = axios.create({
 });
 
 api.interceptors.request.use((config) => {
+  // Envoi de fichier : sans cela, l'en-tete JSON par defaut fait convertir le FormData en JSON par
+  // axios et le fichier est perdu. Le navigateur pose lui-meme multipart/form-data avec sa limite.
+  if (config.data instanceof FormData) {
+    config.headers.delete("Content-Type");
+  }
   const token = localStorage.getItem("auth_token");
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
