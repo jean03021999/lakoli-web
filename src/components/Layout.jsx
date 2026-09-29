@@ -337,7 +337,8 @@ export default function Layout({ children, role, permissions = [], etablissement
 
   return (
     <div className="h-screen overflow-hidden bg-[#F8FAFC] text-slate-800 flex font-sans selection:bg-[#0C447C] selection:text-white">
-      <div className="flex flex-1 min-h-0 w-full max-w-7xl mx-auto">
+      {/* 1600 px max (barre laterale comprise) : les maquettes prevoient ~1200 px pour le contenu seul. */}
+      <div className="flex flex-1 min-h-0 w-full max-w-[1600px] mx-auto">
         {/* Sidebar (fixe, pleine hauteur jusqu'au logo, ne défile pas) */}
         <aside
           className="w-60 shrink-0 hidden md:block h-full"

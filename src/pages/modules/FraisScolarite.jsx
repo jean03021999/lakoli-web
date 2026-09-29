@@ -616,9 +616,9 @@ export default function FraisScolarite({ permissions = [], etablissement = null 
                     <span className={`w-9 h-9 rounded-xl ${c.fond} flex items-center justify-center ${c.couleur} transition-transform group-hover:scale-105`}>
                       <c.icone className="w-5 h-5" />
                     </span>
-                    <span className="font-mono text-xs text-slate-400 font-medium tabular-nums">{classeId ? `${pct}%` : ""}</span>
+                    <span className="font-mono text-xs text-slate-400 font-medium tabular-nums">{classeId && !chargementEleves ? `${pct}%` : ""}</span>
                   </div>
-                  <div className="text-2xl font-black text-slate-900 font-mono tracking-tight tabular-nums mb-0.5">{classeId ? valeur : "—"}</div>
+                  <div className="text-2xl font-black text-slate-900 font-mono tracking-tight tabular-nums mb-0.5">{classeId && !chargementEleves ? valeur : "—"}</div>
                   <div className="text-xs font-semibold text-slate-700 truncate">{c.libelle}</div>
                   <div className="text-[11px] text-slate-400 truncate mt-0.5">{c.detail}</div>
                 </button>
@@ -626,9 +626,10 @@ export default function FraisScolarite({ permissions = [], etablissement = null 
             })}
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-10 gap-6 items-start">
+          {/* Liste plus large que dans la maquette (3/10) : ici la barre laterale prend deja 240 px. */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
             {/* Liste des eleves */}
-            <div className="lg:col-span-3 bg-white p-4 flex flex-col lg:h-[78vh] border border-slate-100/80" style={STYLE_CARTE}>
+            <div className="lg:col-span-5 xl:col-span-4 bg-white p-4 flex flex-col lg:h-[78vh] border border-slate-100/80" style={STYLE_CARTE}>
               <div className="space-y-3 pb-3.5 border-b border-slate-100 shrink-0">
                 <div className="flex items-center justify-between gap-2">
                   <select
@@ -726,7 +727,7 @@ export default function FraisScolarite({ permissions = [], etablissement = null 
                               {e.nom} {e.prenom}
                             </div>
                             <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
-                              <span className="font-mono text-[10px] text-slate-500 font-semibold">{e.matricule}</span>
+                              <span className="font-mono text-[10px] text-slate-500 font-semibold whitespace-nowrap">{e.matricule}</span>
                               {classeId === "tous" && e.classe && (
                                 <>
                                   <span className="text-[10px] text-slate-400">·</span>
@@ -747,7 +748,7 @@ export default function FraisScolarite({ permissions = [], etablissement = null 
             </div>
 
             {/* Detail de l'eleve */}
-            <div className="lg:col-span-7 space-y-6">
+            <div className="lg:col-span-7 xl:col-span-8 space-y-6">
               {!eleveInfos && (
                 <div className="bg-white p-12 flex flex-col items-center justify-center text-center lg:h-[78vh] border border-slate-100/80" style={STYLE_CARTE}>
                   <div className="w-16 h-16 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center text-[#0C447C] mb-4">

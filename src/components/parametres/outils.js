@@ -70,8 +70,8 @@ export const EVENEMENT_APPARENCE = "lakoli:apparence";
 export const FOND_PAR_DEFAUT = "min-gris-lakoli";
 
 export const POLICES = {
-  systeme: { libelle: "Système (défaut)", famille: "", description: "Police native de l'appareil, la plus rapide à afficher" },
-  Inter: { libelle: "Inter", famille: "'Inter', sans-serif", description: "Optimisée pour la lisibilité sur écrans administratifs" },
+  // "systeme" = police par defaut de l'application (Inter, celle des designs LAKOLI).
+  systeme: { libelle: "Inter (défaut)", famille: "", description: "Police des designs LAKOLI, optimisée pour les écrans administratifs" },
   Roboto: { libelle: "Roboto", famille: "'Roboto', sans-serif", description: "Classique, sobre et géométrique" },
   Poppins: { libelle: "Poppins", famille: "'Poppins', sans-serif", description: "Chaleureuse, aux formes rondes" },
 };
