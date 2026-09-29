@@ -262,9 +262,13 @@ export default function EnTete({ etablissement, session, utilisateur, libelleRol
 
             {etablissement?.nom && (
               <div className="flex items-center gap-1.5 min-w-0">
-                <div className="hidden sm:flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-[#eff6ff] text-[#0C447C]">
-                  <Building2 className="h-3.5 w-3.5" />
-                </div>
+                {etablissement.logo_url ? (
+                  <img src={etablissement.logo_url} alt="" className="h-8 w-8 shrink-0 rounded-md object-contain border border-[#e2e8f0] bg-white" />
+                ) : (
+                  <div className="hidden sm:flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-[#eff6ff] text-[#0C447C]">
+                    <Building2 className="h-3.5 w-3.5" />
+                  </div>
+                )}
                 <div className="flex items-center gap-1.5 min-w-0">
                   <span className="text-[12px] sm:text-[13px] font-semibold text-[#1e293b] truncate">{etablissement.nom}</span>
                   {etablissement.ville && (

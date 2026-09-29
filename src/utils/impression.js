@@ -2,6 +2,7 @@
 // ouverte avec window.open(), style noir et blanc optimise pour @media print.
 
 import QRCode from "qrcode";
+import { completerEtablissement } from "./etablissementCourant";
 
 export function echapperHtml(valeur) {
   return String(valeur ?? "")
@@ -130,6 +131,34 @@ const LOGO_SVG = `<svg viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg" ar
 // Meme logo, trait blanc : utilise sur fond fonce (en-tete premium du releve).
 export const LOGO_SVG_BLANC = LOGO_SVG.split('stroke="#000"').join('stroke="#fff"');
 
+// Logo de l'etablissement (Parametres) s'il existe, sinon le pictogramme LAKOLI.
+// `classe` : classe CSS du conteneur (logo-ecole pour les documents A4).
+export function logoEcoleHtml(etablissement, classe = "logo-ecole") {
+  return etablissement?.logo_url
+    ? `<div class="${classe} avec-image"><img src="${echapperHtml(etablissement.logo_url)}" alt=""></div>`
+    : `<div class="${classe}">${LOGO_SVG_BLANC}</div>`;
+}
+
+// Coordonnees completes de l'etablissement, en une ligne.
+export function coordonneesEcole(etablissement) {
+  const e = etablissement || {};
+  const telephones = [e.telephone, e.telephone_secondaire].filter(Boolean).join(" / ");
+  return [
+    [e.adresse, e.quartier, e.ville].filter(Boolean).join(", "),
+    telephones && `Tél : ${telephones}`,
+    e.email,
+  ].filter(Boolean);
+}
+
+// Agrement et slogan sous le nom de l'etablissement (vide si non renseignes).
+export function mentionsEcoleHtml(etablissement) {
+  const e = etablissement || {};
+  return [
+    e.agrement ? `<div class="agrement">Agrément n° ${echapperHtml(e.agrement)}</div>` : "",
+    e.slogan ? `<div class="slogan">« ${echapperHtml(e.slogan)} »</div>` : "",
+  ].join("");
+}
+
 const STYLES = `
   * { box-sizing: border-box; }
   body { font-family: Arial, Helvetica, sans-serif; color: #000; background: #fff; margin: 0; padding: 24px; font-size: 13px; line-height: 1.4; }
@@ -175,6 +204,11 @@ const STYLES = `
   }
   .doc-releve .entete-premium .logo { display: flex; align-items: center; gap: 10px; }
   .doc-releve .entete-premium .logo svg { width: 46px; height: 46px; flex-shrink: 0; }
+  .doc-releve .entete-premium .logo-premium { display: flex; flex-shrink: 0; }
+  .doc-releve .entete-premium .logo-premium.avec-image { width: 50px; height: 50px; padding: 3px; border-radius: 10px; background: #fff; }
+  .doc-releve .entete-premium .logo-premium img { width: 100%; height: 100%; object-fit: contain; }
+  .doc-releve .entete-premium .mentions-premium { margin-top: 4px; font-size: 10px; color: rgba(255, 255, 255, 0.85); }
+  .doc-releve .entete-premium .mentions-premium .slogan { font-style: italic; }
   .doc-releve .entete-premium .nom { font-size: 22px; font-weight: bold; letter-spacing: 3px; color: #fff; }
   .doc-releve .entete-premium .badge-etablissement {
     display: inline-block; margin-top: 5px; padding: 3px 10px; border-radius: 999px;
@@ -278,6 +312,10 @@ const STYLES = `
   .releve-a4 .ecole { flex: 1; text-align: center; }
   .releve-a4 .logo-ecole { display: inline-flex; width: 44px; height: 44px; padding: 5px; border-radius: 10px; background: #0C447C; }
   .releve-a4 .logo-ecole svg { width: 100%; height: 100%; }
+  .releve-a4 .logo-ecole.avec-image { width: 56px; height: 56px; padding: 2px; background: #fff; border: 1px solid #e2e8f0; }
+  .releve-a4 .logo-ecole img { width: 100%; height: 100%; object-fit: contain; }
+  .releve-a4 .ecole .agrement { margin-top: 2px; font-size: 8.5px; font-weight: 700; color: #334155; }
+  .releve-a4 .ecole .slogan { margin-top: 1px; font-size: 9px; font-style: italic; color: #0C447C; }
   .releve-a4 .nom-ecole { margin-top: 4px; font-size: 16px; font-weight: 900; text-transform: uppercase; color: #0C447C; line-height: 1.1; }
   .releve-a4 .coord { margin-top: 3px; font-size: 8.5px; color: #64748b; }
   .releve-a4 .reference { width: 30%; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
@@ -454,7 +492,7 @@ function etatDepuisLibelle(statut) {
 export function genererRecuHtml(data) {
   const tiret = "—";
   const e = (v) => echapperHtml(v || tiret);
-  const etablissement = data.etablissement || {};
+  const etablissement = completerEtablissement(data.etablissement);
   const eleve = data.eleve || {};
   const situation = data.situationGlobale;
   const nomComplet = `${eleve.nom || ""} ${eleve.prenom || ""}`.trim();
@@ -464,11 +502,7 @@ export function genererRecuHtml(data) {
   const resteAnnee = situation ? Math.max(0, situation.resteGlobal) : null;
   const ton = data.estSolde ? "vert" : "ambre";
 
-  const coordonnees = [
-    [etablissement.adresse, etablissement.ville].filter(Boolean).join(", "),
-    etablissement.telephone && `Tél : ${etablissement.telephone}`,
-    etablissement.email,
-  ].filter(Boolean);
+  const coordonnees = coordonneesEcole(etablissement);
 
   const qr = qrCodeSvg(
     [
@@ -526,9 +560,10 @@ export function genererRecuHtml(data) {
         <div class="ministere">Ministère de l'Enseignement Pré-Universitaire et de l'Alphabétisation</div>
       </div>
       <div class="ecole">
-        <div class="logo-ecole">${LOGO_SVG_BLANC}</div>
+        ${logoEcoleHtml(etablissement)}
         <div class="nom-ecole">${echapperHtml(etablissement.nom || "LAKOLI")}</div>
         ${coordonnees.length ? `<div class="coord">${coordonnees.map(echapperHtml).join(" · ")}</div>` : ""}
+        ${mentionsEcoleHtml(etablissement)}
       </div>
       <div class="reference">
         <div class="boite-ref">
@@ -695,7 +730,8 @@ const REGIMES_INSCRIPTION = {
   reinscription: "Réinscription",
 };
 
-export function genererReleveHtml({ etablissement = {}, eleve, lignes }) {
+export function genererReleveHtml({ etablissement: etablissementFourni = {}, eleve, lignes }) {
+  const etablissement = completerEtablissement(etablissementFourni);
   const tiret = "—";
   const e = (v) => echapperHtml(v || tiret);
 
@@ -727,11 +763,7 @@ export function genererReleveHtml({ etablissement = {}, eleve, lignes }) {
     64
   );
 
-  const coordonnees = [
-    [etablissement.adresse, etablissement.ville].filter(Boolean).join(", "),
-    etablissement.telephone && `Tél : ${etablissement.telephone}`,
-    etablissement.email,
-  ].filter(Boolean);
+  const coordonnees = coordonneesEcole(etablissement);
 
   const corpsTableau = lignes.length === 0
     ? `<tr><td colspan="10" class="vide">Aucun frais enregistré pour cet élève.</td></tr>`
@@ -764,9 +796,10 @@ export function genererReleveHtml({ etablissement = {}, eleve, lignes }) {
         <div class="ministere">Ministère de l'Enseignement Pré-Universitaire et de l'Alphabétisation</div>
       </div>
       <div class="ecole">
-        <div class="logo-ecole">${LOGO_SVG_BLANC}</div>
+        ${logoEcoleHtml(etablissement)}
         <div class="nom-ecole">${e(etablissement.nom)}</div>
         ${coordonnees.length ? `<div class="coord">${coordonnees.map(echapperHtml).join(" · ")}</div>` : ""}
+        ${mentionsEcoleHtml(etablissement)}
       </div>
       <div class="reference">
         <div class="boite-ref">
@@ -898,6 +931,7 @@ const STATUTS_PAIEMENT_ELEVE = {
 };
 
 export function genererListeElevesHtml({ etablissement, session, classes, filtreStatut }) {
+  const ecole = completerEtablissement(etablissement);
   const tiret = "—";
   const collator = new Intl.Collator("fr", { sensitivity: "base" });
   const celluleStatut = (statut) => {
@@ -928,10 +962,11 @@ export function genererListeElevesHtml({ etablissement, session, classes, filtre
   <div class="doc-releve liste-classe">
     <div class="entete-premium">
       <div class="logo">
-        ${LOGO_SVG_BLANC}
+        ${logoEcoleHtml(ecole, "logo-premium")}
         <div>
           <div class="nom">LAKOLI</div>
-          ${etablissement ? `<span class="badge-etablissement">${echapperHtml(etablissement)}</span>` : ""}
+          ${ecole.nom ? `<span class="badge-etablissement">${echapperHtml(ecole.nom)}</span>` : ""}
+          ${ecole.agrement || ecole.slogan ? `<div class="mentions-premium">${[ecole.agrement && `Agrément n° ${echapperHtml(ecole.agrement)}`, ecole.slogan && `<span class="slogan">« ${echapperHtml(ecole.slogan)} »</span>`].filter(Boolean).join(" · ")}</div>` : ""}
         </div>
       </div>
       <div class="titre">
@@ -989,6 +1024,7 @@ export function genererListeElevesHtml({ etablissement, session, classes, filtre
 const CONTRATS_ENSEIGNANT = { cdi: "CDI", cdd: "CDD", vacataire: "Vacataire" };
 
 export function genererListeEnseignantsHtml({ etablissement, session, enseignants, filtres = [] }) {
+  const ecole = completerEtablissement(etablissement);
   const tiret = "—";
   const collator = new Intl.Collator("fr", { sensitivity: "base" });
   const tries = [...enseignants].sort(
@@ -1017,10 +1053,11 @@ export function genererListeEnseignantsHtml({ etablissement, session, enseignant
   <div class="doc-releve liste-classe">
     <div class="entete-premium">
       <div class="logo">
-        ${LOGO_SVG_BLANC}
+        ${logoEcoleHtml(ecole, "logo-premium")}
         <div>
           <div class="nom">LAKOLI</div>
-          ${etablissement ? `<span class="badge-etablissement">${echapperHtml(etablissement)}</span>` : ""}
+          ${ecole.nom ? `<span class="badge-etablissement">${echapperHtml(ecole.nom)}</span>` : ""}
+          ${ecole.agrement || ecole.slogan ? `<div class="mentions-premium">${[ecole.agrement && `Agrément n° ${echapperHtml(ecole.agrement)}`, ecole.slogan && `<span class="slogan">« ${echapperHtml(ecole.slogan)} »</span>`].filter(Boolean).join(" · ")}</div>` : ""}
         </div>
       </div>
       <div class="titre">
@@ -1081,6 +1118,7 @@ export function genererListeEnseignantsHtml({ etablissement, session, enseignant
 // montant }). `parMoyen` / `parType` : [{ libelle, montant }]. A passer a imprimerDocument().
 // ---------------------------------------------------------------------------
 export function genererJournalCaisseHtml({ etablissement, filtres = [], versements, parMoyen = [], parType = [] }) {
+  const ecole = completerEtablissement(etablissement);
   const tiret = "—";
   const total = versements.reduce((s, v) => s + (Number(v.montant) || 0), 0);
   const repartition = (titre, lignes) =>
@@ -1109,10 +1147,11 @@ export function genererJournalCaisseHtml({ etablissement, filtres = [], versemen
   <div class="doc-releve liste-classe">
     <div class="entete-premium">
       <div class="logo">
-        ${LOGO_SVG_BLANC}
+        ${logoEcoleHtml(ecole, "logo-premium")}
         <div>
           <div class="nom">LAKOLI</div>
-          ${etablissement ? `<span class="badge-etablissement">${echapperHtml(etablissement)}</span>` : ""}
+          ${ecole.nom ? `<span class="badge-etablissement">${echapperHtml(ecole.nom)}</span>` : ""}
+          ${ecole.agrement || ecole.slogan ? `<div class="mentions-premium">${[ecole.agrement && `Agrément n° ${echapperHtml(ecole.agrement)}`, ecole.slogan && `<span class="slogan">« ${echapperHtml(ecole.slogan)} »</span>`].filter(Boolean).join(" · ")}</div>` : ""}
         </div>
       </div>
       <div class="titre">
@@ -1184,6 +1223,7 @@ const NB_DERNIERS_ENCAISSEMENTS = 20;
 export function genererRapportComptableHtml({
   etablissement, session, dateDonnees, indicateurs, finances, classes, inscriptions, elevesEnRetard, paiements,
 }) {
+  const ecole = completerEtablissement(etablissement);
   const tiret = "—";
   const indisponible = (quoi) => `<p class="indisponible">Données ${quoi} indisponibles au moment de l'édition.</p>`;
   const nombre = (v) => (v === null || v === undefined ? tiret : echapperHtml(String(v)));
@@ -1335,10 +1375,11 @@ export function genererRapportComptableHtml({
   <div class="doc-releve rapport">
     <div class="entete-premium">
       <div class="logo">
-        ${LOGO_SVG_BLANC}
+        ${logoEcoleHtml(ecole, "logo-premium")}
         <div>
           <div class="nom">LAKOLI</div>
-          ${etablissement ? `<span class="badge-etablissement">${echapperHtml(etablissement)}</span>` : ""}
+          ${ecole.nom ? `<span class="badge-etablissement">${echapperHtml(ecole.nom)}</span>` : ""}
+          ${ecole.agrement || ecole.slogan ? `<div class="mentions-premium">${[ecole.agrement && `Agrément n° ${echapperHtml(ecole.agrement)}`, ecole.slogan && `<span class="slogan">« ${echapperHtml(ecole.slogan)} »</span>`].filter(Boolean).join(" · ")}</div>` : ""}
         </div>
       </div>
       <div class="titre">
@@ -1420,6 +1461,7 @@ export function genererEtImprimerFichePaie(salaire, fenetrePreouverte) {
   if (!fenetre) return false;
 
   const ens = salaire.enseignant || {};
+  const ecole = completerEtablissement(salaire.etablissement);
   const { classes, matieres } = classesEtMatieres(ens.affectations);
   const contrat = CONTRATS_FICHE[ens.contrat_actif?.type];
   const poste = matieres.length ? `Professeur de ${matieres.join(", ")}` : "Enseignant";
@@ -1451,7 +1493,10 @@ export function genererEtImprimerFichePaie(salaire, fenetrePreouverte) {
     .header { position: relative; background: #0C447C; color: white; padding: 24px 28px 22px; display: flex; justify-content: space-between; align-items: center; gap: 16px; }
     .header::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 4px; background: linear-gradient(to right, #0C447C, #10b981); }
     .marque { display: flex; align-items: center; gap: 12px; }
-    .logo { width: 48px; height: 48px; border-radius: 12px; background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; font-size: 24px; }
+    .logo { width: 48px; height: 48px; border-radius: 12px; background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; font-size: 24px; overflow: hidden; }
+    .logo.avec-image { background: #fff; padding: 3px; }
+    .logo img { width: 100%; height: 100%; object-fit: contain; }
+    .marque-mentions { font-size: 10px; color: rgba(255,255,255,0.7); margin-top: 2px; }
     .marque-nom { font-size: 22px; font-weight: 900; letter-spacing: -0.5px; display: flex; align-items: center; gap: 8px; }
     .marque-tag { font-size: 10px; text-transform: uppercase; font-weight: 700; padding: 2px 8px; border-radius: 4px; background: rgba(16,185,129,0.2); color: #6ee7b7; border: 1px solid rgba(52,211,153,0.3); }
     .marque-sous { font-size: 11px; color: rgba(255,255,255,0.75); margin-top: 2px; }
@@ -1520,10 +1565,11 @@ export function genererEtImprimerFichePaie(salaire, fenetrePreouverte) {
 <div class="doc">
   <div class="header">
     <div class="marque">
-      <div class="logo">🎓</div>
+      ${ecole.logo_url ? `<div class="logo avec-image"><img src="${echapperHtml(ecole.logo_url)}" alt=""></div>` : `<div class="logo">🎓</div>`}
       <div>
         <div class="marque-nom">LAKOLI <span class="marque-tag">Scolaire</span></div>
-        <div class="marque-sous">${echapperHtml(salaire.etablissement?.nom || "Gestion scolaire · République de Guinée")}</div>
+        <div class="marque-sous">${echapperHtml(ecole.nom || "Gestion scolaire · République de Guinée")}</div>
+        ${ecole.agrement || ecole.slogan ? `<div class="marque-mentions">${[ecole.agrement && `Agrément n° ${echapperHtml(ecole.agrement)}`, ecole.slogan && `« ${echapperHtml(ecole.slogan)} »`].filter(Boolean).join(" · ")}</div>` : ""}
       </div>
     </div>
     <div class="titre">

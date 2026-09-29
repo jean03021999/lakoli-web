@@ -27,7 +27,7 @@ function versFormulaire(e) {
   return Object.fromEntries(CHAMPS_FORMULAIRE.map((c) => [c, c === "cycles" ? e[c] || [] : e[c] ?? ""]));
 }
 
-export default function SectionEtablissement({ etablissement, peutAdministrer, onMaj, onToast }) {
+export default function SectionEtablissement({ etablissement, effectif, peutAdministrer, onMaj, onToast }) {
   const [form, setForm] = useState(() => versFormulaire(etablissement));
   const [envoiLogo, setEnvoiLogo] = useState(false);
   const refFichier = useRef(null);
@@ -224,8 +224,23 @@ export default function SectionEtablissement({ etablissement, peutAdministrer, o
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-            <Champ libelle="Capacité d'accueil (élèves)" aide="Effectif maximal que les locaux peuvent accueillir.">
+            <Champ libelle="Capacité d'accueil (élèves)" aide="Au-delà de 90 %, une alerte s'affiche dans la cloche de l'en-tête.">
               <input type="number" min="0" value={form.capacite_accueil} disabled={lecture} onChange={(e) => maj("capacite_accueil", e.target.value)} placeholder="Ex : 1200" className={CHAMP} />
+              {Number(form.capacite_accueil) > 0 && typeof effectif === "number" && (() => {
+                const pct = Math.round((effectif / Number(form.capacite_accueil)) * 100);
+                const couleur = pct > 100 ? "bg-rose-500" : pct >= 90 ? "bg-amber-500" : "bg-emerald-500";
+                return (
+                  <div className="mt-2">
+                    <div className="flex justify-between text-[11px] font-semibold text-slate-600 mb-1">
+                      <span>Effectif actuel : {effectif.toLocaleString("fr-FR")} élèves</span>
+                      <span className={pct > 100 ? "text-rose-600" : pct >= 90 ? "text-amber-600" : "text-emerald-600"}>{pct} %</span>
+                    </div>
+                    <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+                      <div className={`h-full rounded-full ${couleur}`} style={{ width: `${Math.min(pct, 100)}%` }} />
+                    </div>
+                  </div>
+                );
+              })()}
             </Champ>
             <Champ libelle="N° d'agrément ministériel" aide="Référence de l'autorisation d'ouverture délivrée par le ministère.">
               <AvecIcone icone={FileCheck2}>

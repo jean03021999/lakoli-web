@@ -27,6 +27,7 @@ import Bulletins from "./pages/modules/Bulletins";
 import BulletinApercu from "./pages/modules/BulletinApercu";
 import FraisScolarite from "./pages/modules/FraisScolarite";
 import Parametres from "./pages/modules/Parametres";
+import { definirEtablissement } from "./utils/etablissementCourant";
 import Classes from "./pages/modules/Classes";
 import Periodes from "./pages/modules/Periodes";
 import Utilisateurs from "./pages/modules/Utilisateurs";
@@ -72,6 +73,7 @@ function AppContent() {
         setRole(res.data.role);
         setPermissions(res.data.permissions || []);
         setEtablissement(res.data.etablissement || null);
+        definirEtablissement(res.data.etablissement);
         setSession(res.data.session || null);
         setUtilisateur(res.data.user || null);
         if (res.data.user?.name) {
@@ -157,7 +159,10 @@ function AppContent() {
                 setUtilisateur((actuel) => ({ ...actuel, ...u }));
                 if (u.name) localStorage.setItem("user_name", u.name);
               }}
-              onEtablissementMaj={(e) => setEtablissement((actuel) => ({ ...actuel, nom: e.nom, ville: e.ville, adresse: e.adresse, telephone: e.telephone, email: e.email }))}
+              onEtablissementMaj={(e) => {
+                setEtablissement((actuel) => ({ ...actuel, ...e }));
+                definirEtablissement(e);
+              }}
               onSessionMaj={setSession}
             />
           }

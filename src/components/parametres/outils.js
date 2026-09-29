@@ -178,9 +178,9 @@ export const EVENEMENT_ALERTES = "lakoli:alertes";
 
 export function lireAlertes() {
   try {
-    return { retards: true, evaluations: true, ...JSON.parse(localStorage.getItem(CLE_ALERTES) || "{}") };
+    return { retards: true, evaluations: true, capacite: true, ...JSON.parse(localStorage.getItem(CLE_ALERTES) || "{}") };
   } catch {
-    return { retards: true, evaluations: true };
+    return { retards: true, evaluations: true, capacite: true };
   }
 }
 

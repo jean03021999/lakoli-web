@@ -25,6 +25,12 @@ export default function SectionAlertes({ permissions, onToast }) {
       permission: "eleves.voir",
     },
     {
+      cle: "capacite",
+      libelle: "🏫 Capacité d'accueil",
+      description: "Alerte quand l'effectif atteint 90 % de la capacité déclarée dans Mon établissement, puis la dépasse.",
+      permission: "eleves.voir",
+    },
+    {
       cle: "evaluations",
       libelle: "🎓 Évaluations à valider",
       description: "Notes soumises par les enseignants et en attente de validation.",

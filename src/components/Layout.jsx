@@ -107,17 +107,24 @@ function ContenuSidebar({ modules, estActif, onNaviguer, etablissement, session,
       {/* Etablissement et session active */}
       {(etablissement?.nom || session) && (
         <div className="mx-3 mb-3 px-3 py-2.5 rounded-xl bg-white/10 border border-white/10 shrink-0">
-          {etablissement?.nom && (
-            <p className="flex items-center gap-1.5 text-xs font-semibold text-white truncate">
-              <Building className="h-3.5 w-3.5 text-white/70 shrink-0" />
-              <span className="truncate">{etablissement.nom}</span>
-            </p>
-          )}
-          {(etablissement?.ville || session) && (
-            <p className="mt-1 text-[11px] text-white/60 truncate">
-              {[etablissement?.ville, session && `Session ${session}`].filter(Boolean).join(" · ")}
-            </p>
-          )}
+          <div className="flex items-center gap-2.5 min-w-0">
+            {etablissement?.logo_url && (
+              <img src={etablissement.logo_url} alt="" className="h-9 w-9 shrink-0 rounded-lg bg-white object-contain p-0.5" />
+            )}
+            <div className="min-w-0">
+              {etablissement?.nom && (
+                <p className="flex items-center gap-1.5 text-xs font-semibold text-white truncate">
+                  {!etablissement.logo_url && <Building className="h-3.5 w-3.5 text-white/70 shrink-0" />}
+                  <span className="truncate">{etablissement.nom}</span>
+                </p>
+              )}
+              {(etablissement?.ville || session) && (
+                <p className="mt-1 text-[11px] text-white/60 truncate">
+                  {[etablissement?.ville, session && `Session ${session}`].filter(Boolean).join(" · ")}
+                </p>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
@@ -173,6 +180,7 @@ export default function Layout({ children, role, permissions = [], etablissement
   const [menuMobileOuvert, setMenuMobileOuvert] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [eleves, setEleves] = useState([]); // aussi utilises par la recherche de l'en-tete
+  const [effectif, setEffectif] = useState(null);
   const [apparence, setApparence] = useState(lireApparence);
   const [alertes, setAlertes] = useState(lireAlertes);
   const [enLigne, setEnLigne] = useState(typeof navigator === "undefined" ? true : navigator.onLine);
@@ -191,7 +199,10 @@ export default function Layout({ children, role, permissions = [], etablissement
       ]);
 
       const liste = [];
-      if (eleves.status === "fulfilled") setEleves(eleves.value.data.eleves || []);
+      if (eleves.status === "fulfilled") {
+        setEleves(eleves.value.data.eleves || []);
+        setEffectif(eleves.value.data.stats?.total ?? null);
+      }
       const nbRetard = eleves.status === "fulfilled" ? eleves.value.data.stats.en_retard || 0 : 0;
       if (nbRetard > 0) {
         liste.push({
@@ -238,7 +249,25 @@ export default function Layout({ children, role, permissions = [], etablissement
     document.body.style.fontFamily = POLICES[apparence.police]?.famille || "";
   }, [apparence.police]);
 
-  const notificationsAffichees = notifications.filter((n) => alertes[n.id] !== false);
+  // Capacite d'accueil (Parametres > Mon etablissement) : alerte a 90 % et au-dela, recalculee
+  // des que la capacite change.
+  const capacite = Number(etablissement?.capacite_accueil) || 0;
+  const alerteCapacite =
+    capacite > 0 && effectif !== null && effectif >= capacite * 0.9
+      ? {
+          id: "capacite",
+          icone: Users,
+          couleur: effectif > capacite ? "bg-rose-50 text-rose-600" : "bg-amber-50 text-amber-600",
+          titre: effectif > capacite
+            ? `Capacité d'accueil dépassée : ${effectif.toLocaleString("fr-FR")} / ${capacite.toLocaleString("fr-FR")} élèves`
+            : `Capacité d'accueil presque atteinte : ${effectif.toLocaleString("fr-FR")} / ${capacite.toLocaleString("fr-FR")} élèves`,
+          detail: effectif > capacite
+            ? `${(effectif - capacite).toLocaleString("fr-FR")} élève${effectif - capacite > 1 ? "s" : ""} au-delà de la capacité déclarée.`
+            : `Il reste ${(capacite - effectif).toLocaleString("fr-FR")} place${capacite - effectif > 1 ? "s" : ""}.`,
+          chemin: "/parametres?section=etablissement",
+        }
+      : null;
+  const notificationsAffichees = [...(alerteCapacite ? [alerteCapacite] : []), ...notifications].filter((n) => alertes[n.id] !== false);
 
   // Etat reel de la connexion : le badge "synchronise" ne doit pas s'afficher hors ligne.
   useEffect(() => {

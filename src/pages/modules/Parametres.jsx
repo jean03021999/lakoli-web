@@ -165,6 +165,7 @@ export default function Parametres({ permissions = [], onUtilisateurMaj, onEtabl
           {section === "etablissement" && (
             <SectionEtablissement
               etablissement={etablissement}
+              effectif={donnees.consommation.eleves}
               peutAdministrer={donnees.peut_administrer}
               onToast={toast}
               onMaj={(e) => {

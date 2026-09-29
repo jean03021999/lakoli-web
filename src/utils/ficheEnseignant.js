@@ -1,19 +1,17 @@
 // Fiche enseignant imprimable (A4), meme habillage que le releve et le recu (.releve-a4).
-import { echapperHtml, formaterDate, formaterMontant, LOGO_SVG_BLANC } from "./impression";
+import { echapperHtml, formaterDate, formaterMontant, logoEcoleHtml, coordonneesEcole, mentionsEcoleHtml } from "./impression";
+import { completerEtablissement } from "./etablissementCourant";
 
 const CONTRATS = { cdi: "CDI (durée indéterminée)", cdd: "CDD (durée déterminée)", vacataire: "Vacataire" };
 const JOURS = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"];
 
-export function genererFicheEnseignantHtml({ etablissement = {}, enseignant, contrat, affectations, creneaux }) {
+export function genererFicheEnseignantHtml({ etablissement: etablissementFourni = {}, enseignant, contrat, affectations, creneaux }) {
+  const etablissement = completerEtablissement(etablissementFourni);
   const tiret = "—";
   const e = (v) => echapperHtml(v || tiret);
   const totalHeures = affectations.reduce((s, a) => s + (Number(a.volume_horaire_hebdomadaire) || 0), 0);
   const dateLongue = new Date().toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
-  const coordonnees = [
-    [etablissement.adresse, etablissement.ville].filter(Boolean).join(", "),
-    etablissement.telephone && `Tél : ${etablissement.telephone}`,
-    etablissement.email,
-  ].filter(Boolean);
+  const coordonnees = coordonneesEcole(etablissement);
 
   const lignesAffectations = affectations.length
     ? affectations
@@ -53,9 +51,10 @@ export function genererFicheEnseignantHtml({ etablissement = {}, enseignant, con
         <div class="ministere">Ministère de l'Enseignement Pré-Universitaire et de l'Alphabétisation</div>
       </div>
       <div class="ecole">
-        <div class="logo-ecole">${LOGO_SVG_BLANC}</div>
+        ${logoEcoleHtml(etablissement)}
         <div class="nom-ecole">${echapperHtml(etablissement.nom || "LAKOLI")}</div>
         ${coordonnees.length ? `<div class="coord">${coordonnees.map(echapperHtml).join(" · ")}</div>` : ""}
+        ${mentionsEcoleHtml(etablissement)}
       </div>
       <div class="reference">
         <div class="boite-ref">
