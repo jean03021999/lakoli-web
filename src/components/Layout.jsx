@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import api from "../services/api";
+import api, { CLE_STATS_ELEVES, EVENEMENT_STATS_ELEVES } from "../services/api";
 import EnTete from "./EnTete";
 import AvatarUtilisateur from "./AvatarUtilisateur";
 import { lireApparence, cssFond, chargerPolice, POLICES, EVENEMENT_APPARENCE, lireAlertes, EVENEMENT_ALERTES } from "./parametres/outils";
@@ -179,8 +179,9 @@ export default function Layout({ children, role, permissions = [], etablissement
   const navigate = useNavigate();
   const location = useLocation();
   const [menuMobileOuvert, setMenuMobileOuvert] = useState(false);
-  const [notifications, setNotifications] = useState([]);
-  const [effectif, setEffectif] = useState(null);
+  // Compteurs de la cloche : eleves en retard et effectif (liste complete des eleves), evaluations
+  // soumises a valider. null = pas encore connu.
+  const [compteurs, setCompteurs] = useState({ nbRetard: null, total: null, nbSoumises: null });
   const [apparence, setApparence] = useState(lireApparence);
   const [alertes, setAlertes] = useState(lireAlertes);
   const [enLigne, setEnLigne] = useState(typeof navigator === "undefined" ? true : navigator.onLine);
@@ -191,65 +192,76 @@ export default function Layout({ children, role, permissions = [], etablissement
 
   // Notifications réelles : élèves en retard (eleves.voir) + évaluations soumises en attente
   // de validation (notes.voir), chacune seulement si l'utilisateur a la permission.
-  // /eleves est lourd (statut de paiement de chaque eleve) : les compteurs sont gardes 5 minutes
-  // dans l'onglet et demandes apres le chargement de la page, pour ne pas la retarder.
+  // /eleves est lourd (statut de paiement de chaque eleve) : les compteurs sont repris de toute
+  // liste complete deja chargee par une page (voir services/api.js), gardes 5 minutes dans
+  // l'onglet, et demandes au serveur seulement a defaut, apres le chargement de la page.
   useEffect(() => {
-    const CLE = "lakoli_compteurs_alertes";
-    const construire = ({ nbRetard, nbSoumises, total }) => {
-      setEffectif(total ?? null);
-      const liste = [];
-      if (nbRetard > 0) {
-        liste.push({
-          id: "retards",
-          icone: AlertTriangle,
-          couleur: "bg-rose-50 text-rose-600",
-          titre: `${nbRetard} élève${nbRetard > 1 ? "s" : ""} en retard de paiement`,
-          detail: "Échéance de scolarité dépassée, à relancer.",
-          chemin: "/eleves",
-        });
-      }
-      if (nbSoumises > 0) {
-        liste.push({
-          id: "evaluations",
-          icone: ClipboardCheck,
-          couleur: "bg-blue-50 text-blue-600",
-          titre: `${nbSoumises} évaluation${nbSoumises > 1 ? "s" : ""} à valider`,
-          detail: "Notes soumises par les enseignants.",
-          chemin: "/notes",
-        });
-      }
-      setNotifications(liste);
-    };
-    async function chargerNotifications() {
-      const [eleves, evaluations] = await Promise.allSettled([
-        peutVoirEleves ? api.get("/eleves") : Promise.reject(),
-        peutVoirNotes ? api.get("/evaluations", { params: { vue: "direction" } }) : Promise.reject(),
-      ]);
-      const compteurs = {
-        nbRetard: eleves.status === "fulfilled" ? eleves.value.data.stats?.en_retard || 0 : 0,
-        total: eleves.status === "fulfilled" ? eleves.value.data.stats?.total ?? null : null,
-        nbSoumises: evaluations.status === "fulfilled" ? evaluations.value.data.filter((ev) => ev.statut === "soumis").length : 0,
-      };
-      construire(compteurs);
-      try {
-        sessionStorage.setItem(CLE, JSON.stringify({ ...compteurs, le: Date.now(), role }));
-      } catch {
-        // stockage indisponible : rechargement a la prochaine ouverture
-      }
-    }
     if (!role) return;
-    try {
-      const memo = JSON.parse(sessionStorage.getItem(CLE) || "null");
-      if (memo && memo.role === role && Date.now() - memo.le < 5 * 60 * 1000) {
-        construire(memo);
-        return;
+    const FRAICHEUR = 5 * 60 * 1000;
+    const CLE_EVALUATIONS = "lakoli_evaluations_soumises";
+    const lire = (cle) => {
+      try {
+        const memo = JSON.parse(sessionStorage.getItem(cle) || "null");
+        return memo && Date.now() - memo.le < FRAICHEUR ? memo : null;
+      } catch {
+        return null;
       }
-    } catch {
-      // cache illisible : on recharge
+    };
+    const appliquerStats = (stats) => setCompteurs((c) => ({ ...c, nbRetard: stats?.en_retard || 0, total: stats?.total ?? null }));
+    const surStats = (e) => appliquerStats(e.detail);
+    window.addEventListener(EVENEMENT_STATS_ELEVES, surStats);
+
+    if (peutVoirEleves) {
+      const memo = lire(CLE_STATS_ELEVES);
+      if (memo) appliquerStats(memo.stats);
     }
-    const minuteur = setTimeout(chargerNotifications, 1500);
-    return () => clearTimeout(minuteur);
+    if (peutVoirNotes) {
+      const memo = lire(CLE_EVALUATIONS);
+      if (memo) setCompteurs((c) => ({ ...c, nbSoumises: memo.nombre }));
+    }
+
+    const minuteur = setTimeout(() => {
+      // Une page a peut-etre charge la liste entre-temps : on ne la redemande pas.
+      if (peutVoirEleves && !lire(CLE_STATS_ELEVES)) api.get("/eleves").catch(() => {});
+      if (peutVoirNotes && !lire(CLE_EVALUATIONS)) {
+        api.get("/evaluations", { params: { vue: "direction" } })
+          .then((res) => {
+            const nombre = res.data.filter((ev) => ev.statut === "soumis").length;
+            setCompteurs((c) => ({ ...c, nbSoumises: nombre }));
+            try {
+              sessionStorage.setItem(CLE_EVALUATIONS, JSON.stringify({ nombre, le: Date.now() }));
+            } catch {
+              // stockage indisponible : nouvel appel a la prochaine ouverture
+            }
+          })
+          .catch(() => {});
+      }
+    }, 1500);
+    return () => {
+      clearTimeout(minuteur);
+      window.removeEventListener(EVENEMENT_STATS_ELEVES, surStats);
+    };
   }, [role, peutVoirEleves, peutVoirNotes]);
+
+  const notifications = [
+    compteurs.nbRetard > 0 && {
+      id: "retards",
+      icone: AlertTriangle,
+      couleur: "bg-rose-50 text-rose-600",
+      titre: `${compteurs.nbRetard} élève${compteurs.nbRetard > 1 ? "s" : ""} en retard de paiement`,
+      detail: "Échéance de scolarité dépassée, à relancer.",
+      chemin: "/eleves",
+    },
+    compteurs.nbSoumises > 0 && {
+      id: "evaluations",
+      icone: ClipboardCheck,
+      couleur: "bg-blue-50 text-blue-600",
+      titre: `${compteurs.nbSoumises} évaluation${compteurs.nbSoumises > 1 ? "s" : ""} à valider`,
+      detail: "Notes soumises par les enseignants.",
+      chemin: "/notes",
+    },
+  ].filter(Boolean);
+  const effectif = compteurs.total;
 
   // Preferences de ce navigateur (module Parametres) : fond, police et alertes affichees.
   useEffect(() => {
@@ -316,7 +328,8 @@ export default function Layout({ children, role, permissions = [], etablissement
     localStorage.removeItem("auth_token");
     localStorage.removeItem("device_token");
     localStorage.removeItem("lakoli_session");
-    sessionStorage.removeItem("lakoli_compteurs_alertes");
+    sessionStorage.removeItem(CLE_STATS_ELEVES);
+    sessionStorage.removeItem("lakoli_evaluations_soumises");
     navigate("/");
   };
 

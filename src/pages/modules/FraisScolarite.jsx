@@ -64,11 +64,12 @@ function detailPaiementScolarite(resPaiement, suiviAvant) {
 // Memorise la classe choisie pour la retrouver au retour sur la page.
 const CLE_CLASSE_FILTRE = "frais_classe_filtre";
 
+// Par defaut, toutes les classes : la page affiche tout de suite les compteurs et la liste.
 function lireClasseFiltre() {
   try {
-    return sessionStorage.getItem(CLE_CLASSE_FILTRE) || "";
+    return sessionStorage.getItem(CLE_CLASSE_FILTRE) || "tous";
   } catch {
-    return "";
+    return "tous";
   }
 }
 
@@ -136,7 +137,8 @@ export default function FraisScolarite({ permissions = [], etablissement = null 
   const [eleves, setEleves] = useState([]);
   const [recherche, setRecherche] = useState("");
   const [afficherSuggestions, setAfficherSuggestions] = useState(false);
-  const [chargementEleves, setChargementEleves] = useState(false);
+  // Vrai des le depart si une classe est choisie : les grilles attendent la liste (voir plus bas).
+  const [chargementEleves, setChargementEleves] = useState(() => Boolean(classeId));
   const [eleveSelectionne, setEleveSelectionne] = useState(null);
   const [filtreStatut, setFiltreStatut] = useState(null);
 
@@ -155,13 +157,7 @@ export default function FraisScolarite({ permissions = [], etablissement = null 
   const [erreur, setErreur] = useState("");
   const [succes, setSucces] = useState("");
   const [grillesExistantes, setGrillesExistantes] = useState([]);
-
-
-  useEffect(() => {
-    api.get("/classes").then((res) => setClasses(res.data));
-    chargerTypes();
-    chargerGrilles();
-  }, []);
+  const [grillesDemandees, setGrillesDemandees] = useState(false);
 
   useEffect(() => {
     try {
@@ -174,7 +170,7 @@ export default function FraisScolarite({ permissions = [], etablissement = null 
   // Une classe supprimee depuis la derniere visite ne doit pas rester selectionnee.
   useEffect(() => {
     if (classeId && classeId !== "tous" && classes.length > 0 && !classes.some((c) => String(c.id) === String(classeId))) {
-      setClasseId("");
+      setClasseId("tous");
     }
   }, [classes, classeId]);
 
@@ -210,6 +206,22 @@ export default function FraisScolarite({ permissions = [], etablissement = null 
       annule = true;
     };
   }, [classeId]);
+
+  // Declare apres le chargement des eleves : la liste part en premier vers le serveur, qui traite
+  // les requetes une par une (php artisan serve).
+  useEffect(() => {
+    api.get("/classes").then((res) => setClasses(res.data));
+    chargerTypes();
+  }, []);
+
+  // Grilles tarifaires (lourdes) : apres la liste des eleves, ou des l'ouverture de leur onglet.
+  // Elles ne servent qu'a cet onglet et au montant propose a l'inscription d'un eleve.
+  useEffect(() => {
+    if (grillesDemandees || (onglet !== "grilles" && chargementEleves)) return;
+    setGrillesDemandees(true);
+    chargerGrilles();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onglet, chargementEleves, grillesDemandees]);
 
   const chargerTypes = async () => {
     try {
@@ -629,7 +641,6 @@ export default function FraisScolarite({ permissions = [], etablissement = null 
                     aria-label="Filtrer par classe"
                     className="flex-1 min-w-0 bg-slate-50 border border-slate-200 text-slate-800 text-xs font-semibold rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#0C447C]/20 focus:border-[#0C447C] cursor-pointer"
                   >
-                    <option value="">Choisir une classe...</option>
                     <option value="tous">Toutes les classes</option>
                     {classes.map((c) => (
                       <option key={c.id} value={c.id}>{c.nom}</option>
