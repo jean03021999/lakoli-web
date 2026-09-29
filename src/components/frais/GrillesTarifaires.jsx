@@ -204,7 +204,7 @@ export default function GrillesTarifaires({ classes, typesFrais, grilles, peutCr
             <div>
               <div className="flex justify-between items-center mb-1">
                 <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Montant annuel (GNF)</label>
-                <span className="font-mono text-xs font-bold text-[#0C447C]">{formaterGNF(montantNum)}</span>
+                <span className="text-xs font-bold text-[#0C447C] tabular-nums">{formaterGNF(montantNum)}</span>
               </div>
               <input
                 type="number"
@@ -212,7 +212,7 @@ export default function GrillesTarifaires({ classes, typesFrais, grilles, peutCr
                 value={montant}
                 onChange={(e) => setMontant(e.target.value)}
                 placeholder="ex : 3000000"
-                className={`${CHAMP} font-mono text-sm`}
+                className={`${CHAMP} tabular-nums text-sm`}
                 required
               />
             </div>
@@ -264,7 +264,7 @@ export default function GrillesTarifaires({ classes, typesFrais, grilles, peutCr
             <div className="bg-slate-50/80 rounded-xl p-3.5 border border-slate-200 space-y-2.5">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-slate-800">{parEleve ? "Échéance unique" : "Ventilation des échéances"}</span>
-                <span className={`text-[11px] font-mono font-bold px-2 py-0.5 rounded ${totalPct === 100 ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"}`}>
+                <span className={`text-[11px] tabular-nums font-bold px-2 py-0.5 rounded ${totalPct === 100 ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"}`}>
                   Total : {totalPct}% {totalPct === 100 ? "✓" : "(doit faire 100 %)"}
                 </span>
               </div>
@@ -285,7 +285,7 @@ export default function GrillesTarifaires({ classes, typesFrais, grilles, peutCr
                       value={e.pourcentage}
                       disabled={parEleve}
                       onChange={(ev) => modifierEcheance(i, "pourcentage", ev.target.value)}
-                      className="w-full bg-white border border-slate-300 rounded-lg px-1 py-1 text-center font-mono font-bold disabled:bg-slate-100"
+                      className="w-full bg-white border border-slate-300 rounded-lg px-1 py-1 text-center font-bold disabled:bg-slate-100 tabular-nums"
                     />
                     <span className="text-slate-400">%</span>
                   </div>
@@ -296,7 +296,7 @@ export default function GrillesTarifaires({ classes, typesFrais, grilles, peutCr
                     className="col-span-3 bg-white border border-slate-300 rounded-lg px-1 py-1 text-[11px]"
                     required
                   />
-                  <span className="col-span-2 text-right font-mono font-semibold text-slate-800 text-[11px]">{montants[i].toLocaleString("fr-FR")}</span>
+                  <span className="col-span-2 text-right font-semibold text-slate-800 text-[11px] tabular-nums">{montants[i].toLocaleString("fr-FR")}</span>
                   {!parEleve && echeances.length > 1 ? (
                     <button type="button" onClick={() => setEcheances(echeances.filter((_, j) => j !== i))} className="col-span-1 text-slate-400 hover:text-rose-600 cursor-pointer justify-self-end" title="Retirer">
                       <Trash2 className="w-3.5 h-3.5" />
@@ -362,7 +362,7 @@ export default function GrillesTarifaires({ classes, typesFrais, grilles, peutCr
             <div key={classe.id} className="bg-white p-5 border border-slate-100/90 space-y-4" style={STYLE_CARTE}>
               <div className="flex items-center justify-between pb-3 border-b border-slate-100">
                 <div className="flex items-center gap-2.5">
-                  <span className="px-3 py-1 bg-[#0C447C] text-white text-xs font-black rounded-lg tracking-wide">{classe.nom}</span>
+                  <span className="px-3 py-1 bg-[#0C447C] text-white text-xs font-extrabold rounded-lg tracking-wide">{classe.nom}</span>
                   <span className="text-xs font-semibold text-slate-500">{classe.nombre_eleves ?? 0} élèves</span>
                 </div>
                 <span className="text-[11px] font-medium text-slate-400">{gs.length} tarif{gs.length > 1 ? "s" : ""} configuré{gs.length > 1 ? "s" : ""}</span>
@@ -379,7 +379,7 @@ export default function GrillesTarifaires({ classes, typesFrais, grilles, peutCr
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                         <div className="flex items-center gap-3">
                           <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold ${cfg.classe}`}>{g.type_frais?.nom || "—"}</span>
-                          <span className="text-lg font-black text-slate-900 font-mono tracking-tight tabular-nums">{formaterGNF(total)}</span>
+                          <span className="text-lg font-extrabold text-slate-900 tracking-tight tabular-nums">{formaterGNF(total)}</span>
                         </div>
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="text-[11px] font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 rounded">{LIBELLES_PUBLIC[g.applicable_a] || "Tous les élèves"}</span>
@@ -416,7 +416,7 @@ export default function GrillesTarifaires({ classes, typesFrais, grilles, peutCr
                         <div>
                           <div className="flex items-center justify-between text-[11px] text-slate-500 mb-1">
                             <span>Couverture de la grille</span>
-                            <span className="font-mono font-bold text-slate-700">
+                            <span className="font-bold text-slate-700 tabular-nums">
                               {g.nombre_eleves_couverts} élève{g.nombre_eleves_couverts > 1 ? "s" : ""} couvert{g.nombre_eleves_couverts > 1 ? "s" : ""} / {g.nombre_eleves_classe}
                             </span>
                           </div>
@@ -429,7 +429,7 @@ export default function GrillesTarifaires({ classes, typesFrais, grilles, peutCr
                       {g.echeances?.length > 0 && (
                         <div className="flex flex-wrap items-center gap-2">
                           {g.echeances.map((e) => (
-                            <span key={e.id} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-50 border border-slate-200 text-xs font-mono" title={`Date limite : ${formaterDateCourte(e.date_limite)}`}>
+                            <span key={e.id} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-50 border border-slate-200 text-xs tabular-nums" title={`Date limite : ${formaterDateCourte(e.date_limite)}`}>
                               <span className="font-bold text-slate-600">
                                 {e.libelle}
                                 {total > 0 && ` (${Math.round((Number(e.montant) / total) * 100)}%)`} :

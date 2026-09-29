@@ -268,7 +268,7 @@ export default function PaiementsCaisse({ etablissement = null }) {
               <span className={`text-[11px] font-bold uppercase tracking-wider ${c.titre}`}>{c.libelle}</span>
               <span className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs ${c.fond} ${c.couleur}`}>{c.pastille}</span>
             </div>
-            <div className={`text-lg sm:text-2xl font-black font-mono tracking-tight tabular-nums truncate ${c.couleur}`}>{chargement ? "…" : c.valeur}</div>
+            <div className={`text-lg sm:text-2xl font-extrabold tabular-nums tracking-tight truncate ${c.couleur}`}>{chargement ? "…" : c.valeur}</div>
             <div className="text-[11px] text-slate-400 mt-1 truncate">{c.detail}</div>
           </div>
         ))}
@@ -355,7 +355,7 @@ export default function PaiementsCaisse({ etablissement = null }) {
                           <span className="w-7 h-7 rounded-full bg-[#0C447C]/10 text-[#0C447C] font-bold text-[10px] flex items-center justify-center shrink-0">{initiales(v.eleve?.nom_complet)}</span>
                           <div className="min-w-0">
                             <div className="font-bold text-slate-900 truncate max-w-44">{v.eleve?.nom_complet || "—"}</div>
-                            <div className="font-mono text-[10px] text-slate-400">{v.eleve?.matricule}</div>
+                            <div className="text-[10px] text-slate-400 tabular-nums">{v.eleve?.matricule}</div>
                           </div>
                         </div>
                       </td>
@@ -367,13 +367,13 @@ export default function PaiementsCaisse({ etablissement = null }) {
                           {v.details.map((d) => (
                             <span key={d.id} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold whitespace-nowrap ${configTypeFrais(d.type_frais).classe}`}>
                               {libelleDetail(d)}
-                              {v.details.length > 1 && <span className="font-mono opacity-80">{d.montant.toLocaleString("fr-FR")}</span>}
+                              {v.details.length > 1 && <span className="opacity-80 tabular-nums">{d.montant.toLocaleString("fr-FR")}</span>}
                             </span>
                           ))}
                         </div>
                       </td>
                       <td className="py-3 px-4 text-right whitespace-nowrap">
-                        <span className="font-mono font-extrabold text-[#15803d] text-sm tabular-nums">{formaterGNF(v.montant)}</span>
+                        <span className="font-extrabold text-[#15803d] text-sm tabular-nums">{formaterGNF(v.montant)}</span>
                       </td>
                       <td className="py-3 px-3 whitespace-nowrap">
                         <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-semibold ${moyen?.classe || "bg-slate-100 text-slate-600"}`}>
@@ -381,7 +381,7 @@ export default function PaiementsCaisse({ etablissement = null }) {
                         </span>
                       </td>
                       <td className="py-3 px-3 whitespace-nowrap">
-                        <span className="font-mono text-[11px] text-slate-500 font-medium">{referenceVersement(v)}</span>
+                        <span className="text-[11px] text-slate-500 font-medium tabular-nums">{referenceVersement(v)}</span>
                         {v.caissier && <div className="text-[10px] text-slate-400">par {v.caissier}</div>}
                       </td>
                       <td className="py-3 px-4 text-right whitespace-nowrap">
@@ -436,7 +436,7 @@ export default function PaiementsCaisse({ etablissement = null }) {
           <div className="lg:col-span-4 p-4 rounded-xl bg-blue-50/60 border border-blue-100 flex flex-col justify-between">
             <div>
               <span className="text-xs font-bold text-[#0C447C] uppercase tracking-wider block mb-1">Volume total perçu</span>
-              <div className="text-2xl sm:text-3xl font-black text-[#0C447C] font-mono tabular-nums">{formaterGNF(totalFiltre)}</div>
+              <div className="text-2xl sm:text-3xl font-extrabold text-[#0C447C] tabular-nums">{formaterGNF(totalFiltre)}</div>
             </div>
             <div className="text-xs text-slate-500 mt-4">
               {filtres.length} versement{filtres.length > 1 ? "s" : ""} enregistré{filtres.length > 1 ? "s" : ""} en caisse, chacun avec son reçu.
@@ -451,7 +451,7 @@ export default function PaiementsCaisse({ etablissement = null }) {
                 <div key={cle} className="space-y-1">
                   <div className="flex justify-between text-xs">
                     <span className="font-semibold text-slate-700">{MOYENS[cle].emoji} {MOYENS[cle].libelle}</span>
-                    <span className="font-mono font-bold text-slate-800 tabular-nums">{formaterGNF(montant)} ({pct}%)</span>
+                    <span className="font-bold text-slate-800 tabular-nums">{formaterGNF(montant)} ({pct}%)</span>
                   </div>
                   <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
                     <div className={`h-full rounded-full ${MOYENS[cle].barre}`} style={{ width: `${pct}%` }} />
@@ -470,7 +470,7 @@ export default function PaiementsCaisse({ etablissement = null }) {
                 <div key={type} className="space-y-1">
                   <div className="flex justify-between text-xs">
                     <span className="font-semibold text-slate-700">{type}</span>
-                    <span className="font-mono font-bold text-slate-800 tabular-nums">{formaterGNF(montant)} ({pct}%)</span>
+                    <span className="font-bold text-slate-800 tabular-nums">{formaterGNF(montant)} ({pct}%)</span>
                   </div>
                   <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
                     <div className={`h-full rounded-full ${configTypeFrais(type).barre}`} style={{ width: `${pct}%` }} />

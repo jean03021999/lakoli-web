@@ -525,7 +525,7 @@ export default function FraisScolarite({ permissions = [], etablissement = null 
               <CreditCard className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h1 className="text-xl sm:text-2xl font-black tracking-tight">Frais de Scolarité & Facturation</h1>
+              <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight">Frais de Scolarité & Facturation</h1>
               <p className="text-xs sm:text-sm text-white/70 font-medium mt-0.5">Suivi des paiements · Inscriptions · Grilles tarifaires</p>
             </div>
           </div>
@@ -616,9 +616,9 @@ export default function FraisScolarite({ permissions = [], etablissement = null 
                     <span className={`w-9 h-9 rounded-xl ${c.fond} flex items-center justify-center ${c.couleur} transition-transform group-hover:scale-105`}>
                       <c.icone className="w-5 h-5" />
                     </span>
-                    <span className="font-mono text-xs text-slate-400 font-medium tabular-nums">{classeId && !chargementEleves ? `${pct}%` : ""}</span>
+                    <span className="text-xs text-slate-400 font-medium tabular-nums">{classeId && !chargementEleves ? `${pct}%` : ""}</span>
                   </div>
-                  <div className="text-2xl font-black text-slate-900 font-mono tracking-tight tabular-nums mb-0.5">{classeId && !chargementEleves ? valeur : "—"}</div>
+                  <div className="text-2xl font-extrabold text-slate-900 tracking-tight tabular-nums mb-0.5">{classeId && !chargementEleves ? valeur : "—"}</div>
                   <div className="text-xs font-semibold text-slate-700 truncate">{c.libelle}</div>
                   <div className="text-[11px] text-slate-400 truncate mt-0.5">{c.detail}</div>
                 </button>
@@ -727,7 +727,7 @@ export default function FraisScolarite({ permissions = [], etablissement = null 
                               {e.nom} {e.prenom}
                             </div>
                             <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
-                              <span className="font-mono text-[10px] text-slate-500 font-semibold whitespace-nowrap">{e.matricule}</span>
+                              <span className="text-[10px] text-slate-500 font-semibold whitespace-nowrap tabular-nums">{e.matricule}</span>
                               {classeId === "tous" && e.classe && (
                                 <>
                                   <span className="text-[10px] text-slate-400">·</span>
@@ -783,7 +783,7 @@ export default function FraisScolarite({ permissions = [], etablissement = null 
                             </span>
                           </div>
                           <div className="flex flex-wrap items-center gap-3 mt-1 text-xs text-slate-500">
-                            <span className="font-mono font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded">{eleveInfos.matricule}</span>
+                            <span className="font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded tabular-nums">{eleveInfos.matricule}</span>
                             {eleveInfos.inscription_active?.session_scolaire?.libelle && <span>Session {eleveInfos.inscription_active.session_scolaire.libelle}</span>}
                             <span>{estAncien ? "Ancien élève" : "Nouvel élève"}</span>
                           </div>
@@ -888,7 +888,7 @@ export default function FraisScolarite({ permissions = [], etablissement = null 
                         <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-blue-100">
                           <div>
                             <span className="text-[11px] font-bold text-slate-500 uppercase">Total à encaisser</span>
-                            <p className="text-lg font-black text-[#0C447C] font-mono">{formaterGNF(totalEncaisser)}</p>
+                            <p className="text-lg font-extrabold text-[#0C447C] tabular-nums">{formaterGNF(totalEncaisser)}</p>
                           </div>
                           <div className="flex gap-2">
                             <button type="button" onClick={() => setFormInscription(null)} className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-white border border-slate-200 cursor-pointer">
@@ -919,7 +919,7 @@ export default function FraisScolarite({ permissions = [], etablissement = null 
                           <div>
                             <span className="text-sm font-bold text-slate-900">Frais de {fraisInscription.type_frais}</span>
                             <div className="text-xs text-slate-500 mt-0.5">
-                              Montant : <strong className="font-mono text-slate-800">{formaterGNF(fraisInscription.montant_total)}</strong>
+                              Montant : <strong className="text-slate-800 tabular-nums">{formaterGNF(fraisInscription.montant_total)}</strong>
                             </div>
                           </div>
                         </div>
@@ -945,7 +945,7 @@ export default function FraisScolarite({ permissions = [], etablissement = null 
                               <span className="text-sm font-bold text-slate-900">{estAncien ? "Frais de réinscription" : "Frais d'inscription"}</span>
                               <div className="text-xs text-slate-500 mt-0.5">
                                 {montantGrille(estAncien ? typeReinscription : typeInscription) != null
-                                  ? <>Tarif de la classe : <strong className="font-mono text-slate-800">{formaterGNF(montantGrille(estAncien ? typeReinscription : typeInscription))}</strong></>
+                                  ? <>Tarif de la classe : <strong className="text-slate-800 tabular-nums">{formaterGNF(montantGrille(estAncien ? typeReinscription : typeInscription))}</strong></>
                                   : "Aucun tarif défini pour cette classe"}
                               </div>
                             </div>
@@ -987,7 +987,7 @@ export default function FraisScolarite({ permissions = [], etablissement = null 
                               </p>
                             </div>
                           </div>
-                          <span className={`inline-block px-3 py-1 rounded-xl text-xs font-mono font-bold ${cfg.classe}`}>{formaterGNF(f.montant_total)}</span>
+                          <span className={`inline-block px-3 py-1 rounded-xl text-xs tabular-nums font-bold ${cfg.classe}`}>{formaterGNF(f.montant_total)}</span>
                         </div>
 
                         <div className="space-y-3">
@@ -1010,7 +1010,7 @@ export default function FraisScolarite({ permissions = [], etablissement = null 
                                     </div>
                                   </div>
                                   <div className="flex-1 sm:max-w-md sm:px-2">
-                                    <div className="flex items-center justify-between text-xs font-mono mb-1.5">
+                                    <div className="flex items-center justify-between text-xs mb-1.5 tabular-nums">
                                       <span className="font-bold text-slate-800 tabular-nums">{formaterGNF(ech.montant_paye)}</span>
                                       <span className="text-slate-400 tabular-nums">sur {formaterGNF(ech.montant)}</span>
                                     </div>
@@ -1105,23 +1105,23 @@ export default function FraisScolarite({ permissions = [], etablissement = null 
                           <h3 className="text-sm font-extrabold text-slate-900 uppercase tracking-wider">Situation financière globale</h3>
                           <p className="text-xs text-slate-400">Synthèse de tous les frais de l'élève</p>
                         </div>
-                        <span className="font-mono text-xs font-bold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-lg shrink-0">Progression : {pctGlobal}%</span>
+                        <span className="text-xs font-bold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-lg shrink-0 tabular-nums">Progression : {pctGlobal}%</span>
                       </div>
 
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 mb-5">
                         <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80">
                           <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Total dû</span>
-                          <div className="text-xl font-black text-slate-900 font-mono tabular-nums">{formaterGNF(totalDuGlobal)}</div>
+                          <div className="text-xl font-extrabold text-slate-900 tabular-nums">{formaterGNF(totalDuGlobal)}</div>
                           <span className="text-[11px] text-slate-400">Tous frais confondus</span>
                         </div>
                         <div className="p-3.5 rounded-xl bg-[#dcfce7]/60 border border-[#bbf7d0]">
                           <span className="text-[11px] font-bold text-[#15803d] uppercase tracking-wider block mb-1">Total encaissé</span>
-                          <div className="text-xl font-black text-[#15803d] font-mono tabular-nums">{formaterGNF(totalPayeGlobal)}</div>
+                          <div className="text-xl font-extrabold text-[#15803d] tabular-nums">{formaterGNF(totalPayeGlobal)}</div>
                           <span className="text-[11px] text-[#15803d]/70 font-medium">Paiements enregistrés</span>
                         </div>
                         <div className={`p-3.5 rounded-xl border ${resteGlobal > 0 ? "bg-amber-50/70 border-amber-200" : "bg-emerald-50/50 border-emerald-200"}`}>
                           <span className={`text-[11px] font-bold uppercase tracking-wider block mb-1 ${resteGlobal > 0 ? "text-amber-800" : "text-emerald-800"}`}>Reste à percevoir</span>
-                          <div className={`text-xl font-black font-mono tabular-nums ${resteGlobal > 0 ? "text-amber-700" : "text-emerald-700"}`}>{formaterGNF(resteGlobal)}</div>
+                          <div className={`text-xl font-extrabold tabular-nums ${resteGlobal > 0 ? "text-amber-700" : "text-emerald-700"}`}>{formaterGNF(resteGlobal)}</div>
                           <span className="text-[11px] text-slate-400">{resteGlobal === 0 ? "Tout est réglé" : "Échéances en cours"}</span>
                         </div>
                       </div>
@@ -1144,8 +1144,8 @@ export default function FraisScolarite({ permissions = [], etablissement = null 
                                   {f.type_frais}
                                   {f.echeances.length > 1 && <span className="text-slate-400 font-normal"> ({f.echeances.length} échéances)</span>}
                                 </div>
-                                <div className="col-span-3 text-right font-mono text-slate-700 tabular-nums">{formaterGNF(du)}</div>
-                                <div className="col-span-3 text-right font-mono font-bold text-emerald-700 tabular-nums">{formaterGNF(paye)}</div>
+                                <div className="col-span-3 text-right text-slate-700 tabular-nums">{formaterGNF(du)}</div>
+                                <div className="col-span-3 text-right font-bold text-emerald-700 tabular-nums">{formaterGNF(paye)}</div>
                                 <div className="col-span-2 text-right">
                                   <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${st.badge}`}>{st.libelle}</span>
                                 </div>
