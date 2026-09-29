@@ -37,6 +37,18 @@ import Salaires from "./pages/modules/Salaires";
 
 const AUTH_PATHS = ["/", "/verification-otp", "/mot-de-passe-oublie", "/reinitialiser-mot-de-passe"];
 
+// Derniere session connue (role, permissions, etablissement...) : reprise au demarrage quand le
+// serveur est injoignable, pour ne pas deconnecter l'utilisateur a cause d'une coupure reseau.
+const CLE_SESSION = "lakoli_session";
+
+function lireSessionMemorisee() {
+  try {
+    return JSON.parse(localStorage.getItem(CLE_SESSION) || "null");
+  } catch {
+    return null;
+  }
+}
+
 // Redirige vers le tableau de bord (accessible a tous les roles) si l'utilisateur
 // n'a pas la permission requise, au lieu de se fier uniquement au bouton masque
 // cote UI (qui n'empeche pas la navigation directe par URL).
@@ -55,6 +67,8 @@ function AppContent() {
   const [session, setSession] = useState(null);
   const [utilisateur, setUtilisateur] = useState(null);
   const [chargementRole, setChargementRole] = useState(true);
+  const [serveurInjoignable, setServeurInjoignable] = useState(false);
+  const [tentative, setTentative] = useState(0);
 
   const estPageAuth = AUTH_PATHS.includes(location.pathname);
 
@@ -68,25 +82,43 @@ function AppContent() {
       setChargementRole(false);
       return;
     }
+    const appliquer = (donnees) => {
+      setRole(donnees.role);
+      setPermissions(donnees.permissions || []);
+      setEtablissement(donnees.etablissement || null);
+      definirEtablissement(donnees.etablissement);
+      setSession(donnees.session || null);
+      setUtilisateur(donnees.user || null);
+    };
     api.get("/user")
       .then((res) => {
-        setRole(res.data.role);
-        setPermissions(res.data.permissions || []);
-        setEtablissement(res.data.etablissement || null);
-        definirEtablissement(res.data.etablissement);
-        setSession(res.data.session || null);
-        setUtilisateur(res.data.user || null);
+        appliquer(res.data);
+        setServeurInjoignable(false);
+        try {
+          localStorage.setItem(CLE_SESSION, JSON.stringify(res.data));
+        } catch {
+          // stockage indisponible : pas de reprise hors ligne, sans autre consequence
+        }
         if (res.data.user?.name) {
           localStorage.setItem("user_name", res.data.user.name);
         }
       })
-      .catch(() => {
-        localStorage.removeItem("auth_token");
-        localStorage.removeItem("device_token");
-        setRole(null);
+      .catch((err) => {
+        // Jeton refuse par le serveur : vraie deconnexion.
+        if (err.response?.status === 401) {
+          localStorage.removeItem("auth_token");
+          localStorage.removeItem("device_token");
+          localStorage.removeItem(CLE_SESSION);
+          setRole(null);
+          return;
+        }
+        // Serveur injoignable (coupure reseau...) : on garde la connexion et la derniere session.
+        const memorisee = lireSessionMemorisee();
+        if (memorisee) appliquer(memorisee);
+        setServeurInjoignable(true);
       })
       .finally(() => setChargementRole(false));
-  }, [estPageAuth]);
+  }, [estPageAuth, tentative]);
 
   if (estPageAuth) {
     return (
@@ -103,6 +135,26 @@ function AppContent() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC] text-slate-400 text-sm">
         Chargement...
+      </div>
+    );
+  }
+
+  if (!role && serveurInjoignable) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC] p-6">
+        <div className="max-w-sm w-full bg-white rounded-2xl border border-slate-200 shadow-sm p-6 text-center space-y-3">
+          <p className="text-base font-bold text-slate-900">Serveur LAKOLI injoignable</p>
+          <p className="text-sm text-slate-500">Vérifiez la connexion réseau puis réessayez. Vous restez connecté.</p>
+          <button
+            onClick={() => {
+              setChargementRole(true);
+              setTentative((n) => n + 1);
+            }}
+            className="px-4 py-2 rounded-xl bg-[#0C447C] text-white text-sm font-semibold cursor-pointer"
+          >
+            Réessayer
+          </button>
+        </div>
       </div>
     );
   }

@@ -25,6 +25,7 @@ import {
   DollarSign,
   Building,
   AlertTriangle,
+  WifiOff,
 } from "lucide-react";
 
 const COULEURS = {
@@ -296,6 +297,7 @@ export default function Layout({ children, role, permissions = [], etablissement
   const handleDeconnexion = () => {
     localStorage.removeItem("auth_token");
     localStorage.removeItem("device_token");
+    localStorage.removeItem("lakoli_session");
     navigate("/");
   };
 
@@ -341,6 +343,15 @@ export default function Layout({ children, role, permissions = [], etablissement
 
         {/* Contenu principal (seule zone qui défile) */}
         <main className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden min-w-0 px-4 sm:px-6 md:px-8 py-6 space-y-6" style={{ background: cssFond(apparence) }}>
+          {!enLigne && (
+            <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              <WifiOff className="h-4 w-4 mt-0.5 shrink-0" />
+              <p>
+                <strong>Vous êtes hors ligne.</strong> L'application reste ouverte, mais les données ne peuvent être ni chargées ni enregistrées tant que la connexion
+                n'est pas revenue.
+              </p>
+            </div>
+          )}
           {children}
         </main>
         </div>
