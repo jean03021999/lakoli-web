@@ -180,7 +180,6 @@ export default function Layout({ children, role, permissions = [], etablissement
   const location = useLocation();
   const [menuMobileOuvert, setMenuMobileOuvert] = useState(false);
   const [notifications, setNotifications] = useState([]);
-  const [eleves, setEleves] = useState([]); // aussi utilises par la recherche de l'en-tete
   const [effectif, setEffectif] = useState(null);
   const [apparence, setApparence] = useState(lireApparence);
   const [alertes, setAlertes] = useState(lireAlertes);
@@ -192,19 +191,13 @@ export default function Layout({ children, role, permissions = [], etablissement
 
   // Notifications réelles : élèves en retard (eleves.voir) + évaluations soumises en attente
   // de validation (notes.voir), chacune seulement si l'utilisateur a la permission.
+  // /eleves est lourd (statut de paiement de chaque eleve) : les compteurs sont gardes 5 minutes
+  // dans l'onglet et demandes apres le chargement de la page, pour ne pas la retarder.
   useEffect(() => {
-    async function chargerNotifications() {
-      const [eleves, evaluations] = await Promise.allSettled([
-        peutVoirEleves ? api.get("/eleves") : Promise.reject(),
-        peutVoirNotes ? api.get("/evaluations", { params: { vue: "direction" } }) : Promise.reject(),
-      ]);
-
+    const CLE = "lakoli_compteurs_alertes";
+    const construire = ({ nbRetard, nbSoumises, total }) => {
+      setEffectif(total ?? null);
       const liste = [];
-      if (eleves.status === "fulfilled") {
-        setEleves(eleves.value.data.eleves || []);
-        setEffectif(eleves.value.data.stats?.total ?? null);
-      }
-      const nbRetard = eleves.status === "fulfilled" ? eleves.value.data.stats.en_retard || 0 : 0;
       if (nbRetard > 0) {
         liste.push({
           id: "retards",
@@ -215,9 +208,6 @@ export default function Layout({ children, role, permissions = [], etablissement
           chemin: "/eleves",
         });
       }
-      const nbSoumises = evaluations.status === "fulfilled"
-        ? evaluations.value.data.filter((ev) => ev.statut === "soumis").length
-        : 0;
       if (nbSoumises > 0) {
         liste.push({
           id: "evaluations",
@@ -229,8 +219,36 @@ export default function Layout({ children, role, permissions = [], etablissement
         });
       }
       setNotifications(liste);
+    };
+    async function chargerNotifications() {
+      const [eleves, evaluations] = await Promise.allSettled([
+        peutVoirEleves ? api.get("/eleves") : Promise.reject(),
+        peutVoirNotes ? api.get("/evaluations", { params: { vue: "direction" } }) : Promise.reject(),
+      ]);
+      const compteurs = {
+        nbRetard: eleves.status === "fulfilled" ? eleves.value.data.stats?.en_retard || 0 : 0,
+        total: eleves.status === "fulfilled" ? eleves.value.data.stats?.total ?? null : null,
+        nbSoumises: evaluations.status === "fulfilled" ? evaluations.value.data.filter((ev) => ev.statut === "soumis").length : 0,
+      };
+      construire(compteurs);
+      try {
+        sessionStorage.setItem(CLE, JSON.stringify({ ...compteurs, le: Date.now(), role }));
+      } catch {
+        // stockage indisponible : rechargement a la prochaine ouverture
+      }
     }
-    if (role) chargerNotifications();
+    if (!role) return;
+    try {
+      const memo = JSON.parse(sessionStorage.getItem(CLE) || "null");
+      if (memo && memo.role === role && Date.now() - memo.le < 5 * 60 * 1000) {
+        construire(memo);
+        return;
+      }
+    } catch {
+      // cache illisible : on recharge
+    }
+    const minuteur = setTimeout(chargerNotifications, 1500);
+    return () => clearTimeout(minuteur);
   }, [role, peutVoirEleves, peutVoirNotes]);
 
   // Preferences de ce navigateur (module Parametres) : fond, police et alertes affichees.
@@ -298,6 +316,7 @@ export default function Layout({ children, role, permissions = [], etablissement
     localStorage.removeItem("auth_token");
     localStorage.removeItem("device_token");
     localStorage.removeItem("lakoli_session");
+    sessionStorage.removeItem("lakoli_compteurs_alertes");
     navigate("/");
   };
 
@@ -333,7 +352,6 @@ export default function Layout({ children, role, permissions = [], etablissement
         libelleRole={LABELS_ROLES[role] || role}
         enLigne={enLigne}
         notifications={notificationsAffichees}
-        eleves={eleves}
         modules={modulesVisibles}
         permissions={permissions}
         onMenu={() => setMenuMobileOuvert(true)}

@@ -41,7 +41,7 @@ function IconeResultat({ type, className }) {
   return <ArrowRight className={className} />;
 }
 
-export default function EnTete({ etablissement, session, utilisateur, libelleRole, enLigne, notifications, eleves, modules, permissions, onMenu, onNaviguer, onDeconnexion }) {
+export default function EnTete({ etablissement, session, utilisateur, libelleRole, enLigne, notifications, modules, permissions, onMenu, onNaviguer, onDeconnexion }) {
   const [notifsOuvert, setNotifsOuvert] = useState(false);
   const [profilOuvert, setProfilOuvert] = useState(false);
   const [rechercheMobile, setRechercheMobile] = useState(false);
@@ -60,15 +60,17 @@ export default function EnTete({ etablissement, session, utilisateur, libelleRol
   const nomUtilisateur = utilisateur?.name || "Utilisateur";
   const nonLues = notifications.filter((n) => !notifsLues.includes(cleNotif(n)));
 
-  // Donnees de recherche chargees a la premiere ouverture (les eleves viennent de Layout).
+  // Donnees de recherche chargees a la premiere ouverture de la recherche seulement.
   const chargerIndex = () => {
     if (index) return;
-    setIndex({ enseignants: [], classes: [] });
+    setIndex({ eleves: [], enseignants: [], classes: [] });
     Promise.allSettled([
+      permissions.includes("eleves.voir") ? api.get("/eleves") : Promise.reject(),
       permissions.includes("enseignants.voir") ? api.get("/enseignants") : Promise.reject(),
       permissions.includes("classes.voir") ? api.get("/classes") : Promise.reject(),
-    ]).then(([ens, cls]) =>
+    ]).then(([elv, ens, cls]) =>
       setIndex({
+        eleves: elv.status === "fulfilled" ? elv.value.data.eleves || [] : [],
         enseignants: ens.status === "fulfilled" ? ens.value.data.enseignants || [] : [],
         classes: cls.status === "fulfilled" ? cls.value.data || [] : [],
       })
@@ -94,7 +96,7 @@ export default function EnTete({ etablissement, session, utilisateur, libelleRol
   const resultats = termes.length === 0
     ? raccourcis.slice(0, 6)
     : [
-        ...(eleves || [])
+        ...(index?.eleves || [])
           .map((e) => ({
             id: `e-${e.id}`,
             type: "eleve",

@@ -1,4 +1,3 @@
-import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.jsx'
@@ -11,8 +10,6 @@ if (import.meta.env.PROD && 'serviceWorker' in navigator) {
   })
 }
 
-createRoot(document.getElementById('root')).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
-)
+// Sans StrictMode : en developpement il execute chaque chargement de donnees deux fois, ce qui
+// double l'attente avec `php artisan serve` (une requete a la fois). Aucun effet en production.
+createRoot(document.getElementById('root')).render(<App />)
