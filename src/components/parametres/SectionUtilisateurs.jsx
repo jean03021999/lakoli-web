@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { Users, ShieldCheck, ChevronDown, ChevronUp, Search, Phone, Ban } from "lucide-react";
 import api from "../../services/api";
+import AvatarUtilisateur from "../AvatarUtilisateur";
 import { Carte } from "./ui";
-import { LIBELLES_ROLES, initiales, momentRelatif } from "./outils";
+import { LIBELLES_ROLES, momentRelatif } from "./outils";
 
 const STYLES_ROLES = {
   FONDATEUR: "bg-purple-50 text-purple-700 border-purple-200",
@@ -93,7 +94,7 @@ export default function SectionUtilisateurs({ roles }) {
                   <tr key={u.id} className="hover:bg-slate-50/80 transition-colors">
                     <td className="py-3.5 px-3">
                       <div className="flex items-center gap-3">
-                        <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-white font-bold text-xs shrink-0 ${COULEURS_AVATAR[u.id % COULEURS_AVATAR.length]}`}>{initiales(u.name)}</div>
+                        <AvatarUtilisateur nom={u.name} photoUrl={u.photo_url} className="w-9 h-9 rounded-xl text-xs" classeFond={COULEURS_AVATAR[u.id % COULEURS_AVATAR.length]} />
                         <div className="min-w-0">
                           <p className="font-bold text-slate-900 text-sm truncate">{u.name}</p>
                           <p className="text-slate-400 text-[11px] truncate">{u.email}</p>

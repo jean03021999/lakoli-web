@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import api from "../services/api";
 import EnTete from "./EnTete";
+import AvatarUtilisateur from "./AvatarUtilisateur";
 import { lireApparence, cssFond, chargerPolice, POLICES, EVENEMENT_APPARENCE, lireAlertes, EVENEMENT_ALERTES } from "./parametres/outils";
 import {
   GraduationCap,
@@ -75,15 +76,6 @@ const LABELS_ROLES = {
 
 export { COULEURS };
 
-function initiales(nom) {
-  if (!nom) return "U";
-  return nom
-    .trim()
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((p) => p[0]?.toUpperCase() || "")
-    .join("");
-}
 
 // Contenu de la barre laterale (design Google AI Studio), commun au bureau et au tiroir mobile :
 // logo + drapeau guineen, etablissement/session reels, modules visibles selon les permissions,
@@ -95,7 +87,7 @@ const FOND_SIDEBAR = {
   backgroundPosition: "center",
 };
 
-function ContenuSidebar({ modules, estActif, onNaviguer, etablissement, session, nomUtilisateur, libelleRole, enLigne, onDeconnexion }) {
+function ContenuSidebar({ modules, estActif, onNaviguer, etablissement, session, nomUtilisateur, photoUtilisateur, libelleRole, enLigne, onDeconnexion }) {
   return (
     <div className="h-full flex flex-col">
       {/* Logo LAKOLI + mini drapeau guineen */}
@@ -156,12 +148,7 @@ function ContenuSidebar({ modules, estActif, onNaviguer, etablissement, session,
       <div className="p-3 border-t border-white/10 space-y-2 shrink-0">
         <div className="flex items-center gap-3 px-2 py-2 rounded-xl bg-white/10">
           <span className="relative shrink-0">
-            <span
-              className="h-9 w-9 rounded-full flex items-center justify-center text-white text-xs font-bold"
-              style={{ background: "linear-gradient(135deg, #f59e0b 0%, #f97316 100%)" }}
-            >
-              {initiales(nomUtilisateur)}
-            </span>
+            <AvatarUtilisateur nom={nomUtilisateur} photoUrl={photoUtilisateur} className="h-9 w-9 rounded-full text-xs" fond="linear-gradient(135deg, #f59e0b 0%, #f97316 100%)" />
             <span
               className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full ring-2 ring-[#0b3a6b] ${enLigne ? "bg-emerald-400" : "bg-slate-400"}`}
               title={enLigne ? "En ligne" : "Hors ligne"}
@@ -303,6 +290,7 @@ export default function Layout({ children, role, permissions = [], etablissement
             etablissement={etablissement}
             session={session}
             nomUtilisateur={nomUtilisateur}
+            photoUtilisateur={utilisateur?.photo_url}
             libelleRole={LABELS_ROLES[role] || role}
             enLigne={enLigne}
             onDeconnexion={handleDeconnexion}
@@ -378,6 +366,7 @@ export default function Layout({ children, role, permissions = [], etablissement
               etablissement={etablissement}
               session={session}
               nomUtilisateur={nomUtilisateur}
+              photoUtilisateur={utilisateur?.photo_url}
               libelleRole={LABELS_ROLES[role] || role}
               enLigne={enLigne}
               onDeconnexion={handleDeconnexion}

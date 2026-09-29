@@ -1,11 +1,17 @@
-import { useState } from "react";
-import { User, Shield, Mail, Phone, CalendarDays } from "lucide-react";
+import { useRef, useState } from "react";
+import { User, Shield, Mail, Phone, CalendarDays, Upload, Trash2, Loader2 } from "lucide-react";
 import api from "../../services/api";
+import AvatarUtilisateur from "../AvatarUtilisateur";
 import { Carte, Champ, AvecIcone, BoutonEnregistrer } from "./ui";
-import { CHAMP, LIBELLES_ROLES, dateLongue, initiales, messageErreur } from "./outils";
+import { CHAMP, LIBELLES_ROLES, dateLongue, messageErreur } from "./outils";
 
+const TAILLE_MAX_PHOTO = 2 * 1024 * 1024;
+
+// Profil du compte connecte (tous les roles) : photo, nom, e-mail et telephone.
 export default function SectionProfil({ profil, onMaj, onToast }) {
   const [form, setForm] = useState({ name: profil.name || "", email: profil.email || "", telephone: profil.telephone || "" });
+  const [envoiPhoto, setEnvoiPhoto] = useState(false);
+  const refFichier = useRef(null);
   const maj = (champ, valeur) => setForm((f) => ({ ...f, [champ]: valeur }));
   const role = LIBELLES_ROLES[String(profil.role || "").toUpperCase()] || profil.role || "Aucun rôle";
 
@@ -24,20 +30,56 @@ export default function SectionProfil({ profil, onMaj, onToast }) {
     }
   };
 
+  const envoyerPhoto = async (e) => {
+    const fichier = e.target.files?.[0];
+    e.target.value = "";
+    if (!fichier) return;
+    if (fichier.size > TAILLE_MAX_PHOTO) {
+      onToast("Photo trop lourde", "La photo ne doit pas dépasser 2 Mo.", "warning");
+      return;
+    }
+    const donnees = new FormData();
+    donnees.append("photo", fichier);
+    setEnvoiPhoto(true);
+    try {
+      const res = await api.post("/parametres/profil/photo", donnees);
+      onMaj(res.data);
+      onToast("Photo enregistrée", "Votre photo apparaît désormais dans l'en-tête et auprès du personnel.");
+    } catch (err) {
+      onToast("Photo refusée", messageErreur(err, "Impossible d'enregistrer cette photo."), "warning");
+    } finally {
+      setEnvoiPhoto(false);
+    }
+  };
+
+  const supprimerPhoto = async () => {
+    if (!window.confirm("Supprimer votre photo de profil ?")) return;
+    try {
+      const res = await api.delete("/parametres/profil/photo");
+      onMaj(res.data);
+      onToast("Photo supprimée", "Vos initiales remplacent la photo.", "info");
+    } catch (err) {
+      onToast("Suppression impossible", messageErreur(err, "Erreur lors de la suppression."), "warning");
+    }
+  };
+
   return (
     <div className="space-y-6">
-      <Carte icone={User} titre="Identité du compte" description="Tel que vous apparaissez auprès du personnel de l'établissement">
+      <Carte icone={User} titre="Photo de profil" description="Visible dans l'en-tête et par le personnel de l'établissement">
         <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6">
-          <div
-            style={{ background: "linear-gradient(135deg, #0C447C 0%, #1a6bb5 100%)" }}
-            className="w-20 h-20 rounded-2xl flex items-center justify-center text-white text-2xl font-bold tracking-wider shadow-md shrink-0"
-          >
-            {initiales(form.name)}
+          <input ref={refFichier} type="file" accept="image/png,image/jpeg,image/webp" onChange={envoyerPhoto} className="hidden" />
+          <div className="relative">
+            <AvatarUtilisateur nom={form.name} photoUrl={profil.photo_url} className="w-20 h-20 rounded-2xl text-2xl tracking-wider shadow-md border-2 border-slate-200" />
+            {envoiPhoto && (
+              <span className="absolute inset-0 rounded-2xl bg-black/40 flex items-center justify-center">
+                <Loader2 className="w-6 h-6 text-white animate-spin" />
+              </span>
+            )}
           </div>
           <div className="flex-1 text-center sm:text-left space-y-2">
             <p className="text-xl font-bold text-slate-900">{form.name || "—"}</p>
             <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200">{role}</span>
+              <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200">{role}</span>
               {profil.membre_depuis && (
                 <span className="inline-flex items-center gap-1.5 text-xs text-slate-500">
                   <CalendarDays className="w-3.5 h-3.5" />
@@ -45,7 +87,29 @@ export default function SectionProfil({ profil, onMaj, onToast }) {
                 </span>
               )}
             </div>
-            <p className="text-xs text-slate-400">L'avatar reprend automatiquement les initiales de votre nom.</p>
+            <div className="flex flex-wrap items-center justify-center sm:justify-start gap-3 pt-1">
+              <button
+                type="button"
+                disabled={envoiPhoto}
+                onClick={() => refFichier.current?.click()}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl transition disabled:opacity-50 cursor-pointer"
+              >
+                <Upload className="w-3.5 h-3.5" />
+                {envoiPhoto ? "Envoi en cours..." : profil.photo_url ? "Changer la photo" : "Ajouter une photo"}
+              </button>
+              {profil.photo_url && (
+                <button
+                  type="button"
+                  disabled={envoiPhoto}
+                  onClick={supprimerPhoto}
+                  className="inline-flex items-center gap-2 px-3 py-2 text-rose-600 hover:bg-rose-50 text-xs font-semibold rounded-xl transition border border-rose-200 disabled:opacity-50 cursor-pointer"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Supprimer
+                </button>
+              )}
+            </div>
+            <p className="text-xs text-slate-400">Image carrée de préférence (PNG, JPG ou WebP, 2 Mo maximum).</p>
           </div>
         </div>
       </Carte>

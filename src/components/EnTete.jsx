@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useId } from "react";
 import api from "../services/api";
+import AvatarUtilisateur from "./AvatarUtilisateur";
 import { Menu, Building2, Calendar, Search, Bell, ChevronDown, Settings, LogOut, X, CheckCheck, GraduationCap, Users, School, ArrowRight, Mail } from "lucide-react";
 
 // En-tete de l'application (design "Header & gestion scolaire guineenne") sur donnees reelles :
@@ -19,11 +20,6 @@ const STATUTS_ELEVE = {
 
 function normaliser(texte) {
   return (texte || "").normalize("NFD").replace(/\p{Mn}/gu, "").toLowerCase();
-}
-
-function initiales(nom) {
-  if (!nom) return "U";
-  return nom.trim().split(/\s+/).slice(0, 2).map((p) => p[0]?.toUpperCase() || "").join("");
 }
 
 // Notifications deja lues : conservees dans ce navigateur (confort personnel, sans importance si perdu).
@@ -465,9 +461,7 @@ export default function EnTete({ etablissement, session, utilisateur, libelleRol
                 aria-label="Menu du compte"
                 className="flex items-center gap-2.5 rounded-xl p-1.5 hover:bg-[#f1f5f9] transition-colors group cursor-pointer"
               >
-                <div style={{ background: "linear-gradient(135deg, #0C447C 0%, #1a6bb5 100%)" }} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-white ring-2 ring-white">
-                  <span className="text-[12px] font-bold tracking-tight">{initiales(nomUtilisateur)}</span>
-                </div>
+                <AvatarUtilisateur nom={nomUtilisateur} photoUrl={utilisateur?.photo_url} className="h-8 w-8 rounded-full ring-2 ring-white text-[12px]" />
                 <div className="hidden lg:flex flex-col text-left leading-none">
                   <span className="text-[13px] font-semibold text-[#1e293b] group-hover:text-[#0C447C] transition-colors">{nomUtilisateur}</span>
                   <span className="mt-1 text-[11px] text-[#64748b] font-medium">{libelleRole}</span>
@@ -481,9 +475,7 @@ export default function EnTete({ etablissement, session, utilisateur, libelleRol
                   className="absolute right-0 top-full mt-2 w-[250px] rounded-[14px] border border-[#e2e8f0] bg-white p-2 animate-dropdown z-50"
                 >
                   <div className="flex items-center gap-3 p-2.5">
-                    <div style={{ background: "linear-gradient(135deg, #0C447C 0%, #1a6bb5 100%)" }} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-white ring-2 ring-slate-100">
-                      <span className="text-[14px] font-bold">{initiales(nomUtilisateur)}</span>
-                    </div>
+                    <AvatarUtilisateur nom={nomUtilisateur} photoUrl={utilisateur?.photo_url} className="h-11 w-11 rounded-full ring-2 ring-slate-100 text-[14px]" />
                     <div className="min-w-0 flex-1">
                       <p className="text-[13px] font-bold text-[#1e293b] truncate">{nomUtilisateur}</p>
                       {libelleRole && <span className="inline-block rounded bg-[#eff6ff] px-1.5 py-0.5 text-[10px] font-semibold text-[#1d4ed8]">{libelleRole}</span>}
