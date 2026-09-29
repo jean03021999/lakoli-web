@@ -80,12 +80,8 @@ export { COULEURS };
 // Contenu de la barre laterale (design Google AI Studio), commun au bureau et au tiroir mobile :
 // logo + drapeau guineen, etablissement/session reels, modules visibles selon les permissions,
 // carte utilisateur et deconnexion.
-// Fond de la barre laterale : photo de salle de classe sous un voile bleu (lisibilite du menu).
-const FOND_SIDEBAR = {
-  backgroundImage: "linear-gradient(180deg, rgba(12,68,124,0.75) 0%, rgba(10,45,90,0.85) 100%), url('/images/login-bg.jpeg')",
-  backgroundSize: "cover",
-  backgroundPosition: "center",
-};
+// Fond de la barre laterale (bureau et tiroir mobile).
+const FOND_SIDEBAR = { background: "linear-gradient(180deg, #0C447C 0%, #0a2d5a 100%)" };
 
 function ContenuSidebar({ modules, estActif, onNaviguer, etablissement, session, nomUtilisateur, photoUtilisateur, libelleRole, enLigne, onDeconnexion }) {
   return (
