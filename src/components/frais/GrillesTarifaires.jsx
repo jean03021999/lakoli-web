@@ -1,10 +1,14 @@
 import { useState } from "react";
 import api from "../../services/api";
-import { Plus, RefreshCw, Layers, SlidersHorizontal, Trash2, Tag } from "lucide-react";
+import { Plus, RefreshCw, Layers, SlidersHorizontal, Trash2, Tag, Pencil, Settings2 } from "lucide-react";
 import { STYLE_CARTE, configTypeFrais, formaterGNF, formaterDateCourte, normaliser } from "./configFrais";
+import ModaleGrille from "./ModaleGrille";
+import ModaleTypesFrais from "./ModaleTypesFrais";
 
 // Onglet "Grilles tarifaires" (design "Frais de scolarite & facturation") : creation a gauche,
 // grilles existantes regroupees par classe a droite. Donnees reelles de /frais/grilles.
+// Chaque grille se modifie (montant, echeances) ou se supprime ; les types de frais se renomment
+// ou se suppriment (le serveur refuse ce qui a deja servi).
 
 const PUBLICS = [
   { id: "tous", libelle: "Tous", desc: "Tout l'effectif" },
@@ -49,6 +53,8 @@ export default function GrillesTarifaires({ classes, typesFrais, grilles, peutCr
   const [filtreClasse, setFiltreClasse] = useState("tous");
   const [filtreType, setFiltreType] = useState("tous");
   const [actionEnCours, setActionEnCours] = useState(null);
+  const [grilleEnEdition, setGrilleEnEdition] = useState(null);
+  const [typesOuverts, setTypesOuverts] = useState(false);
 
   const type = typesFrais.find((t) => String(t.id) === String(typeId));
   const parEleve = type && estParEleve(type.nom);
@@ -124,6 +130,20 @@ export default function GrillesTarifaires({ classes, typesFrais, grilles, peutCr
     }
   };
 
+  const supprimerGrille = async (grille) => {
+    if (!window.confirm(`Supprimer la grille « ${grille.type_frais?.nom} » de ${grille.classe?.nom} ?\n\nLes frais qu'elle a créés pour les élèves seront retirés. Refusé si un élève a déjà payé dessus.`)) return;
+    setActionEnCours(`supprimer-${grille.id}`);
+    try {
+      const res = await api.delete(`/frais/grilles/${grille.id}`);
+      onMessage("succes", res.data.message);
+      await onGrillesModifiees();
+    } catch (err) {
+      onMessage("erreur", err.response?.data?.message || "Suppression impossible.");
+    } finally {
+      setActionEnCours(null);
+    }
+  };
+
   // Grilles filtrees, regroupees par classe dans l'ordre pedagogique de /classes.
   const filtrees = grilles.filter(
     (g) => (filtreClasse === "tous" || String(g.classe_id) === filtreClasse) && (filtreType === "tous" || String(g.type_frais_id) === filtreType)
@@ -171,6 +191,14 @@ export default function GrillesTarifaires({ classes, typesFrais, grilles, peutCr
                   className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-dashed border-slate-300 text-slate-500 hover:bg-slate-50 cursor-pointer inline-flex items-center gap-1"
                 >
                   <Tag className="w-3 h-3" /> Nouveau type
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTypesOuverts(true)}
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-slate-200 text-slate-500 hover:bg-slate-50 cursor-pointer inline-flex items-center gap-1"
+                  title="Renommer ou supprimer des types de frais"
+                >
+                  <Settings2 className="w-3 h-3" /> Gérer
                 </button>
               </div>
               {ajoutType && (
@@ -409,6 +437,27 @@ export default function GrillesTarifaires({ classes, typesFrais, grilles, peutCr
                               Synchroniser
                             </button>
                           )}
+                          {peutCreer && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => setGrilleEnEdition(g)}
+                                className="p-1.5 rounded-lg text-slate-400 hover:text-[#0C447C] hover:bg-blue-50 cursor-pointer"
+                                title="Modifier le montant et les échéances"
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                disabled={actionEnCours === `supprimer-${g.id}`}
+                                onClick={() => supprimerGrille(g)}
+                                className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 cursor-pointer disabled:opacity-40"
+                                title="Supprimer cette grille"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </>
+                          )}
                         </div>
                       </div>
 
@@ -448,6 +497,21 @@ export default function GrillesTarifaires({ classes, typesFrais, grilles, peutCr
           ))
         )}
       </div>
+
+      {grilleEnEdition && (
+        <ModaleGrille
+          grille={grilleEnEdition}
+          onFermer={() => setGrilleEnEdition(null)}
+          onEnregistree={async (message) => {
+            setGrilleEnEdition(null);
+            onMessage("succes", message);
+            await onGrillesModifiees();
+          }}
+        />
+      )}
+      {typesOuverts && (
+        <ModaleTypesFrais typesFrais={typesFrais} onFermer={() => setTypesOuverts(false)} onModifies={onTypesModifies} onMessage={onMessage} />
+      )}
     </div>
   );
 }

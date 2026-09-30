@@ -383,7 +383,7 @@ function TableauDeBordComptable({ role }) {
       }
 
       if (paiements.status === "fulfilled") {
-        const liste = paiements.value.data;
+        const liste = paiements.value.data.filter((p) => !p.annule);
         setTotalEncaisse(liste.reduce((s, p) => s + parseFloat(p.montant), 0));
         setTousPaiements(liste);
         setPaiementsDisponibles(true);
@@ -415,7 +415,7 @@ function TableauDeBordComptable({ role }) {
 
       if (paiements.status === "fulfilled") {
         const totaux = { inscriptions: 0, reinscriptions: 0, scolarite: 0, autres: 0 };
-        paiements.value.data.forEach((p) => {
+        paiements.value.data.filter((p) => !p.annule).forEach((p) => {
           const nom = normaliser(p.type_frais);
           const montant = parseFloat(p.montant) || 0;
           if (nom.includes("reinscription")) totaux.reinscriptions += montant;
@@ -1129,7 +1129,7 @@ function TableauDeBordGenerique({ role }) {
 
       if (tousPaiements.status === "fulfilled") {
         const totaux = { inscriptions: 0, reinscriptions: 0, scolarite: 0, autres: 0 };
-        tousPaiements.value.data.forEach((p) => {
+        tousPaiements.value.data.filter((p) => !p.annule).forEach((p) => {
           const nom = normaliser(p.type_frais);
           const montant = parseFloat(p.montant) || 0;
           if (nom.includes("reinscription")) totaux.reinscriptions += montant;

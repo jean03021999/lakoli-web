@@ -22,12 +22,18 @@ export function regrouperVersements(paiements) {
         caissier: p.caissier,
         montant: 0,
         details: [],
+        // Un versement est annule d'un bloc (tous ses paiements) : on reprend l'auteur et le motif.
+        annule: Boolean(p.annule),
+        annule_le: p.annule_le || null,
+        annule_par: p.annule_par || null,
+        motif_annulation: p.motif_annulation || null,
       });
     }
     const v = parId.get(cle);
     v.montant += parseFloat(p.montant) || 0;
     v.reference = v.reference || p.reference;
     v.caissier = v.caissier || p.caissier;
+    v.annule = v.annule && Boolean(p.annule);
     v.details.push({
       id: p.id,
       echeance_eleve_id: p.echeance_eleve_id,
