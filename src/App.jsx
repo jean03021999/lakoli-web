@@ -181,7 +181,7 @@ function AppContent() {
         <Route path="/enseignants" element={<Enseignants permissions={permissions} etablissement={etablissement} session={session} />} />
         <Route path="/enseignants/:id" element={<EnseignantFiche permissions={permissions} etablissement={etablissement} />} />
         <Route path="/enseignants-ajouter" element={<RouteProtegee permissions={permissions} requiert="enseignants.creer"><AjouterEnseignant /></RouteProtegee>} />
-        <Route path="/matieres" element={<Matieres />} />
+        <Route path="/matieres" element={<Matieres permissions={permissions} />} />
         <Route path="/affectations" element={<Affectations />} />
         <Route path="/emploi-du-temps" element={<RouteProtegee permissions={permissions} requiert="emploi_du_temps.voir"><EmploiDuTemps permissions={permissions} /></RouteProtegee>} />
         <Route path="/notes" element={<Notes role={role} />} />
@@ -193,8 +193,8 @@ function AppContent() {
           path="/frais-scolarite"
           element={<RouteProtegee permissions={permissions} requiert="frais.voir"><FraisScolarite permissions={permissions} etablissement={etablissement} /></RouteProtegee>}
         />
-        <Route path="/classes" element={<Classes />} />
-        <Route path="/periodes" element={<Periodes />} />
+        <Route path="/classes" element={<Classes permissions={permissions} />} />
+        <Route path="/periodes" element={<Periodes permissions={permissions} />} />
         <Route path="/utilisateurs" element={<Utilisateurs />} />
         <Route path="/paiements" element={<RouteProtegee permissions={permissions} requiert="frais.voir"><PaiementsCaisse etablissement={etablissement} permissions={permissions} /></RouteProtegee>} />
         <Route
