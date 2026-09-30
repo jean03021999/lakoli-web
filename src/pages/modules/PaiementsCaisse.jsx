@@ -2,6 +2,8 @@ import { useState, useEffect, useMemo } from "react";
 import api from "../../services/api";
 import { FileSpreadsheet, FileText, Search, Printer, ChevronLeft, ChevronRight, X, Ban, AlertTriangle, Loader2 } from "lucide-react";
 import { regrouperVersements } from "../../utils/versements";
+import CarteSoldeCaisse from "../../components/caisse/CarteSoldeCaisse";
+import SortiesCaisse from "../../components/caisse/SortiesCaisse";
 import { situationGlobaleDepuisSuivi } from "../../utils/situationFrais";
 import {
   imprimerDocument,
@@ -56,6 +58,8 @@ export default function PaiementsCaisse({ etablissement = null, permissions = []
   const [annulation, setAnnulation] = useState({ envoi: false, erreur: "" });
   const [succes, setSucces] = useState("");
   const [rechargement, setRechargement] = useState(0);
+  const [onglet, setOnglet] = useState("encaissements");
+  const [synthese, setSynthese] = useState(null);
 
   useEffect(() => {
     api
@@ -64,6 +68,11 @@ export default function PaiementsCaisse({ etablissement = null, permissions = []
       .then((res) => setVersements(regrouperVersements(res.data)))
       .catch(() => setErreur("Impossible de charger le journal de caisse."))
       .finally(() => setChargement(false));
+  }, [rechargement]);
+
+  // Solde de caisse : encaissements - salaires verses - depenses (rafraichi apres chaque changement).
+  useEffect(() => {
+    api.get("/caisse/synthese").then((res) => setSynthese(res.data)).catch(() => setSynthese(null));
   }, [rechargement]);
 
   // Annulation d'un versement (tous ses paiements), motif obligatoire ; il reste visible, barre.
@@ -258,9 +267,9 @@ export default function PaiementsCaisse({ etablissement = null, permissions = []
       <div className="rounded-2xl p-5 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs" style={{ background: "#0C447C" }}>
         <div>
           <h1 className="text-xl font-extrabold tracking-tight">Journal de Caisse</h1>
-          <p className="text-xs text-white/80 mt-0.5">Historique complet des encaissements · Contrôle comptable et délivrance des reçus</p>
+          <p className="text-xs text-white/80 mt-0.5">Encaissements des familles · Salaires et dépenses payés avec · Solde disponible</p>
         </div>
-        <div className="flex items-center gap-2 self-start sm:self-auto">
+        <div className={`flex items-center gap-2 self-start sm:self-auto ${onglet === "encaissements" ? "" : "invisible"}`}>
           <button
             onClick={exporterCsv}
             disabled={filtres.length === 0}
@@ -282,6 +291,31 @@ export default function PaiementsCaisse({ etablissement = null, permissions = []
 
       {erreur && <p className="text-sm text-rose-600 bg-rose-50 border border-rose-100 rounded-xl px-4 py-2.5">{erreur}</p>}
 
+      <CarteSoldeCaisse synthese={synthese} chargement={!synthese} />
+
+      {/* Onglets : entrees / sorties de caisse */}
+      <div className="flex items-center gap-2 p-1.5 bg-slate-200/60 rounded-xl w-fit">
+        {[
+          ["encaissements", "Encaissements"],
+          ["sorties", "Sorties de caisse (salaires & dépenses)"],
+        ].map(([cle, libelle]) => (
+          <button
+            key={cle}
+            type="button"
+            onClick={() => setOnglet(cle)}
+            className={`px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${onglet === cle ? "bg-white text-[#0C447C] shadow-xs" : "text-slate-500 hover:text-slate-800"}`}
+          >
+            {libelle}
+          </button>
+        ))}
+      </div>
+
+      {onglet === "sorties" && (
+        <SortiesCaisse synthese={synthese} peutEnregistrer={peutAnnuler} onModifiee={() => setRechargement((n) => n + 1)} />
+      )}
+
+      {onglet === "encaissements" && (
+      <>
       {/* 4 compteurs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4">
         {[
@@ -534,6 +568,8 @@ export default function PaiementsCaisse({ etablissement = null, permissions = []
           </div>
         </div>
       </div>
+      </>
+      )}
 
       {succes && (
         <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-3 rounded-xl bg-slate-900 text-white text-sm shadow-2xl">

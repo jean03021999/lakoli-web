@@ -26,6 +26,7 @@ import {
 import api from "../../services/api";
 import { imprimerDocument, genererRapportComptableHtml } from "../../utils/impression";
 import { regrouperVersements } from "../../utils/versements";
+import CarteSoldeCaisse from "../../components/caisse/CarteSoldeCaisse";
 import GraphiquesComptables from "../../components/graphiques/GraphiquesComptables";
 import { StatCard as StatCardSysteme, Card, Badge, Button, PageHeader } from "../../components/ui/LakoliDesignSystem";
 
@@ -322,6 +323,8 @@ function TableauDeBordComptable({ role }) {
   const [elevesEnRetard, setElevesEnRetard] = useState([]);
   const [listeEleves, setListeEleves] = useState([]);
   const [tousPaiements, setTousPaiements] = useState([]);
+  // Solde de caisse : encaissements - salaires verses - depenses.
+  const [syntheseCaisse, setSyntheseCaisse] = useState(null);
   const [totalEncaisse, setTotalEncaisse] = useState(null);
   const [paiementsDisponibles, setPaiementsDisponibles] = useState(true);
   const [versementsRecents, setVersementsRecents] = useState([]);
@@ -348,12 +351,14 @@ function TableauDeBordComptable({ role }) {
   useEffect(() => {
     async function charger() {
       setEnChargement(true);
-      const [eleves, paiements, parClasse, recents] = await Promise.allSettled([
+      const [eleves, paiements, parClasse, recents, caisse] = await Promise.allSettled([
         api.get("/eleves"),
         api.get("/frais/paiements"),
         api.get("/frais/stats-par-classe"),
         api.get("/frais/paiements/recent"),
+        api.get("/caisse/synthese"),
       ]);
+      setSyntheseCaisse(caisse.status === "fulfilled" ? caisse.value.data : null);
 
       // Versements recents : donnees de demonstration (signalees) si l'API ne repond pas.
       if (recents.status === "fulfilled" && Array.isArray(recents.value.data)) {
@@ -597,6 +602,9 @@ function TableauDeBordComptable({ role }) {
       {erreurRapport && (
         <div className="px-4 py-3 rounded-xl bg-rose-50 border border-rose-200 text-sm text-rose-700">{erreurRapport}</div>
       )}
+
+      {/* Solde de caisse : l'argent encaisse paie les salaires et les depenses */}
+      {syntheseCaisse && <CarteSoldeCaisse synthese={syntheseCaisse} />}
 
       {/* 6 cartes statistiques */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">

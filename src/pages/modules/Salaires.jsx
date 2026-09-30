@@ -38,6 +38,8 @@ export default function Salaires({ permissions = [] }) {
   const [panneau, setPanneau] = useState(null); // { enseignant } quand le panneau est ouvert
   const [aPayer, setAPayer] = useState(null); // { salaire, moyen }
   const [paiementEnCours, setPaiementEnCours] = useState(false);
+  // Argent disponible en caisse par moyen (les salaires sont payes avec l'argent encaisse).
+  const [caisse, setCaisse] = useState(null);
 
   // Incrementer `rechargement` relance le chargement des salaires (apres ajout, paiement...).
   const [rechargement, setRechargement] = useState(0);
@@ -57,6 +59,12 @@ export default function Salaires({ permissions = [] }) {
       .finally(() => { if (!annule) setChargement(false); });
     return () => { annule = true; };
   }, [rechargement]);
+
+  const salaireAPayerId = aPayer?.salaire.id;
+  useEffect(() => {
+    if (!salaireAPayerId) return;
+    api.get("/caisse/synthese").then((res) => setCaisse(res.data)).catch(() => setCaisse(null));
+  }, [salaireAPayerId]);
 
   // ?nouveau=ID : ouvre le panneau une fois les enseignants et salaires charges (pre-remplissage).
   const nouveauUrl = idUrl("nouveau");
@@ -302,6 +310,23 @@ export default function Salaires({ permissions = [] }) {
                   </button>
                 ))}
               </div>
+              {caisse?.par_moyen?.[aPayer.moyen] && (() => {
+                const dispo = caisse.par_moyen[aPayer.moyen].solde;
+                const insuffisant = Number(aPayer.salaire.montant_net) > dispo;
+                return (
+                  <div className={`mt-2 p-3 rounded-xl border text-xs ${insuffisant ? "bg-rose-50 border-rose-200 text-rose-700" : "bg-emerald-50 border-emerald-200 text-emerald-800"}`}>
+                    <div className="flex items-center justify-between gap-3">
+                      <span>Disponible ({MOYENS[aPayer.moyen]?.libelle})</span>
+                      <strong className="tabular-nums">{formaterGNF(dispo)}</strong>
+                    </div>
+                    <div className="flex items-center justify-between gap-3 mt-0.5">
+                      <span>Après ce paiement</span>
+                      <strong className="tabular-nums">{formaterGNF(dispo - Number(aPayer.salaire.montant_net))}</strong>
+                    </div>
+                    {insuffisant && <p className="mt-1.5 font-semibold">L'argent encaissé par ce moyen ne suffit pas pour ce salaire.</p>}
+                  </div>
+                );
+              })()}
             </div>
             <div className="grid grid-cols-2 gap-3">
               <button onClick={() => setAPayer(null)} disabled={paiementEnCours} className="px-4 py-2.5 border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-xl text-sm font-semibold cursor-pointer disabled:opacity-50">
