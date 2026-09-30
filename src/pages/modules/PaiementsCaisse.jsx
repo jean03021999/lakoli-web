@@ -60,6 +60,7 @@ export default function PaiementsCaisse({ etablissement = null, permissions = []
   const [rechargement, setRechargement] = useState(0);
   const [onglet, setOnglet] = useState("encaissements");
   const [synthese, setSynthese] = useState(null);
+  const [sortiesCaisse, setSortiesCaisse] = useState(null);
 
   useEffect(() => {
     api
@@ -73,6 +74,8 @@ export default function PaiementsCaisse({ etablissement = null, permissions = []
   // Solde de caisse : encaissements - salaires verses - depenses (rafraichi apres chaque changement).
   useEffect(() => {
     api.get("/caisse/synthese").then((res) => setSynthese(res.data)).catch(() => setSynthese(null));
+    // Sorties detaillees pour le journal imprime (depenses a justifier, dernieres sorties).
+    api.get("/caisse/sorties").then((res) => setSortiesCaisse(res.data)).catch(() => setSortiesCaisse(null));
   }, [rechargement]);
 
   // Annulation d'un versement (tous ses paiements), motif obligatoire ; il reste visible, barre.
@@ -201,6 +204,7 @@ export default function PaiementsCaisse({ etablissement = null, permissions = []
       })),
       parMoyen: parMoyen.filter((m) => m.montant > 0).map((m) => ({ libelle: MOYENS[m.cle].libelle, montant: m.montant })),
       parType: parType.filter((t) => t.montant > 0).map((t) => ({ libelle: t.type, montant: t.montant })),
+      caisse: synthese ? { synthese, sorties: sortiesCaisse } : null,
     });
     if (!imprimerDocument("Journal de caisse", html)) {
       setErreur("Le navigateur a bloqué la fenêtre d'impression. Autorisez les pop-ups pour ce site.");

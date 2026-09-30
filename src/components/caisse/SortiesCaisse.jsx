@@ -1,128 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Search, Ban, X, Loader2, AlertTriangle, Save, GraduationCap } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Plus, Search, Ban, X, Loader2, AlertTriangle, GraduationCap, Paperclip } from "lucide-react";
 import api from "../../services/api";
 import { MOYENS, STYLE_CARTE, formaterGNF, formaterDateCourte, normaliser, telechargerCsv } from "../frais/configFrais";
 import { messageErreurApi } from "../../utils/erreurs";
+import ModaleDepense from "./ModaleDepense";
+import { COULEURS_CATEGORIES, CHAMP, aujourdhui } from "./configCaisse";
 
 // Sorties de caisse (GET /caisse/sorties) : salaires verses (depuis Gestion des salaires) et autres
 // depenses, avec saisie d'une depense et annulation motivee.
-
-const COULEURS_CATEGORIES = {
-  salaire: "bg-[#dbeafe] text-[#1d4ed8]",
-  fournitures: "bg-amber-50 text-amber-700",
-  electricite_eau: "bg-sky-50 text-sky-700",
-  entretien: "bg-orange-50 text-orange-700",
-  transport: "bg-violet-50 text-violet-700",
-  communication: "bg-cyan-50 text-cyan-700",
-  loyer: "bg-rose-50 text-rose-700",
-  evenement: "bg-pink-50 text-pink-700",
-  administratif: "bg-slate-100 text-slate-700",
-  autre: "bg-slate-100 text-slate-600",
-};
-
-const CHAMP = "w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#0C447C]/15 focus:border-[#0C447C]";
-
-function aujourdhui() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
-function ModaleDepense({ categories, soldeParMoyen, onFermer, onEnregistree }) {
-  const [form, setForm] = useState({ date_depense: aujourdhui(), categorie: "fournitures", libelle: "", montant: "", moyen_paiement: "especes", beneficiaire: "", observation: "" });
-  const [envoi, setEnvoi] = useState(false);
-  const [erreur, setErreur] = useState("");
-  const maj = (c, v) => setForm((f) => ({ ...f, [c]: v }));
-  const disponible = soldeParMoyen?.[form.moyen_paiement]?.solde;
-  const depasse = disponible !== undefined && Number(form.montant) > disponible;
-
-  const enregistrer = async (e) => {
-    e.preventDefault();
-    setEnvoi(true);
-    setErreur("");
-    try {
-      const res = await api.post("/caisse/depenses", { ...form, montant: Number(form.montant) });
-      onEnregistree(res.data.message);
-    } catch (err) {
-      setErreur(messageErreurApi(err, "Erreur lors de l'enregistrement."));
-      setEnvoi(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-[2px] flex items-center justify-center p-4" onClick={() => !envoi && onFermer()}>
-      <form onSubmit={enregistrer} className="bg-white rounded-2xl w-full max-w-lg max-h-[92vh] overflow-y-auto shadow-2xl" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-          <div>
-            <h3 className="text-base font-extrabold text-slate-900">Nouvelle dépense</h3>
-            <p className="text-xs text-slate-500">Sortie d'argent de la caisse (hors salaires)</p>
-          </div>
-          <button type="button" onClick={onFermer} className="p-2 rounded-lg text-slate-400 hover:bg-slate-100 cursor-pointer" aria-label="Fermer"><X className="w-5 h-5" /></button>
-        </div>
-        <div className="p-6 space-y-4">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1.5">Date *</label>
-              <input type="date" max={aujourdhui()} value={form.date_depense} onChange={(e) => maj("date_depense", e.target.value)} required className={CHAMP} />
-            </div>
-            <div>
-              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1.5">Catégorie *</label>
-              <select value={form.categorie} onChange={(e) => maj("categorie", e.target.value)} className={CHAMP}>
-                {Object.entries(categories).map(([cle, libelle]) => <option key={cle} value={cle}>{libelle}</option>)}
-              </select>
-            </div>
-          </div>
-          <div>
-            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1.5">Objet de la dépense *</label>
-            <input value={form.libelle} onChange={(e) => maj("libelle", e.target.value)} required placeholder="Ex : Facture d'électricité de septembre" className={CHAMP} />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1.5">Montant (GNF) *</label>
-              <input type="number" min="1" value={form.montant} onChange={(e) => maj("montant", e.target.value)} required className={`${CHAMP} tabular-nums font-bold`} />
-            </div>
-            <div>
-              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1.5">Bénéficiaire</label>
-              <input value={form.beneficiaire} onChange={(e) => maj("beneficiaire", e.target.value)} placeholder="Ex : EDG, Librairie…" className={CHAMP} />
-            </div>
-          </div>
-          <div>
-            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1.5">Payé par</label>
-            <div className="grid grid-cols-4 gap-2 text-xs">
-              {Object.entries(MOYENS).map(([cle, m]) => (
-                <button
-                  key={cle}
-                  type="button"
-                  onClick={() => maj("moyen_paiement", cle)}
-                  className={`p-2 rounded-xl border font-semibold cursor-pointer ${form.moyen_paiement === cle ? "border-[#0C447C] bg-blue-50 text-[#0C447C] ring-1 ring-[#0C447C]" : "border-slate-200 text-slate-600 hover:bg-slate-50"}`}
-                >
-                  {m.emoji} {m.libelle}
-                </button>
-              ))}
-            </div>
-            {disponible !== undefined && (
-              <p className={`mt-1.5 text-[11px] ${depasse ? "text-rose-600 font-semibold" : "text-slate-500"}`}>
-                Disponible par ce moyen : {formaterGNF(disponible)}
-                {depasse && " — le montant dépasse ce qui est disponible."}
-              </p>
-            )}
-          </div>
-          <div>
-            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1.5">Observation</label>
-            <textarea rows={2} value={form.observation} onChange={(e) => maj("observation", e.target.value)} className={`${CHAMP} resize-none`} />
-          </div>
-          {erreur && <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-700">{erreur}</div>}
-        </div>
-        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-100">
-          <button type="button" onClick={onFermer} disabled={envoi} className="px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 cursor-pointer">Annuler</button>
-          <button type="submit" disabled={envoi} className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#0C447C] hover:bg-[#093663] text-white text-xs font-bold disabled:opacity-50 cursor-pointer">
-            {envoi ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-            Enregistrer la dépense
-          </button>
-        </div>
-      </form>
-    </div>
-  );
-}
 
 export default function SortiesCaisse({ synthese, peutEnregistrer, onModifiee }) {
   const [sorties, setSorties] = useState([]);
@@ -136,6 +22,7 @@ export default function SortiesCaisse({ synthese, peutEnregistrer, onModifiee })
   const [annulation, setAnnulation] = useState({ envoi: false, erreur: "" });
   const [message, setMessage] = useState("");
   const [rechargement, setRechargement] = useState(0);
+  const navigate = useNavigate();
 
   useEffect(() => {
     let annule = false;
@@ -153,7 +40,7 @@ export default function SortiesCaisse({ synthese, peutEnregistrer, onModifiee })
   const affichees = useMemo(
     () =>
       sorties.filter((s) => {
-        const cible = normaliser(`${s.libelle} ${s.beneficiaire || ""} ${s.reference || ""} ${libelleCategorie(s.categorie)}`);
+        const cible = normaliser(`${s.libelle} ${s.beneficiaire || ""} ${s.reference || ""} ${s.numero_piece || ""} ${libelleCategorie(s.categorie)}`);
         return termes.every((t) => cible.includes(t)) && (filtre === "tous" || (filtre === "salaire" ? s.source === "salaire" : s.source === "depense"));
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -183,7 +70,7 @@ export default function SortiesCaisse({ synthese, peutEnregistrer, onModifiee })
   const exporter = () =>
     telechargerCsv(
       `sorties-de-caisse-${aujourdhui()}.csv`,
-      ["Date", "Référence", "Catégorie", "Objet", "Bénéficiaire", "Montant (GNF)", "Moyen", "Enregistré par", "Statut"],
+      ["Date", "Référence", "Catégorie", "Objet", "Bénéficiaire", "Montant (GNF)", "Moyen", "N° pièce", "Justificatif", "Enregistré par", "Statut"],
       affichees.map((s) => [
         formaterDateCourte(s.date),
         s.reference || "",
@@ -192,6 +79,8 @@ export default function SortiesCaisse({ synthese, peutEnregistrer, onModifiee })
         s.beneficiaire || "",
         Math.round(s.montant),
         MOYENS[s.moyen_paiement]?.libelle || s.moyen_paiement,
+        s.numero_piece || "",
+        s.source === "salaire" ? "Fiche de paie" : s.a_justifier ? "À justifier" : `${s.nb_justificatifs} pièce(s)`,
         s.par || "",
         s.annule ? `Annulée : ${s.motif_annulation || ""}` : "Valide",
       ])
@@ -263,6 +152,16 @@ export default function SortiesCaisse({ synthese, peutEnregistrer, onModifiee })
                       </td>
                       <td className="py-3 px-3 text-slate-800 font-semibold">
                         {s.libelle}
+                        {s.source === "depense" && !s.annule && (
+                          <button
+                            onClick={() => navigate(`/depenses?depense=${s.id}`)}
+                            className={`ml-2 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold cursor-pointer align-middle ${s.a_justifier ? "bg-amber-100 text-amber-800 hover:bg-amber-200" : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"}`}
+                            title={s.a_justifier ? "Joindre la facture ou le reçu" : "Voir les pièces justificatives"}
+                          >
+                            <Paperclip className="w-3 h-3" />
+                            {s.a_justifier ? "À justifier" : s.nb_justificatifs}
+                          </button>
+                        )}
                         {s.annule && <div className="text-[10px] text-rose-600 font-normal mt-0.5">Annulée{s.annule_par ? ` par ${s.annule_par}` : ""} : {s.motif_annulation}</div>}
                       </td>
                       <td className="py-3 px-3 text-slate-600">{s.beneficiaire || "—"}</td>

@@ -239,6 +239,10 @@ const STYLES = `
   .badge-partiel { background: #fff7ed; color: #b45309; }
   .badge-echoir { background: #f1f5f9; color: #64748b; }
   .badge-retard { background: #fee2e2; color: #dc2626; }
+  .badge-annule { background: #f1f5f9; color: #64748b; text-decoration: line-through; }
+  .doc-releve.rapport tr.annulee td { color: #94a3b8; }
+  .doc-releve.rapport .alerte-caisse { margin-top: 8px; padding: 8px 12px; border-radius: 8px; background: #fee2e2; color: #b91c1c; font-size: 12px; font-weight: bold; }
+  .doc-releve .signature-zone.double { justify-content: space-between; }
 
   .doc-releve .signature-zone { display: flex; justify-content: flex-end; margin-top: 50px; }
   .doc-releve .signature-zone .cadre { width: 260px; text-align: center; }
@@ -1117,7 +1121,7 @@ export function genererListeEnseignantsHtml({ etablissement, session, enseignant
 // filtrees et formatees ({ date, heure, reference, eleve, matricule, classe, detail, moyen,
 // montant }). `parMoyen` / `parType` : [{ libelle, montant }]. A passer a imprimerDocument().
 // ---------------------------------------------------------------------------
-export function genererJournalCaisseHtml({ etablissement, filtres = [], versements, parMoyen = [], parType = [] }) {
+export function genererJournalCaisseHtml({ etablissement, filtres = [], versements, parMoyen = [], parType = [], caisse = null }) {
   const ecole = completerEtablissement(etablissement);
   const tiret = "—";
   const total = versements.reduce((s, v) => s + (Number(v.montant) || 0), 0);
@@ -1144,7 +1148,7 @@ export function genererJournalCaisseHtml({ etablissement, filtres = [], versemen
     .join("");
 
   return `
-  <div class="doc-releve liste-classe">
+  <div class="doc-releve liste-classe rapport">
     <div class="entete-premium">
       <div class="logo">
         ${logoEcoleHtml(ecole, "logo-premium")}
@@ -1193,6 +1197,8 @@ export function genererJournalCaisseHtml({ etablissement, filtres = [], versemen
       ${repartition("Par type de frais", parType)}
     </div>
 
+    ${caisse?.synthese ? sectionsCaisseHtml(caisse, { titreSituation: "Situation de caisse à ce jour", nbSorties: 10 }) : ""}
+
     <div class="signature-zone">
       <div class="cadre">
         <div class="ligne"></div>
@@ -1208,6 +1214,229 @@ export function genererJournalCaisseHtml({ etablissement, filtres = [], versemen
 }
 
 // ---------------------------------------------------------------------------
+// Caisse — sections communes au rapport comptable et au journal de caisse : solde par moyen de
+// paiement (encaissements - salaires - depenses), sorties par categorie, depenses sans piece
+// justificative et dernieres sorties.
+//   caisse : { synthese: GET /caisse/synthese, sorties: GET /caisse/sorties | null }
+// ---------------------------------------------------------------------------
+const MOYENS_CAISSE = [
+  ["especes", "Espèces en caisse"],
+  ["mobile_money", "Mobile Money"],
+  ["virement", "Banque (virement)"],
+  ["cheque", "Chèque"],
+];
+
+function sectionsCaisseHtml({ synthese, sorties }, { titreSituation = "Situation de caisse", nbSorties = 15 } = {}) {
+  const tiret = "—";
+  const s = synthese;
+  const pm = s.par_moyen || {};
+  const lignesMoyens = MOYENS_CAISSE.filter(([m]) => {
+    const d = pm[m];
+    return d && (d.entrees || d.salaires || d.depenses);
+  })
+    .map(([m, lib]) => {
+      const d = pm[m];
+      return `<tr><td>${lib}</td><td class="droite">${formaterMontant(d.entrees)}</td><td class="droite">${formaterMontant(d.salaires)}</td><td class="droite">${formaterMontant(d.depenses)}</td><td class="droite"><strong>${formaterMontant(d.solde)}</strong></td></tr>`;
+    })
+    .join("");
+  const situation = `<table class="tableau-premium compact">
+      <thead><tr><th>Moyen</th><th class="droite">Encaissé (GNF)</th><th class="droite">Salaires (GNF)</th><th class="droite">Dépenses (GNF)</th><th class="droite">Solde (GNF)</th></tr></thead>
+      <tbody>${lignesMoyens || `<tr><td colspan="5" class="gris">Aucun mouvement de caisse.</td></tr>`}
+        <tr class="total"><td>TOTAL</td><td class="droite">${formaterMontant(s.total_entrees)}</td><td class="droite">${formaterMontant(s.total_salaires)}</td><td class="droite">${formaterMontant(s.total_depenses)}</td><td class="droite">${formaterMontant(s.solde)}</td></tr>
+      </tbody>
+    </table>
+    ${s.solde < 0 ? `<div class="alerte-caisse">Solde négatif : les sorties dépassent les encaissements. Vérifiez les saisies.</div>` : ""}`;
+
+  // Sorties par categorie (salaires compris) sur toute la periode.
+  const nbSalaires = sorties ? sorties.filter((x) => x.source === "salaire").length : null;
+  const categories = [
+    ...(s.total_salaires > 0 ? [{ libelle: "Salaires du personnel", nombre: nbSalaires, total: s.total_salaires }] : []),
+    ...(s.depenses_par_categorie || []),
+  ];
+  const totalSorties = s.total_salaires + s.total_depenses;
+  const pctSortie = (m) => {
+    if (!(totalSorties > 0)) return tiret;
+    const v = (m / totalSorties) * 100;
+    return `${v > 0 && v < 10 ? v.toFixed(1).replace(".", ",") : Math.round(v)} %`;
+  };
+  const parCategorie = categories.length === 0
+    ? `<p class="vide">Aucune sortie de caisse enregistrée.</p>`
+    : `<table class="tableau-premium compact">
+        <thead><tr><th>Nature de la sortie</th><th class="droite">Nombre</th><th class="droite">Montant (GNF)</th><th class="droite">Part</th></tr></thead>
+        <tbody>${categories
+          .map((c) => `<tr><td>${echapperHtml(c.libelle)}</td><td class="droite">${c.nombre ?? tiret}</td><td class="droite">${formaterMontant(c.total)}</td><td class="droite">${pctSortie(c.total)}</td></tr>`)
+          .join("")}
+          <tr class="total"><td>TOTAL DES SORTIES</td><td class="droite"></td><td class="droite">${formaterMontant(totalSorties)}</td><td class="droite">${totalSorties > 0 ? "100 %" : tiret}</td></tr>
+        </tbody>
+      </table>`;
+
+  // Depenses a justifier (sans piece jointe).
+  const aJustifier = sorties ? sorties.filter((x) => x.source === "depense" && x.a_justifier) : null;
+  let sectionAJustifier = "";
+  if (aJustifier) {
+    sectionAJustifier = aJustifier.length === 0
+      ? `<p class="vide">Toutes les dépenses sont justifiées par une pièce.</p>`
+      : `<table class="tableau-premium compact">
+          <thead><tr><th>Date</th><th>Référence</th><th>Objet</th><th>Bénéficiaire</th><th>N° pièce</th><th class="droite">Montant (GNF)</th></tr></thead>
+          <tbody>${aJustifier
+            .map((d) => `<tr>
+              <td>${d.date ? formaterDate(d.date) : tiret}</td>
+              <td class="mono">${echapperHtml(d.reference || tiret)}</td>
+              <td>${echapperHtml(d.libelle)}</td>
+              <td>${echapperHtml(d.beneficiaire || tiret)}</td>
+              <td>${echapperHtml(d.numero_piece || tiret)}</td>
+              <td class="droite"><strong>${formaterMontant(d.montant)}</strong></td>
+            </tr>`)
+            .join("")}
+            <tr class="total"><td colspan="5">TOTAL À JUSTIFIER</td><td class="droite">${formaterMontant(aJustifier.reduce((t, d) => t + d.montant, 0))}</td></tr>
+          </tbody>
+        </table>`;
+  } else if (s.a_justifier) {
+    sectionAJustifier = s.a_justifier.nombre === 0
+      ? `<p class="vide">Toutes les dépenses sont justifiées par une pièce.</p>`
+      : `<p class="note">${s.a_justifier.nombre} dépense(s) sans pièce justificative pour ${formaterMontant(s.a_justifier.montant)} GNF.</p>`;
+  }
+
+  // Dernieres sorties (hors annulees).
+  let sectionDernieres = "";
+  if (sorties) {
+    const valides = sorties.filter((x) => !x.annule);
+    const derniers = valides.slice(0, nbSorties);
+    sectionDernieres = derniers.length === 0
+      ? `<p class="vide">Aucune sortie de caisse enregistrée.</p>`
+      : `<table class="tableau-premium compact">
+          <thead><tr><th>Date</th><th>Nature</th><th>Objet</th><th>Bénéficiaire</th><th>Moyen</th><th class="droite">Montant (GNF)</th></tr></thead>
+          <tbody>${derniers
+            .map((x) => `<tr>
+              <td>${x.date ? formaterDate(x.date) : tiret}</td>
+              <td>${echapperHtml(x.source === "salaire" ? "Salaire" : (s.categories || {})[x.categorie] || x.categorie)}</td>
+              <td>${echapperHtml(x.libelle)}${x.source === "depense" && x.a_justifier ? ` <span class="badge-statut badge-retard">À justifier</span>` : ""}</td>
+              <td>${echapperHtml(x.beneficiaire || tiret)}</td>
+              <td>${echapperHtml(MOYENS_PAIEMENT[x.moyen_paiement] || x.moyen_paiement || tiret)}</td>
+              <td class="droite"><strong>${formaterMontant(x.montant)}</strong></td>
+            </tr>`)
+            .join("")}</tbody>
+        </table>
+        ${valides.length > derniers.length ? `<p class="note">${derniers.length} dernières sur ${valides.length} sorties enregistrées.</p>` : ""}`;
+  }
+
+  return `
+    <h2 class="section">${echapperHtml(titreSituation)}</h2>
+    ${situation}
+
+    <h2 class="section">Sorties de caisse par nature</h2>
+    ${parCategorie}
+
+    ${sectionAJustifier ? `<h2 class="section">Dépenses à justifier${aJustifier ? ` (${aJustifier.length})` : ""}</h2>${sectionAJustifier}` : ""}
+
+    ${sectionDernieres ? `<h2 class="section">Dernières sorties de caisse</h2>${sectionDernieres}` : ""}`;
+}
+
+// ---------------------------------------------------------------------------
+// Etat des depenses — liste imprimable du module Depenses (filtres appliques), avec l'etat de la
+// justification de chaque depense. A passer a imprimerDocument().
+//   depenses : GET /caisse/depenses (depenses[]), categories : { cle: libelle }
+// ---------------------------------------------------------------------------
+export function genererEtatDepensesHtml({ etablissement, filtres = [], depenses, categories = {} }) {
+  const ecole = completerEtablissement(etablissement);
+  const tiret = "—";
+  const valides = depenses.filter((d) => !d.annule);
+  const total = valides.reduce((t, d) => t + d.montant, 0);
+  const aJustifier = valides.filter((d) => d.a_justifier);
+  const totalAJustifier = aJustifier.reduce((t, d) => t + d.montant, 0);
+
+  const parCategorie = Object.values(
+    valides.reduce((acc, d) => {
+      const c = (acc[d.categorie] ||= { libelle: categories[d.categorie] || d.categorie, montant: 0 });
+      c.montant += d.montant;
+      return acc;
+    }, {})
+  ).sort((a, b) => b.montant - a.montant);
+  const parMoyen = Object.values(
+    valides.reduce((acc, d) => {
+      const c = (acc[d.moyen_paiement] ||= { libelle: MOYENS_PAIEMENT[d.moyen_paiement] || d.moyen_paiement, montant: 0 });
+      c.montant += d.montant;
+      return acc;
+    }, {})
+  );
+  const repartition = (titre, lignes) =>
+    lignes.length
+      ? `<div class="tuile-repartition"><strong>${echapperHtml(titre)}</strong>${lignes
+          .map((l) => `<div><span>${echapperHtml(l.libelle)}</span><span>${formaterMontant(l.montant)} GNF</span></div>`)
+          .join("")}</div>`
+      : "";
+
+  const lignes = depenses
+    .map(
+      (d, i) => `<tr${d.annule ? ' class="annulee"' : ""}>
+      <td class="num">${i + 1}</td>
+      <td style="white-space:nowrap">${d.date ? formaterDate(d.date) : tiret}</td>
+      <td class="mono" style="font-size:10px">${echapperHtml(d.reference || tiret)}</td>
+      <td>${echapperHtml(categories[d.categorie] || d.categorie)}</td>
+      <td><strong>${echapperHtml(d.libelle)}</strong>${d.beneficiaire ? `<br><span class="gris">${echapperHtml(d.beneficiaire)}</span>` : ""}${d.annule ? `<br><span class="gris">Annulée : ${echapperHtml(d.motif_annulation || "")}</span>` : ""}</td>
+      <td>${echapperHtml(MOYENS_PAIEMENT[d.moyen_paiement] || d.moyen_paiement)}</td>
+      <td>${echapperHtml(d.numero_piece || tiret)}</td>
+      <td>${d.annule ? `<span class="badge-statut badge-annule">Annulée</span>` : d.a_justifier ? `<span class="badge-statut badge-retard">À justifier</span>` : `<span class="badge-statut badge-paye">${d.nb_justificatifs} pièce${d.nb_justificatifs > 1 ? "s" : ""}</span>`}</td>
+      <td class="droite" style="white-space:nowrap">${d.annule ? `<s>${formaterMontant(d.montant)}</s>` : formaterMontant(d.montant)}</td>
+    </tr>`
+    )
+    .join("");
+
+  return `
+  <div class="doc-releve liste-classe rapport">
+    <div class="entete-premium">
+      <div class="logo">
+        ${logoEcoleHtml(ecole, "logo-premium")}
+        <div>
+          <div class="nom">LAKOLI</div>
+          ${ecole.nom ? `<span class="badge-etablissement">${echapperHtml(ecole.nom)}</span>` : ""}
+          ${ecole.agrement || ecole.slogan ? `<div class="mentions-premium">${[ecole.agrement && `Agrément n° ${echapperHtml(ecole.agrement)}`, ecole.slogan && `<span class="slogan">« ${echapperHtml(ecole.slogan)} »</span>`].filter(Boolean).join(" · ")}</div>` : ""}
+        </div>
+      </div>
+      <div class="titre">
+        <h1>ÉTAT DES DÉPENSES</h1>
+        <div class="classe">${formaterMontant(total)} GNF</div>
+        <div class="session">${filtres.length ? echapperHtml(filtres.join(" · ")) : "Toutes les dépenses"}</div>
+      </div>
+    </div>
+
+    <div class="resume-classe">
+      <span>Dépenses : <strong>${valides.length}</strong></span>
+      <span>Justifiées : <strong>${valides.length - aJustifier.length}</strong></span>
+      <span>À justifier : <strong>${aJustifier.length}</strong> (${formaterMontant(totalAJustifier)} GNF)</span>
+    </div>
+
+    <table class="tableau-premium compact">
+      <thead>
+        <tr>
+          <th>N°</th><th>Date</th><th>Référence</th><th>Catégorie</th><th>Objet / bénéficiaire</th><th>Moyen</th><th>N° pièce</th><th>Justificatif</th><th class="droite">Montant (GNF)</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${lignes || `<tr><td colspan="9" class="gris">Aucune dépense.</td></tr>`}
+        <tr class="total"><td colspan="8">TOTAL (hors annulées)</td><td class="droite">${formaterMontant(total)}</td></tr>
+      </tbody>
+    </table>
+
+    <div class="repartitions">
+      ${repartition("Par catégorie", parCategorie)}
+      ${repartition("Par moyen de paiement", parMoyen)}
+    </div>
+
+    <div class="signature-zone double">
+      <div class="cadre"><div class="ligne"></div><div class="libelle">Le comptable</div></div>
+      <div class="cadre"><div class="ligne"></div><div class="libelle">Visa de la direction</div></div>
+    </div>
+
+    <div class="pied-premium">
+      Document officiel LAKOLI · Les pièces justificatives sont conservées dans l'application (module Dépenses)<br>
+      Imprimé le ${echapperHtml(dateImpression())}
+    </div>
+  </div>`;
+}
+
+
+// ---------------------------------------------------------------------------
 // Rapport comptable — synthese imprimable (ou enregistrable en PDF) du tableau de bord comptable,
 // avec les donnees reelles. Une section dont la source n'a pas pu etre chargee est signalee
 // « indisponible » plutot que remplie de zeros. A passer a imprimerDocument().
@@ -1221,7 +1450,7 @@ export function genererJournalCaisseHtml({ etablissement, filtres = [], versemen
 const NB_DERNIERS_ENCAISSEMENTS = 20;
 
 export function genererRapportComptableHtml({
-  etablissement, session, dateDonnees, indicateurs, finances, classes, inscriptions, elevesEnRetard, paiements,
+  etablissement, session, dateDonnees, indicateurs, finances, classes, inscriptions, elevesEnRetard, paiements, caisse,
 }) {
   const ecole = completerEtablissement(etablissement);
   const tiret = "—";
@@ -1246,6 +1475,9 @@ export function genererRapportComptableHtml({
     ["Total encaissé", indicateurs.totalEncaisse === null ? tiret : `${formaterMontant(indicateurs.totalEncaisse)} GNF`],
     ["Scolarité due", totalDu === null ? tiret : `${formaterMontant(totalDu)} GNF`],
     ["Taux de recouvrement", totalDu === null ? tiret : pct(totalEncaisseClasses, totalDu)],
+    ["Salaires versés", caisse?.synthese ? `${formaterMontant(caisse.synthese.total_salaires)} GNF` : tiret],
+    ["Autres dépenses", caisse?.synthese ? `${formaterMontant(caisse.synthese.total_depenses)} GNF` : tiret],
+    ["Solde de caisse", caisse?.synthese ? `${formaterMontant(caisse.synthese.solde)} GNF` : tiret],
   ]
     .map(([libelle, valeur]) => `<div class="tuile"><div class="lib">${libelle}</div><div class="val">${valeur}</div></div>`)
     .join("");
@@ -1406,6 +1638,8 @@ export function genererRapportComptableHtml({
 
     <h2 class="section">Derniers encaissements</h2>
     ${sectionPaiements}
+
+    ${caisse?.synthese ? sectionsCaisseHtml(caisse, { titreSituation: "Situation de caisse", nbSorties: 15 }) : `<h2 class="section">Situation de caisse</h2>${indisponible("de caisse (salaires et dépenses)")}`}
 
     <div class="signature-zone">
       <div class="cadre">

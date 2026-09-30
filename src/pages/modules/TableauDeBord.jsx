@@ -325,6 +325,7 @@ function TableauDeBordComptable({ role }) {
   const [tousPaiements, setTousPaiements] = useState([]);
   // Solde de caisse : encaissements - salaires verses - depenses.
   const [syntheseCaisse, setSyntheseCaisse] = useState(null);
+  const [sortiesCaisse, setSortiesCaisse] = useState(null);
   const [totalEncaisse, setTotalEncaisse] = useState(null);
   const [paiementsDisponibles, setPaiementsDisponibles] = useState(true);
   const [versementsRecents, setVersementsRecents] = useState([]);
@@ -351,14 +352,16 @@ function TableauDeBordComptable({ role }) {
   useEffect(() => {
     async function charger() {
       setEnChargement(true);
-      const [eleves, paiements, parClasse, recents, caisse] = await Promise.allSettled([
+      const [eleves, paiements, parClasse, recents, caisse, sorties] = await Promise.allSettled([
         api.get("/eleves"),
         api.get("/frais/paiements"),
         api.get("/frais/stats-par-classe"),
         api.get("/frais/paiements/recent"),
         api.get("/caisse/synthese"),
+        api.get("/caisse/sorties"),
       ]);
       setSyntheseCaisse(caisse.status === "fulfilled" ? caisse.value.data : null);
+      setSortiesCaisse(sorties.status === "fulfilled" ? sorties.value.data : null);
 
       // Versements recents : donnees de demonstration (signalees) si l'API ne repond pas.
       if (recents.status === "fulfilled" && Array.isArray(recents.value.data)) {
@@ -516,6 +519,7 @@ function TableauDeBordComptable({ role }) {
       inscriptions: inscriptionsDisponibles ? situationInscriptions : null,
       elevesEnRetard: typeof stats.enRetard === "number" ? elevesEnRetard : null,
       paiements: paiementsDisponibles ? versements : null,
+      caisse: syntheseCaisse ? { synthese: syntheseCaisse, sorties: sortiesCaisse } : null,
     });
     if (!imprimerDocument(`Rapport comptable - ${new Date().toLocaleDateString("fr-FR")}`, html)) {
       setErreurRapport("Le navigateur a bloqué la fenêtre du rapport. Autorisez les pop-ups pour ce site.");
