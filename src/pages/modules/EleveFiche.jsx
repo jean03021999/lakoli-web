@@ -14,13 +14,21 @@ import {
   ShieldCheck,
   FileCheck,
   Clock,
+  Pencil,
+  Trash2,
+  CheckCircle2,
+  AlertTriangle,
+  X,
 } from "lucide-react";
 import { imprimerDocument } from "../../utils/impression";
 import { echeancesEleve, genererReleveEleveHtml, titreReleve } from "../../utils/releveEleve";
 import { BadgeStatutPaiement, BadgeInscription } from "../../components/eleves/BadgesEleve";
 import { initiales } from "../../components/eleves/avatar";
+import FormulaireEleve from "../../components/eleves/FormulaireEleve";
 
 // Fiche eleve (design Lakoli 2) : banniere, identite, filiation, echeancier par frais et totaux.
+// Avec eleves.modifier : modification (identite, classe, filiation) et suppression d'un eleve sans
+// historique (le serveur refuse s'il a des paiements, notes ou bulletins).
 
 const STYLE_CARTE = { borderRadius: "16px", boxShadow: "0 4px 24px rgba(0,0,0,0.06)" };
 
@@ -99,12 +107,19 @@ function BlocResponsable({ titre, personne, precision }) {
 
 export default function EleveFiche({ permissions = [] }) {
   const peutImprimer = permissions.includes("frais.voir");
+  const peutModifier = permissions.includes("eleves.modifier");
   const { id } = useParams();
   const navigate = useNavigate();
   const [eleve, setEleve] = useState(null);
   const [chargement, setChargement] = useState(true);
   const [erreur, setErreur] = useState("");
   const [erreurImpression, setErreurImpression] = useState("");
+  const [edition, setEdition] = useState(false);
+  const [succes, setSucces] = useState("");
+  const [confirmerSuppression, setConfirmerSuppression] = useState(false);
+  const [suppressionEnCours, setSuppressionEnCours] = useState(false);
+  const [erreurSuppression, setErreurSuppression] = useState("");
+  const [rechargement, setRechargement] = useState(0);
 
   useEffect(() => {
     const charger = async () => {
@@ -118,7 +133,19 @@ export default function EleveFiche({ permissions = [] }) {
       }
     };
     charger();
-  }, [id]);
+  }, [id, rechargement]);
+
+  const supprimer = async () => {
+    setSuppressionEnCours(true);
+    setErreurSuppression("");
+    try {
+      await api.delete(`/eleves/${id}`);
+      navigate("/eleves", { replace: true });
+    } catch (err) {
+      setErreurSuppression(err.response?.data?.message || "Suppression impossible.");
+      setSuppressionEnCours(false);
+    }
+  };
 
   if (chargement) return <p className="text-sm text-slate-500">Chargement...</p>;
   if (erreur) return <p className="text-sm text-rose-600">{erreur}</p>;
@@ -198,14 +225,61 @@ export default function EleveFiche({ permissions = [] }) {
           </div>
         </div>
 
-        <div className="bg-white/10 px-4 py-3 rounded-xl border border-white/20 flex items-center gap-3 self-start sm:self-auto">
-          <div>
-            <span className="text-[10px] text-white/70 block uppercase font-bold">Total encaissé</span>
-            <span className="text-sm font-black tabular-nums">{formaterGNF(totalPaye)}</span>
+        <div className="flex flex-col sm:items-end gap-3 self-start sm:self-auto">
+          <div className="bg-white/10 px-4 py-3 rounded-xl border border-white/20 flex items-center gap-3">
+            <div>
+              <span className="text-[10px] text-white/70 block uppercase font-bold">Total encaissé</span>
+              <span className="text-sm font-black tabular-nums">{formaterGNF(totalPaye)}</span>
+            </div>
+            <BadgeStatutPaiement statut={eleve.statut_paiement} taille="md" />
           </div>
-          <BadgeStatutPaiement statut={eleve.statut_paiement} taille="md" />
+          {peutModifier && !edition && (
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setSucces("");
+                  setEdition(true);
+                }}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white text-[#0C447C] hover:bg-blue-50 text-xs font-bold shadow-sm cursor-pointer"
+              >
+                <Pencil className="w-3.5 h-3.5" />
+                Modifier
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setErreurSuppression("");
+                  setConfirmerSuppression(true);
+                }}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/10 border border-white/25 text-white hover:bg-rose-500/80 text-xs font-bold cursor-pointer"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                Supprimer
+              </button>
+            </div>
+          )}
         </div>
       </div>
+
+      {succes && (
+        <div className="flex items-center justify-between gap-3 px-4 py-3 rounded-xl bg-emerald-50 border border-emerald-200 text-sm text-emerald-700">
+          <span className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 shrink-0" />{succes}</span>
+          <button onClick={() => setSucces("")} className="text-emerald-500 hover:text-emerald-700 cursor-pointer" aria-label="Fermer"><X className="w-4 h-4" /></button>
+        </div>
+      )}
+
+      {edition ? (
+        <FormulaireEleve
+          eleve={eleve}
+          onAnnuler={() => setEdition(false)}
+          onEnregistre={(message) => {
+            setEdition(false);
+            setSucces(message);
+            setRechargement((n) => n + 1);
+          }}
+        />
+      ) : (
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Colonne gauche : identite + filiation */}
@@ -353,6 +427,40 @@ export default function EleveFiche({ permissions = [] }) {
           </div>
         </div>
       </div>
+      )}
+
+      {confirmerSuppression && (
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-[2px] flex items-center justify-center p-4" onClick={() => !suppressionEnCours && setConfirmerSuppression(false)}>
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="w-12 h-12 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center mx-auto mb-4">
+              <Trash2 className="w-6 h-6" />
+            </div>
+            <h3 className="text-lg font-bold text-slate-900 text-center">
+              Supprimer {eleve.nom} {eleve.prenom} ?
+            </h3>
+            <p className="text-xs text-slate-500 mt-2 leading-relaxed text-center">
+              Réservé aux élèves enregistrés par erreur. La suppression est refusée si l'élève a déjà des paiements, des notes ou des
+              bulletins. Ses frais non payés sont retirés et il ne compte plus dans les effectifs.
+            </p>
+            {erreurSuppression && (
+              <div className="mt-4 flex items-start gap-2 p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-700">
+                <AlertTriangle className="w-4 h-4 shrink-0" />
+                {erreurSuppression}
+              </div>
+            )}
+            <div className="mt-6 flex items-center justify-center gap-3">
+              <button type="button" onClick={() => setConfirmerSuppression(false)} disabled={suppressionEnCours} className="px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 cursor-pointer disabled:opacity-50">
+                {erreurSuppression ? "Fermer" : "Annuler"}
+              </button>
+              {!erreurSuppression && (
+                <button type="button" onClick={supprimer} disabled={suppressionEnCours} className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-md cursor-pointer disabled:opacity-50">
+                  {suppressionEnCours ? "Suppression..." : "Supprimer définitivement"}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
