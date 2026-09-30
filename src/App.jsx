@@ -30,7 +30,6 @@ import Parametres from "./pages/modules/Parametres";
 import { definirEtablissement } from "./utils/etablissementCourant";
 import Classes from "./pages/modules/Classes";
 import Periodes from "./pages/modules/Periodes";
-import Utilisateurs from "./pages/modules/Utilisateurs";
 import PaiementsCaisse from "./pages/modules/PaiementsCaisse";
 import Abonnement from "./pages/modules/Abonnement";
 import Salaires from "./pages/modules/Salaires";
@@ -195,7 +194,7 @@ function AppContent() {
         />
         <Route path="/classes" element={<Classes permissions={permissions} />} />
         <Route path="/periodes" element={<Periodes permissions={permissions} />} />
-        <Route path="/utilisateurs" element={<Utilisateurs />} />
+        <Route path="/utilisateurs" element={<Navigate to="/parametres?section=utilisateurs" replace />} />
         <Route path="/paiements" element={<RouteProtegee permissions={permissions} requiert="frais.voir"><PaiementsCaisse etablissement={etablissement} permissions={permissions} /></RouteProtegee>} />
         <Route
           path="/salaires"

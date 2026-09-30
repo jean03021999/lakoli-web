@@ -14,6 +14,9 @@ import {
   GraduationCap,
   FileText,
   Check,
+  Trash2,
+  AlertTriangle,
+  X,
 } from "lucide-react";
 import BadgeContrat from "../../components/enseignants/BadgeContrat";
 import { degradeEnseignant, initialesEnseignant, libelleAnciennete, formaterGNF, formaterDate } from "../../components/enseignants/theme";
@@ -22,6 +25,8 @@ import { genererFicheEnseignantHtml } from "../../utils/ficheEnseignant";
 
 // Fiche enseignant (design "Gestion des enseignants") : 3 colonnes — profil et contrat,
 // affectations et emploi du temps, salaires et statistiques pedagogiques. Donnees reelles.
+// Modification de l'identite et du contrat, suppression d'un enseignant sans historique (le serveur
+// refuse s'il a des affectations ou des salaires).
 
 const STYLE_CARTE = { borderRadius: "16px", boxShadow: "0 4px 24px rgba(0,0,0,0.06)", border: "1px solid rgba(226,232,240,0.7)" };
 const JOURS = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"];
@@ -80,6 +85,7 @@ export default function EnseignantFiche({ permissions = [], etablissement = null
   const peutModifier = permissions.includes("enseignants.creer");
   const peutVoirSalaires = permissions.includes("enseignants.salaires.voir");
   const peutGererAffectations = permissions.includes("affectations.gerer");
+  const peutGererContrat = permissions.includes("enseignants.contrats.gerer");
   const { id } = useParams();
   const navigate = useNavigate();
   const [enseignant, setEnseignant] = useState(null);
@@ -90,6 +96,10 @@ export default function EnseignantFiche({ permissions = [], etablissement = null
   const [edition, setEdition] = useState(null);
   const [enregistrement, setEnregistrement] = useState(false);
   const [message, setMessage] = useState("");
+  const [editionContrat, setEditionContrat] = useState(null);
+  const [confirmerSuppression, setConfirmerSuppression] = useState(false);
+  const [suppression, setSuppression] = useState({ envoi: false, erreur: "" });
+  const [rechargement, setRechargement] = useState(0);
 
   useEffect(() => {
     api
@@ -106,7 +116,7 @@ export default function EnseignantFiche({ permissions = [], etablissement = null
     if (peutVoirSalaires) {
       api.get("/salaires", { params: { enseignant_id: id } }).then((res) => setSalaires(res.data)).catch(() => {});
     }
-  }, [id, peutVoirSalaires]);
+  }, [id, peutVoirSalaires, rechargement]);
 
   if (chargement) return <p className="text-sm text-slate-500">Chargement...</p>;
   if (erreur) return <p className="text-sm text-rose-600">{erreur}</p>;
@@ -138,9 +148,43 @@ export default function EnseignantFiche({ permissions = [], etablissement = null
       setEdition(null);
       setMessage("Coordonnées enregistrées.");
     } catch (err) {
-      setMessage(err.response?.data?.message || "Impossible d'enregistrer les modifications.");
+      setMessage(erreurApi(err, "Impossible d'enregistrer les modifications."));
     } finally {
       setEnregistrement(false);
+    }
+  };
+
+  const erreurApi = (err, defaut) => {
+    const liste = err.response?.data?.errors;
+    return liste ? Object.values(liste).flat()[0] : err.response?.data?.message || defaut;
+  };
+
+  const enregistrerContrat = async () => {
+    setEnregistrement(true);
+    setMessage("");
+    try {
+      await api.put(`/enseignants/${id}/contrat`, {
+        ...editionContrat,
+        date_fin: editionContrat.date_fin || null,
+        taux_horaire_heures_sup: editionContrat.taux_horaire_heures_sup || null,
+      });
+      setEditionContrat(null);
+      setMessage("Contrat enregistré. Le nouveau salaire de base sera proposé pour les prochains salaires.");
+      setRechargement((n) => n + 1);
+    } catch (err) {
+      setMessage(erreurApi(err, "Impossible d'enregistrer le contrat."));
+    } finally {
+      setEnregistrement(false);
+    }
+  };
+
+  const supprimer = async () => {
+    setSuppression({ envoi: true, erreur: "" });
+    try {
+      await api.delete(`/enseignants/${id}`);
+      navigate("/enseignants", { replace: true });
+    } catch (err) {
+      setSuppression({ envoi: false, erreur: erreurApi(err, "Suppression impossible.") });
     }
   };
 
@@ -217,13 +261,33 @@ export default function EnseignantFiche({ permissions = [], etablissement = null
                   setEdition(
                     edition
                       ? null
-                      : { telephone: enseignant.telephone, email: enseignant.email, diplome: enseignant.diplome, lieu_naissance: enseignant.lieu_naissance }
+                      : {
+                          nom: enseignant.nom,
+                          prenom: enseignant.prenom,
+                          date_naissance: String(enseignant.date_naissance || "").slice(0, 10),
+                          telephone: enseignant.telephone,
+                          email: enseignant.email,
+                          diplome: enseignant.diplome,
+                          lieu_naissance: enseignant.lieu_naissance,
+                        }
                   )
                 }
                 className="px-3.5 py-2 bg-white/15 hover:bg-white/25 text-white text-xs sm:text-sm font-semibold rounded-xl transition-colors border border-white/25 flex items-center gap-1.5 cursor-pointer"
               >
                 <Edit3 className="w-4 h-4" />
                 {edition ? "Fermer l'édition" : "Modifier"}
+              </button>
+            )}
+            {peutModifier && (
+              <button
+                onClick={() => {
+                  setSuppression({ envoi: false, erreur: "" });
+                  setConfirmerSuppression(true);
+                }}
+                className="px-3.5 py-2 bg-white/10 hover:bg-rose-500/80 text-white text-xs sm:text-sm font-semibold rounded-xl transition-colors border border-white/25 flex items-center gap-1.5 cursor-pointer"
+              >
+                <Trash2 className="w-4 h-4" />
+                Supprimer
               </button>
             )}
             {peutVoirSalaires && (
@@ -278,6 +342,9 @@ export default function EnseignantFiche({ permissions = [], etablissement = null
             <div className="pt-2 border-t border-slate-100 space-y-3 text-xs">
               {edition ? (
                 <div className="space-y-2 bg-slate-50 p-3 rounded-lg border border-slate-200">
+                  {champ("nom", "Nom")}
+                  {champ("prenom", "Prénom")}
+                  {champ("date_naissance", "Date de naissance", "date")}
                   {champ("telephone", "Téléphone")}
                   {champ("email", "E-mail", "email")}
                   {champ("diplome", "Diplôme")}
@@ -316,8 +383,64 @@ export default function EnseignantFiche({ permissions = [], etablissement = null
             </div>
           </Carte>
 
-          <Carte titre="Contrat actuel">
-            {contrat ? (
+          <Carte
+            titre="Contrat actuel"
+            action={
+              peutGererContrat &&
+              !editionContrat && (
+                <button
+                  onClick={() =>
+                    setEditionContrat({
+                      type: contrat?.type || "cdi",
+                      date_debut: String(contrat?.date_debut || "").slice(0, 10),
+                      date_fin: String(contrat?.date_fin || "").slice(0, 10),
+                      salaire_base: contrat ? String(Math.round(Number(contrat.salaire_base))) : "",
+                      taux_horaire_heures_sup: contrat?.taux_horaire_heures_sup ? String(Math.round(Number(contrat.taux_horaire_heures_sup))) : "",
+                    })
+                  }
+                  className="inline-flex items-center gap-1 text-xs font-semibold text-[#0C447C] hover:underline cursor-pointer"
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                  {contrat ? "Modifier" : "Créer"}
+                </button>
+              )
+            }
+          >
+            {editionContrat ? (
+              <div className="space-y-2 bg-slate-50 p-3 rounded-lg border border-slate-200 text-xs">
+                <div>
+                  <label className="text-[11px] text-slate-500 font-semibold block mb-0.5">Régime</label>
+                  <select value={editionContrat.type} onChange={(e) => setEditionContrat({ ...editionContrat, type: e.target.value })} className="w-full px-2 py-1.5 bg-white border border-slate-300 rounded-lg text-xs">
+                    <option value="cdi">CDI · durée indéterminée</option>
+                    <option value="cdd">CDD · durée déterminée</option>
+                    <option value="vacataire">Vacataire</option>
+                  </select>
+                </div>
+                {[
+                  ["date_debut", "Date de début", "date"],
+                  ["date_fin", "Date de fin (optionnel)", "date"],
+                  ["salaire_base", "Salaire de base (GNF)", "number"],
+                  ["taux_horaire_heures_sup", "Taux heure sup. (GNF, optionnel)", "number"],
+                ].map(([nom, libelle, type]) => (
+                  <div key={nom}>
+                    <label className="text-[11px] text-slate-500 font-semibold block mb-0.5">{libelle}</label>
+                    <input
+                      type={type}
+                      min={type === "number" ? "0" : undefined}
+                      value={editionContrat[nom]}
+                      onChange={(e) => setEditionContrat({ ...editionContrat, [nom]: e.target.value })}
+                      className="w-full px-2 py-1.5 bg-white border border-slate-300 rounded-lg text-xs focus:outline-none focus:border-[#0C447C]"
+                    />
+                  </div>
+                ))}
+                <div className="flex gap-2 pt-1">
+                  <button onClick={() => setEditionContrat(null)} disabled={enregistrement} className="flex-1 py-1.5 border border-slate-200 bg-white text-slate-600 text-xs font-semibold rounded-lg cursor-pointer">Annuler</button>
+                  <button onClick={enregistrerContrat} disabled={enregistrement} className="flex-1 py-1.5 bg-[#0C447C] text-white text-xs font-semibold rounded-lg hover:bg-[#1a6bb5] cursor-pointer disabled:opacity-60">
+                    {enregistrement ? "..." : "Enregistrer"}
+                  </button>
+                </div>
+              </div>
+            ) : contrat ? (
               <div className="space-y-3 text-xs">
                 <div className="flex items-center justify-between">
                   <span className="text-slate-500">Régime</span>
@@ -558,6 +681,38 @@ export default function EnseignantFiche({ permissions = [], etablissement = null
           </Carte>
         </div>
       </div>
+
+      {confirmerSuppression && (
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-[2px] flex items-center justify-center p-4" onClick={() => !suppression.envoi && setConfirmerSuppression(false)}>
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="w-12 h-12 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center mx-auto mb-4">
+              <Trash2 className="w-6 h-6" />
+            </div>
+            <h3 className="text-lg font-bold text-slate-900 text-center">Supprimer {enseignant.prenom} {enseignant.nom} ?</h3>
+            <p className="text-xs text-slate-500 mt-2 leading-relaxed text-center">
+              Réservé aux enseignants enregistrés par erreur : refusé s'il a des affectations ou des salaires. Son contrat est clôturé et son
+              compte de connexion, s'il en a un, est suspendu.
+            </p>
+            {suppression.erreur && (
+              <div className="mt-4 flex items-start gap-2 p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-700">
+                <AlertTriangle className="w-4 h-4 shrink-0" />
+                {suppression.erreur}
+              </div>
+            )}
+            <div className="mt-6 flex items-center justify-center gap-3">
+              <button type="button" onClick={() => setConfirmerSuppression(false)} disabled={suppression.envoi} className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 cursor-pointer">
+                <X className="w-3.5 h-3.5" />
+                {suppression.erreur ? "Fermer" : "Annuler"}
+              </button>
+              {!suppression.erreur && (
+                <button type="button" onClick={supprimer} disabled={suppression.envoi} className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-md cursor-pointer disabled:opacity-50">
+                  {suppression.envoi ? "Suppression..." : "Supprimer définitivement"}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
-import { Users, ShieldCheck, ChevronDown, ChevronUp, Search, Phone, Ban } from "lucide-react";
+import { Users, ShieldCheck, ChevronDown, ChevronUp, Search, Phone, Ban, UserPlus, Pencil, KeyRound, CheckCircle, Loader2 } from "lucide-react";
 import api from "../../services/api";
 import AvatarUtilisateur from "../AvatarUtilisateur";
 import { Carte } from "./ui";
-import { LIBELLES_ROLES, momentRelatif } from "./outils";
+import { ModaleUtilisateur, ModaleMotDePasse } from "./ModalesUtilisateur";
+import { LIBELLES_ROLES, momentRelatif, messageErreur } from "./outils";
 
 const STYLES_ROLES = {
   FONDATEUR: "bg-purple-50 text-purple-700 border-purple-200",
@@ -24,19 +25,52 @@ function libelleRole(nom) {
   return LIBELLES_ROLES[String(nom || "").toUpperCase()] || nom;
 }
 
-// Utilisateurs de l'etablissement (GET /utilisateurs) et roles avec leurs permissions reelles.
-export default function SectionUtilisateurs({ roles }) {
+// Utilisateurs de l'etablissement (GET /utilisateurs) et roles avec leurs permissions reelles. La
+// direction peut ajouter, modifier, suspendre un compte et generer un mot de passe provisoire.
+export default function SectionUtilisateurs({ roles, peutAdministrer = false, onToast = () => {} }) {
   const [utilisateurs, setUtilisateurs] = useState(null);
   const [erreur, setErreur] = useState("");
   const [recherche, setRecherche] = useState("");
   const [filtreRole, setFiltreRole] = useState("tous");
   const [roleOuvert, setRoleOuvert] = useState(null);
+  const [formulaire, setFormulaire] = useState(null); // { utilisateur } (null = creation)
+  const [motDePasse, setMotDePasse] = useState(null); // { nom, email, motDePasse }
+  const [enCours, setEnCours] = useState(null);
+  const [rechargement, setRechargement] = useState(0);
 
   useEffect(() => {
     api.get("/utilisateurs")
       .then((res) => setUtilisateurs(res.data))
       .catch(() => setErreur("Impossible de charger les utilisateurs."));
-  }, []);
+  }, [rechargement]);
+
+  const basculerStatut = async (u) => {
+    const suspendre = u.statut !== "suspendu";
+    if (suspendre && !window.confirm(`Suspendre le compte de ${u.name} ? Il ne pourra plus se connecter.`)) return;
+    setEnCours(u.id);
+    try {
+      const res = await api.post(`/utilisateurs/${u.id}/statut`);
+      onToast(suspendre ? "Compte suspendu" : "Compte réactivé", res.data.message, suspendre ? "warning" : "success");
+      setRechargement((n) => n + 1);
+    } catch (err) {
+      onToast("Action impossible", messageErreur(err, "Erreur inattendue."), "warning");
+    } finally {
+      setEnCours(null);
+    }
+  };
+
+  const nouveauMotDePasse = async (u) => {
+    if (!window.confirm(`Générer un nouveau mot de passe provisoire pour ${u.name} ? L'ancien ne fonctionnera plus.`)) return;
+    setEnCours(u.id);
+    try {
+      const res = await api.post(`/utilisateurs/${u.id}/mot-de-passe`);
+      setMotDePasse({ nom: u.name, email: u.email, motDePasse: res.data.mot_de_passe_provisoire });
+    } catch (err) {
+      onToast("Action impossible", messageErreur(err, "Erreur inattendue."), "warning");
+    } finally {
+      setEnCours(null);
+    }
+  };
 
   const q = recherche.trim().toLowerCase();
   const affiches = (utilisateurs || []).filter(
@@ -45,7 +79,23 @@ export default function SectionUtilisateurs({ roles }) {
 
   return (
     <div className="space-y-6">
-      <Carte icone={Users} titre="Utilisateurs de l'établissement" description={utilisateurs ? `${utilisateurs.length} compte${utilisateurs.length > 1 ? "s" : ""} ayant accès à LAKOLI` : "Chargement..."}>
+      <Carte
+        icone={Users}
+        titre="Utilisateurs de l'établissement"
+        description={utilisateurs ? `${utilisateurs.length} compte${utilisateurs.length > 1 ? "s" : ""} ayant accès à LAKOLI` : "Chargement..."}
+        action={
+          peutAdministrer && (
+            <button
+              type="button"
+              onClick={() => setFormulaire({ utilisateur: null })}
+              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[#0C447C] text-white text-xs font-bold shadow-md hover:brightness-110 cursor-pointer shrink-0"
+            >
+              <UserPlus className="w-4 h-4" />
+              Ajouter un utilisateur
+            </button>
+          )
+        }
+      >
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
           <div className="relative w-full sm:w-72">
             <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400 pointer-events-none" />
@@ -82,13 +132,14 @@ export default function SectionUtilisateurs({ roles }) {
                 <th className="py-3 px-3">Téléphone</th>
                 <th className="py-3 px-3">Dernière activité</th>
                 <th className="py-3 px-3">Statut</th>
+                {peutAdministrer && <th className="py-3 px-3 text-right">Actions</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-700">
               {utilisateurs === null && !erreur ? (
-                <tr><td colSpan={5} className="py-8 text-center text-slate-400">Chargement...</td></tr>
+                <tr><td colSpan={6} className="py-8 text-center text-slate-400">Chargement...</td></tr>
               ) : affiches.length === 0 ? (
-                <tr><td colSpan={5} className="py-8 text-center text-slate-400">Aucun utilisateur ne correspond à ces critères.</td></tr>
+                <tr><td colSpan={6} className="py-8 text-center text-slate-400">Aucun utilisateur ne correspond à ces critères.</td></tr>
               ) : (
                 affiches.map((u) => (
                   <tr key={u.id} className="hover:bg-slate-50/80 transition-colors">
@@ -123,6 +174,29 @@ export default function SectionUtilisateurs({ roles }) {
                         <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />Actif</span>
                       )}
                     </td>
+                    {peutAdministrer && (
+                      <td className="py-3.5 px-3">
+                        {enCours === u.id ? (
+                          <Loader2 className="w-4 h-4 animate-spin text-slate-400 ml-auto" />
+                        ) : (
+                          <div className="flex items-center justify-end gap-1">
+                            <button onClick={() => setFormulaire({ utilisateur: u })} className="p-1.5 rounded-lg text-slate-400 hover:text-[#0C447C] hover:bg-blue-50 cursor-pointer" title="Modifier le compte">
+                              <Pencil className="w-4 h-4" />
+                            </button>
+                            <button onClick={() => nouveauMotDePasse(u)} className="p-1.5 rounded-lg text-slate-400 hover:text-amber-600 hover:bg-amber-50 cursor-pointer" title="Nouveau mot de passe provisoire">
+                              <KeyRound className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => basculerStatut(u)}
+                              className={`p-1.5 rounded-lg cursor-pointer ${u.statut === "suspendu" ? "text-slate-400 hover:text-emerald-600 hover:bg-emerald-50" : "text-slate-400 hover:text-rose-600 hover:bg-rose-50"}`}
+                              title={u.statut === "suspendu" ? "Réactiver le compte" : "Suspendre le compte"}
+                            >
+                              {u.statut === "suspendu" ? <CheckCircle className="w-4 h-4" /> : <Ban className="w-4 h-4" />}
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                    )}
                   </tr>
                 ))
               )}
@@ -183,6 +257,25 @@ export default function SectionUtilisateurs({ roles }) {
           })}
         </div>
       </Carte>
+
+      {formulaire && (
+        <ModaleUtilisateur
+          utilisateur={formulaire.utilisateur}
+          roles={roles}
+          onFermer={() => setFormulaire(null)}
+          onEnregistre={(donnees) => {
+            const cree = !formulaire.utilisateur;
+            setFormulaire(null);
+            setRechargement((n) => n + 1);
+            if (cree) {
+              setMotDePasse({ nom: donnees.utilisateur.name, email: donnees.utilisateur.email, motDePasse: donnees.mot_de_passe_provisoire });
+            } else {
+              onToast("Compte mis à jour", donnees.message);
+            }
+          }}
+        />
+      )}
+      {motDePasse && <ModaleMotDePasse {...motDePasse} onFermer={() => setMotDePasse(null)} />}
     </div>
   );
 }

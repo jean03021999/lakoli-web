@@ -48,14 +48,33 @@ function preremplissage(enseignant, salaires) {
   };
 }
 
-export default function PanneauNouveauSalaire({ enseignants, salaires, enseignantInitial, moisInitial, anneeInitiale, annees, onFermer, onEnregistrer }) {
-  const premier = enseignants.find((e) => e.id === enseignantInitial) || null;
-  const initial = preremplissage(premier, salaires);
+// Avec `salaireAModifier` : correction d'un salaire en attente (enseignant fixe, pas de paiement).
+function versChamps(s) {
+  return {
+    type_remuneration: s.type_remuneration,
+    salaire_base: valeur(s.salaire_base),
+    nb_heures: valeur(s.nb_heures),
+    taux_horaire: valeur(s.taux_horaire),
+    taux_heure_supp: valeur(s.taux_heure_supp),
+    moyen_paiement: s.moyen_paiement,
+  };
+}
+
+export default function PanneauNouveauSalaire({ enseignants, salaires, enseignantInitial, moisInitial, anneeInitiale, annees, onFermer, onEnregistrer, salaireAModifier = null }) {
+  const modification = Boolean(salaireAModifier);
+  const premier = enseignants.find((e) => e.id === (modification ? salaireAModifier.enseignant_id : enseignantInitial)) || null;
+  const initial = modification
+    ? { source: `Correction du salaire ${salaireAModifier.reference}`, champs: versChamps(salaireAModifier) }
+    : preremplissage(premier, salaires);
 
   const [enseignantId, setEnseignantId] = useState(premier?.id ?? "");
   const [source, setSource] = useState(premier ? initial.source : "");
-  const [form, setForm] = useState({ mois: moisInitial, annee: anneeInitiale, nb_heures_supp: "", observation: "", ...initial.champs });
-  const [avecHeuresSupp, setAvecHeuresSupp] = useState(false);
+  const [form, setForm] = useState(
+    modification
+      ? { mois: salaireAModifier.mois, annee: salaireAModifier.annee, nb_heures_supp: valeur(salaireAModifier.nb_heures_supp), observation: salaireAModifier.observation || "", ...initial.champs }
+      : { mois: moisInitial, annee: anneeInitiale, nb_heures_supp: "", observation: "", ...initial.champs }
+  );
+  const [avecHeuresSupp, setAvecHeuresSupp] = useState(modification && Number(salaireAModifier.nb_heures_supp) > 0);
   const [recherche, setRecherche] = useState("");
   const [listeOuverte, setListeOuverte] = useState(!premier);
   const [envoi, setEnvoi] = useState(false);
@@ -80,7 +99,9 @@ export default function PanneauNouveauSalaire({ enseignants, salaires, enseignan
     return termes.every((t) => cible.includes(t));
   });
 
-  const doublon = salaires.some((s) => s.enseignant_id === enseignantId && s.mois === Number(form.mois) && s.annee === Number(form.annee));
+  const doublon = salaires.some(
+    (s) => s.id !== salaireAModifier?.id && s.enseignant_id === enseignantId && s.mois === Number(form.mois) && s.annee === Number(form.annee)
+  );
   const estFixe = form.type_remuneration === "fixe";
   const calcul = {
     type_remuneration: form.type_remuneration,
@@ -136,7 +157,7 @@ export default function PanneauNouveauSalaire({ enseignants, salaires, enseignan
               <Banknote className="w-4 h-4" />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-slate-900 leading-tight">Nouveau salaire</h2>
+              <h2 className="text-lg font-bold text-slate-900 leading-tight">{modification ? "Modifier le salaire" : "Nouveau salaire"}</h2>
               <p className="text-xs text-slate-500">Le montant net est recalculé par le serveur</p>
             </div>
           </div>
@@ -151,8 +172,8 @@ export default function PanneauNouveauSalaire({ enseignants, salaires, enseignan
             <label className={LIBELLE}>Enseignant bénéficiaire</label>
             <button
               type="button"
-              onClick={() => setListeOuverte((o) => !o)}
-              className="w-full text-left p-2.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl flex items-center justify-between gap-3 cursor-pointer"
+              onClick={() => !modification && setListeOuverte((o) => !o)}
+              className={`w-full text-left p-2.5 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between gap-3 ${modification ? "cursor-default" : "hover:bg-slate-100 cursor-pointer"}`}
             >
               {enseignant ? (
                 <div className="flex items-center gap-3 min-w-0">
@@ -390,6 +411,16 @@ export default function PanneauNouveauSalaire({ enseignants, salaires, enseignan
         {/* Actions */}
         <div className="p-4 border-t border-slate-200 bg-white shrink-0 space-y-2">
           {erreur && <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{erreur}</div>}
+          {modification ? (
+            <button
+              type="button"
+              onClick={() => enregistrer(false)}
+              disabled={envoi}
+              className="w-full px-4 py-2.5 bg-[#0C447C] hover:bg-[#093560] text-white rounded-xl text-sm font-bold transition-colors shadow-md cursor-pointer disabled:opacity-50"
+            >
+              {envoi ? "Enregistrement..." : "Enregistrer les modifications"}
+            </button>
+          ) : (
           <div className="grid grid-cols-2 gap-3">
             <button
               type="button"
@@ -408,7 +439,10 @@ export default function PanneauNouveauSalaire({ enseignants, salaires, enseignan
               {envoi ? "Enregistrement..." : "Enregistrer et payer"}
             </button>
           </div>
-          <p className="text-[11px] text-center text-slate-400">« Enregistrer et payer » marque le salaire comme payé et ouvre la fiche.</p>
+          )}
+          <p className="text-[11px] text-center text-slate-400">
+            {modification ? "Le montant net est recalculé ; le salaire reste en attente de paiement." : "« Enregistrer et payer » marque le salaire comme payé et ouvre la fiche."}
+          </p>
         </div>
       </div>
     </div>

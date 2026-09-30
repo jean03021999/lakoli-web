@@ -185,7 +185,7 @@ export default function Parametres({ permissions = [], onUtilisateurMaj, onEtabl
             />
           )}
           {section === "securite" && <SectionSecurite securite={donnees.securite} email={donnees.profil.email} onToast={toast} onMaj={(s) => maj("securite", s)} />}
-          {section === "utilisateurs" && <SectionUtilisateurs roles={donnees.roles} />}
+          {section === "utilisateurs" && <SectionUtilisateurs roles={donnees.roles} peutAdministrer={donnees.peut_administrer} onToast={toast} />}
           {section === "session" && (
             <SectionSessions
               sessions={donnees.sessions}

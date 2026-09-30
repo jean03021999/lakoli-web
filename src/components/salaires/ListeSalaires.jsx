@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Wallet, CheckCircle, Clock, TrendingUp, Calendar, Download, Printer, Check, ArrowRight, Trash2 } from "lucide-react";
+import { Wallet, CheckCircle, Clock, TrendingUp, Calendar, Download, Printer, Check, ArrowRight, Trash2, Pencil } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { degradeEnseignant, initialesEnseignant, formaterGNF } from "../enseignants/theme";
 import { MOYENS, telechargerCsv } from "../frais/configFrais";
@@ -37,7 +37,7 @@ function CarteStat({ libelle, valeur, detail, pourcentage, degrade, icone: Icone
 
 // Onglet "Liste des salaires" : 4 compteurs de la periode, filtres, tableau, recapitulatif et
 // evolution de la masse salariale sur les 6 mois se terminant a la periode affichee.
-export default function ListeSalaires({ salaires, enseignants, chargement, peutGerer, annees, filtres, setFiltres, onNouveau, onFiche, onPayer, onSupprimer, onHistorique }) {
+export default function ListeSalaires({ salaires, enseignants, chargement, peutGerer, annees, filtres, setFiltres, onNouveau, onFiche, onPayer, onModifier, onSupprimer, onHistorique }) {
   const { mois, annee, enseignant, statut } = filtres;
   const maj = (champ, v) => setFiltres((f) => ({ ...f, [champ]: v }));
 
@@ -311,6 +311,9 @@ export default function ListeSalaires({ salaires, enseignants, chargement, peutG
                               >
                                 <Check className="w-3.5 h-3.5 stroke-[3]" />
                                 Payer
+                              </button>
+                              <button onClick={() => onModifier(s)} title="Corriger ce salaire" className="p-1.5 rounded-lg text-slate-400 hover:text-[#0C447C] hover:bg-blue-50 cursor-pointer">
+                                <Pencil className="w-4 h-4" />
                               </button>
                               <button onClick={() => onSupprimer(s)} title="Supprimer" className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 cursor-pointer">
                                 <Trash2 className="w-4 h-4" />

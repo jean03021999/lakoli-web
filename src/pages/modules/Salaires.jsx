@@ -105,6 +105,17 @@ export default function Salaires({ permissions = [] }) {
 
   // Appelee par le panneau ; rejette avec un message affichable en cas d'erreur.
   async function enregistrer(donnees, payer) {
+    if (panneau?.salaire) {
+      try {
+        const res = await api.put(`/salaires/${panneau.salaire.id}`, donnees);
+        setPanneau(null);
+        setToast(`Salaire ${res.data.reference} corrigé : ${formaterGNF(res.data.montant_net)}.`);
+        recharger();
+      } catch (err) {
+        throw new Error(messageErreur(err, "Erreur lors de la modification."));
+      }
+      return;
+    }
     const fenetre = payer ? ouvrirFenetreVierge() : null;
     setErreur("");
     try {
@@ -224,6 +235,7 @@ export default function Salaires({ permissions = [] }) {
           onNouveau={ouvrirNouveau}
           onFiche={imprimer}
           onPayer={(s) => setAPayer({ salaire: s, moyen: s.moyen_paiement })}
+          onModifier={(s) => setPanneau({ enseignant: s.enseignant_id, salaire: s })}
           onSupprimer={supprimer}
           onHistorique={ouvrirHistorique}
         />
@@ -252,6 +264,7 @@ export default function Salaires({ permissions = [] }) {
           annees={annees}
           onFermer={() => setPanneau(null)}
           onEnregistrer={enregistrer}
+          salaireAModifier={panneau.salaire || null}
         />
       )}
 
