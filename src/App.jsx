@@ -33,6 +33,7 @@ import Periodes from "./pages/modules/Periodes";
 import PaiementsCaisse from "./pages/modules/PaiementsCaisse";
 import Depenses from "./pages/modules/Depenses";
 import Relances from "./pages/modules/Relances";
+import RapportFinancier from "./pages/modules/RapportFinancier";
 import Abonnement from "./pages/modules/Abonnement";
 import Salaires from "./pages/modules/Salaires";
 
@@ -200,6 +201,7 @@ function AppContent() {
         <Route path="/paiements" element={<RouteProtegee permissions={permissions} requiert="frais.voir"><PaiementsCaisse etablissement={etablissement} permissions={permissions} /></RouteProtegee>} />
         <Route path="/depenses" element={<RouteProtegee permissions={permissions} requiert="frais.voir"><Depenses etablissement={etablissement} permissions={permissions} /></RouteProtegee>} />
         <Route path="/relances" element={<RouteProtegee permissions={permissions} requiert="frais.voir"><Relances etablissement={etablissement} permissions={permissions} /></RouteProtegee>} />
+        <Route path="/rapport-financier" element={<RouteProtegee permissions={permissions} requiert="frais.voir"><RapportFinancier etablissement={etablissement} /></RouteProtegee>} />
         <Route
           path="/salaires"
           element={<RouteProtegee permissions={permissions} requiert="enseignants.salaires.voir"><Salaires permissions={permissions} /></RouteProtegee>}

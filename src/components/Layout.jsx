@@ -28,6 +28,7 @@ import {
   WifiOff,
   Receipt,
   BellRing,
+  TrendingUp,
 } from "lucide-react";
 
 const COULEURS = {
@@ -60,6 +61,7 @@ const MODULES = [
   { nom: "Gestion des Salaires", icone: DollarSign, chemin: "/salaires", permission: "enseignants.salaires.voir" },
   { nom: "Journal de Caisse", icone: CreditCard, chemin: "/paiements", permission: "frais.voir" },
   { nom: "Dépenses & Justificatifs", icone: Receipt, chemin: "/depenses", permission: "frais.voir" },
+  { nom: "Rapport Financier", icone: TrendingUp, chemin: "/rapport-financier", permission: "frais.voir" },
   { nom: "Périodes Scolaires", icone: Clock, chemin: "/periodes", permission: "periodes.gerer" },
   // Pas de permission dediee cote backend pour les utilisateurs : on garde la liste de roles.
   { nom: "Utilisateurs", icone: UserCog, chemin: "/utilisateurs", roles: ["DIRECTEUR", "FONDATEUR", "PROVISEUR", "CENSEUR"] },

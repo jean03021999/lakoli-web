@@ -1220,6 +1220,108 @@ export function genererJournalCaisseHtml({ etablissement, filtres = [], versemen
 }
 
 // ---------------------------------------------------------------------------
+// Rapport financier (GET /caisse/evolution) : la session mois par mois, ou un mois en detail
+// (moisDetail = cle "YYYY-MM"). A passer a imprimerDocument().
+// ---------------------------------------------------------------------------
+export function genererRapportFinancierHtml({ etablissement, donnees, moisDetail = null }) {
+  const ecole = completerEtablissement(etablissement);
+  const tiret = "—";
+  const taux = (part, tout) => (tout > 0 ? `${Math.round((part / tout) * 100)} %` : tiret);
+  const t = donnees.totaux;
+  const entete = (titre, sousTitre) => `
+    <div class="entete-premium">
+      <div class="logo">
+        ${logoEcoleHtml(ecole, "logo-premium")}
+        <div>
+          <div class="nom">LAKOLI</div>
+          ${ecole.nom ? `<span class="badge-etablissement">${echapperHtml(ecole.nom)}</span>` : ""}
+          ${ecole.agrement || ecole.slogan ? `<div class="mentions-premium">${[ecole.agrement && `Agrément n° ${echapperHtml(ecole.agrement)}`, ecole.slogan && `<span class="slogan">« ${echapperHtml(ecole.slogan)} »</span>`].filter(Boolean).join(" · ")}</div>` : ""}
+        </div>
+      </div>
+      <div class="titre">
+        <h1>${titre}</h1>
+        <div class="session">${sousTitre}</div>
+      </div>
+    </div>`;
+  const pied = `
+    <div class="signature-zone double">
+      <div class="cadre"><div class="ligne"></div><div class="libelle">Le comptable</div></div>
+      <div class="cadre"><div class="ligne"></div><div class="libelle">Visa de la direction</div></div>
+    </div>
+    <div class="pied-premium">Document officiel LAKOLI · Rapport établi à partir des données enregistrées dans l'application<br>Imprimé le ${echapperHtml(dateImpression())}</div>`;
+
+  if (moisDetail) {
+    const m = donnees.mois.find((x) => x.mois === moisDetail);
+    if (!m) return "";
+    const types = [["Scolarité", m.entrees_par_type.scolarite], ["Inscriptions / réinscriptions", m.entrees_par_type.inscription], ["Autres frais", m.entrees_par_type.autres]].filter(([, v]) => v > 0);
+    return `
+  <div class="doc-releve rapport">
+    ${entete("RAPPORT MENSUEL", `${echapperHtml(m.libelle)} · Année scolaire ${echapperHtml(donnees.session.libelle)}`)}
+    <h2 class="section">Synthèse du mois</h2>
+    <div class="tuiles">
+      <div class="tuile"><div class="lib">Encaissé</div><div class="val">${formaterMontant(m.entrees)} GNF</div></div>
+      <div class="tuile"><div class="lib">Salaires versés</div><div class="val">${formaterMontant(m.salaires)} GNF</div></div>
+      <div class="tuile"><div class="lib">Autres dépenses</div><div class="val">${formaterMontant(m.depenses)} GNF</div></div>
+      <div class="tuile"><div class="lib">Solde du mois</div><div class="val">${formaterMontant(m.solde)} GNF</div></div>
+      <div class="tuile"><div class="lib">Solde cumulé fin de mois</div><div class="val">${formaterMontant(m.solde_cumule)} GNF</div></div>
+      <div class="tuile"><div class="lib">Échéances du mois recouvrées</div><div class="val">${taux(m.recouvre, m.attendu)}</div></div>
+    </div>
+    <h2 class="section">Encaissements par type de frais</h2>
+    ${types.length ? `<table class="tableau-premium compact"><thead><tr><th>Type</th><th class="droite">Montant (GNF)</th><th class="droite">Part</th></tr></thead><tbody>
+      ${types.map(([lib, v]) => `<tr><td>${lib}</td><td class="droite">${formaterMontant(v)}</td><td class="droite">${taux(v, m.entrees)}</td></tr>`).join("")}
+      <tr class="total"><td>TOTAL</td><td class="droite">${formaterMontant(m.entrees)}</td><td class="droite">100 %</td></tr></tbody></table>` : `<p class="vide">Aucun encaissement ce mois.</p>`}
+    <h2 class="section">Échéancier du mois</h2>
+    <table class="tableau-premium compact"><tbody>
+      <tr><td>Montant attendu (échéances arrivant à terme ce mois)</td><td class="droite">${formaterMontant(m.attendu)} GNF</td></tr>
+      <tr><td>Déjà recouvré sur ces échéances</td><td class="droite">${formaterMontant(m.recouvre)} GNF</td></tr>
+      <tr class="total"><td>RESTE À RECOUVRER</td><td class="droite">${formaterMontant(Math.max(0, m.attendu - m.recouvre))} GNF</td></tr>
+    </tbody></table>
+    <h2 class="section">Sorties du mois</h2>
+    ${m.salaires + m.depenses > 0 ? `<table class="tableau-premium compact"><thead><tr><th>Nature</th><th class="droite">Montant (GNF)</th></tr></thead><tbody>
+      ${m.salaires > 0 ? `<tr><td>Salaires du personnel (${m.nombre_salaires})</td><td class="droite">${formaterMontant(m.salaires)}</td></tr>` : ""}
+      ${m.depenses_par_categorie.map((c) => `<tr><td>${echapperHtml(c.libelle)}</td><td class="droite">${formaterMontant(c.total)}</td></tr>`).join("")}
+      <tr class="total"><td>TOTAL DES SORTIES</td><td class="droite">${formaterMontant(m.salaires + m.depenses)}</td></tr></tbody></table>` : `<p class="vide">Aucune sortie ce mois.</p>`}
+    ${pied}
+  </div>`;
+  }
+
+  const lignes = donnees.mois
+    .map((m) => `<tr${m.futur ? ' style="color:#94a3b8"' : ""}>
+      <td><strong>${echapperHtml(m.libelle)}</strong></td>
+      <td class="droite">${m.attendu ? formaterMontant(m.attendu) : tiret}</td>
+      <td class="droite">${m.attendu ? taux(m.recouvre, m.attendu) : tiret}</td>
+      <td class="droite">${formaterMontant(m.entrees)}</td>
+      <td class="droite">${formaterMontant(m.salaires)}</td>
+      <td class="droite">${formaterMontant(m.depenses)}</td>
+      <td class="droite">${formaterMontant(m.solde)}</td>
+      <td class="droite"><strong>${formaterMontant(m.solde_cumule)}</strong></td>
+    </tr>`)
+    .join("");
+  return `
+  <div class="doc-releve rapport">
+    ${entete("RAPPORT FINANCIER", `Année scolaire ${echapperHtml(donnees.session.libelle)} · mois par mois`)}
+    <h2 class="section">Synthèse de l'année</h2>
+    <div class="tuiles">
+      <div class="tuile"><div class="lib">Total encaissé</div><div class="val">${formaterMontant(t.entrees)} GNF</div></div>
+      <div class="tuile"><div class="lib">Salaires versés</div><div class="val">${formaterMontant(t.salaires)} GNF</div></div>
+      <div class="tuile"><div class="lib">Autres dépenses</div><div class="val">${formaterMontant(t.depenses)} GNF</div></div>
+      <div class="tuile"><div class="lib">Solde</div><div class="val">${formaterMontant(t.solde)} GNF</div></div>
+      <div class="tuile"><div class="lib">Attendu sur l'année</div><div class="val">${formaterMontant(t.attendu)} GNF</div></div>
+      <div class="tuile"><div class="lib">Recouvrement des échéances échues</div><div class="val">${taux(t.recouvre_echu, t.attendu_echu)}</div></div>
+    </div>
+    <h2 class="section">Évolution mensuelle</h2>
+    <table class="tableau-premium compact">
+      <thead><tr><th>Mois</th><th class="droite">Attendu</th><th class="droite">Recouvré</th><th class="droite">Encaissé</th><th class="droite">Salaires</th><th class="droite">Dépenses</th><th class="droite">Solde du mois</th><th class="droite">Solde cumulé</th></tr></thead>
+      <tbody>${lignes}
+        <tr class="total"><td>TOTAL</td><td class="droite">${formaterMontant(t.attendu)}</td><td class="droite">${taux(t.recouvre, t.attendu)}</td><td class="droite">${formaterMontant(t.entrees)}</td><td class="droite">${formaterMontant(t.salaires)}</td><td class="droite">${formaterMontant(t.depenses)}</td><td class="droite">${formaterMontant(t.solde)}</td><td class="droite">${formaterMontant(t.solde)}</td></tr>
+      </tbody>
+    </table>
+    <p class="note">Montants en GNF. Attendu = échéances dont la date limite tombe dans le mois ; Recouvré = part de ces échéances déjà payée. Les mois à venir sont en gris.</p>
+    ${pied}
+  </div>`;
+}
+
+// ---------------------------------------------------------------------------
 // Lettres de relance aux familles (GET /frais/relances) : une page par eleve, rappel d'echeance
 // proche ou retard de paiement, avec le montant du et la date limite. A passer a imprimerDocument().
 // ---------------------------------------------------------------------------
