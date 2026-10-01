@@ -18,6 +18,7 @@ import {
   ChevronRight,
   Receipt,
   Search,
+  Ban,
 } from "lucide-react";
 import { calculerStatutEcheance } from "../../constants/statutEcheance";
 import { situationGlobaleDepuisSuivi } from "../../utils/situationFrais";
@@ -153,6 +154,8 @@ export default function FraisScolarite({ permissions = [], etablissement = null 
   const [formInscription, setFormInscription] = useState(null);
   // Formulaire de paiement d'une echeance de scolarite prise isolement (bouton "Payer").
   const [paiement, setPaiement] = useState(null);
+  // Annulation d'une inscription / reinscription faite par erreur : { frais, motif, envoi, erreur }.
+  const [annulInscription, setAnnulInscription] = useState(null);
 
   const [erreur, setErreur] = useState("");
   const [succes, setSucces] = useState("");
@@ -513,6 +516,24 @@ export default function FraisScolarite({ permissions = [], etablissement = null 
   const dejaInscrit = (suivi?.frais || []).some(
     (f) => normaliser(f.type_frais).includes("inscription") && f.echeances.some((ech) => Number(ech.montant_paye) > 0)
   );
+  // Frais d'inscription / reinscription (fraisInscription, plus haut), payes ou non : annulables en
+  // cas d'erreur ; tant qu'ils existent, Inscrire / Reinscrire ne sont pas proposes (refuses).
+  const montantPayeInscription = fraisInscription ? fraisInscription.echeances.reduce((t, ech) => t + Number(ech.montant_paye || 0), 0) : 0;
+
+  const confirmerAnnulationInscription = async () => {
+    setAnnulInscription((a) => ({ ...a, envoi: true, erreur: "" }));
+    try {
+      const res = await api.post("/frais/annuler-inscription", { frais_eleve_id: annulInscription.frais.id, motif: annulInscription.motif.trim() });
+      setAnnulInscription(null);
+      await chargerSuivi(eleveSelectionne);
+      setSucces(res.data.message);
+      // L'eleve n'est plus compte inscrit : la liste et l'en-tete se mettent a jour sans recharger.
+      setEleves((liste) => liste.map((e) => (e.id === eleveSelectionne ? { ...e, inscription_reglee: null } : e)));
+      setEleveInfos((e) => (e ? { ...e, inscription_reglee: null } : e));
+    } catch (err) {
+      setAnnulInscription((a) => ({ ...a, envoi: false, erreur: err.response?.data?.message || "Annulation impossible." }));
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -790,7 +811,18 @@ export default function FraisScolarite({ permissions = [], etablissement = null 
                         </div>
                       </div>
 
-                      {peutInscrire && !dejaInscrit && (
+                      {peutPayer && fraisInscription && (
+                        <button
+                          type="button"
+                          onClick={() => setAnnulInscription({ frais: fraisInscription, motif: "", envoi: false, erreur: "" })}
+                          className="px-4 py-2 text-xs font-bold rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50 flex items-center gap-1.5 cursor-pointer shrink-0"
+                        >
+                          <Ban className="w-3.5 h-3.5" />
+                          Annuler la {normaliser(fraisInscription.type_frais).startsWith("re") ? "réinscription" : "inscription"}
+                        </button>
+                      )}
+
+                      {peutInscrire && !dejaInscrit && !fraisInscription && (
                         <div className="flex items-center gap-2 shrink-0 flex-wrap">
                           <button
                             type="button"
@@ -1176,6 +1208,48 @@ export default function FraisScolarite({ permissions = [], etablissement = null 
             setSucces(type === "succes" ? texte : "");
           }}
         />
+      )}
+      {annulInscription && (
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-[2px] flex items-center justify-center p-4" onClick={() => !annulInscription.envoi && setAnnulInscription(null)}>
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-start gap-3">
+              <span className="w-11 h-11 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center shrink-0"><AlertTriangle className="w-5 h-5" /></span>
+              <div>
+                <h3 className="text-base font-bold text-slate-900">Annuler la {normaliser(annulInscription.frais.type_frais).startsWith("re") ? "réinscription" : "inscription"} ?</h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  {eleveInfos ? `${eleveInfos.nom} ${eleveInfos.prenom} · ` : ""}{annulInscription.frais.type_frais} · payé {montantPayeInscription.toLocaleString("fr-FR")} GNF
+                </p>
+              </div>
+            </div>
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Les paiements de ces frais sont annulés (ils restent visibles, barrés, dans le Journal de caisse) puis les frais sont retirés de l'élève.
+              Vous pourrez ensuite l'inscrire ou le réinscrire correctement. L'opération est gardée dans l'historique de l'élève.
+            </p>
+            <div>
+              <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1.5">Motif de l'annulation *</label>
+              <input
+                autoFocus
+                value={annulInscription.motif}
+                onChange={(e) => setAnnulInscription((a) => ({ ...a, motif: e.target.value }))}
+                placeholder="Ex : inscrit au lieu de réinscrit, mauvais élève…"
+                className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-rose-200 focus:border-rose-400"
+              />
+            </div>
+            {annulInscription.erreur && <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-700">{annulInscription.erreur}</div>}
+            <div className="flex items-center justify-end gap-3 pt-1">
+              <button type="button" onClick={() => setAnnulInscription(null)} disabled={annulInscription.envoi} className="px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 cursor-pointer">Retour</button>
+              <button
+                type="button"
+                onClick={confirmerAnnulationInscription}
+                disabled={annulInscription.envoi || annulInscription.motif.trim().length < 3}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+              >
+                <Ban className="w-4 h-4" />
+                {annulInscription.envoi ? "Annulation…" : "Confirmer l'annulation"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

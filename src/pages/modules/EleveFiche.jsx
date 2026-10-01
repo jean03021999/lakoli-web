@@ -408,6 +408,21 @@ export default function EleveFiche({ permissions = [] }) {
               </div>
             )}
 
+            {/* Historique des operations sensibles (annulation d'inscription...) : qui, quand, motif, montant. */}
+            {eleve.historique?.length > 0 && (
+              <div className="p-4 rounded-xl bg-amber-50/60 border border-amber-200/70 space-y-2">
+                <h4 className="text-xs font-bold text-amber-800 flex items-center gap-1.5"><AlertTriangle className="w-3.5 h-3.5" /> Historique de l'élève</h4>
+                {eleve.historique.map((h, i) => (
+                  <div key={i} className="text-[11px] text-slate-700 border-t border-amber-200/60 pt-2 first:border-0 first:pt-0">
+                    <p className="font-semibold">{h.description}{h.montant > 0 ? ` · ${formaterGNF(h.montant)}` : ""}</p>
+                    <p className="text-slate-500">
+                      Le {formaterDate(h.date)} à {String(h.date || "").slice(11, 16)}{h.par ? ` par ${h.par}` : ""}{h.motif ? ` · Motif : ${h.motif}` : ""}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+
             <div className="mt-auto grid grid-cols-3 gap-3 bg-[#f0f4f8]/70 p-4 rounded-xl border border-slate-200/80 text-center">
               <div>
                 <span className="text-[10px] uppercase font-bold text-slate-500 block">Total dû</span>
@@ -439,7 +454,7 @@ export default function EleveFiche({ permissions = [] }) {
               Supprimer {eleve.nom} {eleve.prenom} ?
             </h3>
             <p className="text-xs text-slate-500 mt-2 leading-relaxed text-center">
-              Réservé aux élèves enregistrés par erreur. La suppression est refusée si l'élève a déjà des paiements, des notes ou des
+              Réservé aux élèves enregistrés par erreur. La suppression est refusée si l'élève a des paiements actifs (non annulés), des notes ou des
               bulletins. Ses frais non payés sont retirés et il ne compte plus dans les effectifs.
             </p>
             {erreurSuppression && (
