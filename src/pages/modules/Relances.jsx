@@ -45,6 +45,12 @@ export default function Relances({ etablissement = null, permissions = [] }) {
   const [envoi, setEnvoi] = useState(false);
   const [rechargement, setRechargement] = useState(0);
   const [historique, setHistorique] = useState(null); // { ligne, relances }
+  const [toutesClasses, setToutesClasses] = useState([]);
+
+  // Toutes les classes de l'etablissement (ordre pedagogique), meme sans famille a relancer.
+  useEffect(() => {
+    api.get("/classes").then((res) => setToutesClasses(res.data)).catch(() => setToutesClasses([]));
+  }, []);
 
   useEffect(() => {
     let annule = false;
@@ -65,7 +71,12 @@ export default function Relances({ etablissement = null, permissions = [] }) {
   const lignes = donnees.lignes;
   const enRetard = lignes.filter((l) => l.motif === "retard");
   const rappels = lignes.filter((l) => l.motif === "rappel");
-  const classes = useMemo(() => [...new Set(lignes.map((l) => l.classe).filter(Boolean))].sort((a, b) => a.localeCompare(b, "fr")), [lignes]);
+  // Nombre de familles de l'onglet courant par classe (affiche dans le menu des classes).
+  const parClasse = useMemo(() => {
+    const n = {};
+    lignes.filter((l) => l.motif === onglet).forEach((l) => { n[l.classe_id] = (n[l.classe_id] || 0) + 1; });
+    return n;
+  }, [lignes, onglet]);
   const ilYASeptJours = Date.now() - 7 * 86400000;
 
   const termes = normaliser(recherche).split(/\s+/).filter(Boolean);
@@ -73,7 +84,7 @@ export default function Relances({ etablissement = null, permissions = [] }) {
     () =>
       lignes.filter((l) => {
         if (l.motif !== onglet) return false;
-        if (classe !== "toutes" && l.classe !== classe) return false;
+        if (classe !== "toutes" && String(l.classe_id) !== classe) return false;
         if (nonRelances && l.derniere_relance && new Date(l.derniere_relance.date.replace(" ", "T")).getTime() > ilYASeptJours) return false;
         const cible = normaliser(`${l.nom} ${l.prenom} ${l.matricule} ${l.classe || ""} ${l.contacts.map((c) => `${c.nom} ${c.telephone}`).join(" ")}`);
         return termes.every((t) => cible.includes(t));
@@ -208,7 +219,7 @@ export default function Relances({ etablissement = null, permissions = [] }) {
           </div>
           <select value={classe} onChange={(e) => setClasse(e.target.value)} className="bg-slate-50 border border-slate-200 text-xs font-semibold rounded-xl px-2.5 py-2 text-slate-700 focus:outline-none">
             <option value="toutes">Toutes les classes</option>
-            {classes.map((c) => <option key={c} value={c}>{c}</option>)}
+            {toutesClasses.map((c) => <option key={c.id} value={String(c.id)}>{c.nom} ({parClasse[c.id] || 0})</option>)}
           </select>
           {onglet === "rappel" && (
             <select value={horizon} onChange={(e) => setHorizon(Number(e.target.value))} className="bg-slate-50 border border-slate-200 text-xs font-semibold rounded-xl px-2.5 py-2 text-slate-700 focus:outline-none">
@@ -252,7 +263,9 @@ export default function Relances({ etablissement = null, permissions = [] }) {
                 <tr><td colSpan={7} className="py-12 text-center text-slate-400"><Loader2 className="w-5 h-5 animate-spin inline" /> Calcul des impayés…</td></tr>
               ) : affichees.length === 0 ? (
                 <tr><td colSpan={7} className="py-12 text-center text-slate-400">
-                  {onglet === "retard" ? (enRetard.length === 0 ? "Aucune famille en retard de paiement. 🎉" : "Aucune famille ne correspond aux filtres.") : (rappels.length === 0 ? `Aucune échéance à venir dans les ${horizon} prochains jours.` : "Aucune famille ne correspond aux filtres.")}
+                  {classe !== "toutes" && !parClasse[classe]
+                    ? `Aucune famille de cette classe ${onglet === "retard" ? "en retard de paiement" : `avec une échéance dans les ${horizon} prochains jours`}.`
+                    : onglet === "retard" ? (enRetard.length === 0 ? "Aucune famille en retard de paiement. 🎉" : "Aucune famille ne correspond aux filtres.") : (rappels.length === 0 ? `Aucune échéance à venir dans les ${horizon} prochains jours.` : "Aucune famille ne correspond aux filtres.")}
                 </td></tr>
               ) : (
                 affichees.map((l) => {
