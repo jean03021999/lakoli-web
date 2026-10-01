@@ -1321,6 +1321,18 @@ export function genererRapportFinancierHtml({ etablissement, donnees, moisDetail
   </div>`;
 }
 
+// Civilite du parent selon son lien avec l'eleve : « Monsieur » (pere), « Madame » (mere),
+// « Madame, Monsieur » (tuteur ou inconnu). Utilisee par les lettres et les messages de relance.
+export function civiliteParent(contact) {
+  const titre = contact?.lien === "pere" ? "Monsieur" : contact?.lien === "mere" ? "Madame" : "Madame, Monsieur";
+  const nom = (contact?.nom || "").trim();
+  return {
+    titre, // pour l'appel et la formule de politesse : « Monsieur, »
+    destinataire: nom ? `${titre === "Madame, Monsieur" ? "Madame / Monsieur" : titre} ${nom}` : "Madame, Monsieur les parents",
+    salutation: nom ? `${titre === "Madame, Monsieur" ? "Madame, Monsieur" : `${titre} ${nom}`}` : "Madame, Monsieur",
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Lettres de relance aux familles (GET /frais/relances) : une page par eleve, rappel d'echeance
 // proche ou retard de paiement, avec le montant du et la date limite. A passer a imprimerDocument().
@@ -1333,18 +1345,22 @@ export function genererLettresRelanceHtml({ etablissement, lignes }) {
   return lignes
     .map((l) => {
       const parent = l.contacts?.[0];
+      const civ = civiliteParent(parent);
       const retard = l.motif === "retard";
       const eleve = `${echapperHtml(l.prenom)} ${echapperHtml((l.nom || "").toUpperCase())}`;
       const corps = retard
-        ? `Sauf erreur de notre part, les frais de scolarité de votre enfant <strong>${eleve}</strong>, élève en <strong>${echapperHtml(l.classe || "—")}</strong>,
-           présentent un montant de <strong>${formaterMontant(l.montant_du)} GNF</strong> resté impayé depuis le <strong>${formaterDate(l.date_limite)}</strong>
+        ? `Nous nous permettons de vous informer respectueusement que, sauf erreur de notre part, les frais de scolarité de votre enfant
+           <strong>${eleve}</strong>, élève en <strong>${echapperHtml(l.classe || "—")}</strong>, présentent un reste à payer de
+           <strong>${formaterMontant(l.montant_du)} GNF</strong> depuis le <strong>${formaterDate(l.date_limite)}</strong>
            (${echapperHtml(l.echeance || "échéance")}${l.nombre_echeances > 1 ? ` et ${l.nombre_echeances - 1} autre(s) échéance(s)` : ""}).`
-        : `Nous vous rappelons que l'échéance <strong>${echapperHtml(l.echeance || "")}</strong> des frais de scolarité de votre enfant <strong>${eleve}</strong>,
-           élève en <strong>${echapperHtml(l.classe || "—")}</strong>, arrive à son terme le <strong>${formaterDate(l.date_limite)}</strong>,
+        : `Nous avons l'honneur de vous rappeler que l'échéance <strong>${echapperHtml(l.echeance || "")}</strong> des frais de scolarité de votre enfant
+           <strong>${eleve}</strong>, élève en <strong>${echapperHtml(l.classe || "—")}</strong>, arrive à son terme le <strong>${formaterDate(l.date_limite)}</strong>,
            pour un montant de <strong>${formaterMontant(l.montant_du)} GNF</strong>.`;
       const demande = retard
-        ? "Nous vous prions de bien vouloir régulariser cette situation dans les meilleurs délais en vous présentant à la caisse de l'établissement. Si le paiement a déjà été effectué, merci de ne pas tenir compte de ce courrier et de nous présenter votre reçu."
-        : "Nous vous remercions de bien vouloir effectuer ce paiement avant cette date à la caisse de l'établissement.";
+        ? `Nous vous serions très reconnaissants de bien vouloir passer à la caisse de l'établissement afin de régulariser cette situation dès que possible.
+           Si vous rencontrez une difficulté, n'hésitez pas à venir nous en parler : nous restons à votre écoute pour trouver ensemble une solution.
+           Si le paiement a déjà été effectué, veuillez ne pas tenir compte de ce courrier et accepter nos excuses pour la gêne occasionnée.`
+        : "Nous vous serions reconnaissants de bien vouloir effectuer ce règlement à la caisse de l'établissement avant cette date. Nous vous remercions par avance de votre confiance et de votre collaboration.";
       return `
   <div class="doc-releve liste-classe lettre-relance">
     <div class="entete-premium">
@@ -1362,17 +1378,17 @@ export function genererLettresRelanceHtml({ etablissement, lignes }) {
     </div>
     <div class="corps-lettre">
       <p class="droite-lettre">${echapperHtml(ecole.ville || "")}${ecole.ville ? ", le " : "Le "}${aujourdhui}</p>
-      <p class="destinataire">À l'attention de ${parent?.nom ? `<strong>${echapperHtml(parent.nom)}</strong>` : "<strong>Monsieur / Madame les parents</strong>"}<br>
+      <p class="destinataire">À l'attention de <strong>${echapperHtml(civ.destinataire)}</strong><br>
         Parent de ${eleve} — ${echapperHtml(l.classe || "")}${parent?.telephone ? `<br>Tél. ${echapperHtml(parent.telephone)}` : ""}</p>
       <p><strong>Objet :</strong> ${retard ? "Relance — frais de scolarité impayés" : "Rappel — prochaine échéance de scolarité"}</p>
-      <p>Madame, Monsieur,</p>
+      <p>${echapperHtml(civ.salutation)},</p>
       <p>${corps}</p>
       <table class="tableau-premium compact">
         <thead><tr><th>Échéance</th><th>Date limite</th><th class="droite">Montant dû (GNF)</th><th class="droite">Reste sur l'année (GNF)</th></tr></thead>
         <tbody><tr><td>${echapperHtml(l.echeance || "—")}</td><td>${formaterDate(l.date_limite)}</td><td class="droite"><strong>${formaterMontant(l.montant_du)}</strong></td><td class="droite">${formaterMontant(l.reste_annee)}</td></tr></tbody>
       </table>
       <p>${demande}</p>
-      <p>Veuillez agréer, Madame, Monsieur, l'expression de nos salutations distinguées.</p>
+      <p>Nous vous prions d'agréer, ${echapperHtml(civ.titre)}, l'expression de nos salutations respectueuses.</p>
     </div>
     <div class="signature-zone">
       <div class="cadre"><div class="ligne"></div><div class="libelle">Le service de comptabilité</div></div>

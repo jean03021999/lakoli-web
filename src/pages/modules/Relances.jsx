@@ -3,7 +3,8 @@ import { Search, Printer, MessageCircle, Phone, CheckCheck, X, AlertTriangle, Cl
 import api from "../../services/api";
 import { STYLE_CARTE, formaterGNF, formaterDateCourte, normaliser, telechargerCsv } from "../../components/frais/configFrais";
 import { messageErreurApi } from "../../utils/erreurs";
-import { imprimerDocument, genererLettresRelanceHtml, formaterDate } from "../../utils/impression";
+import { imprimerDocument, genererLettresRelanceHtml, formaterDate, civiliteParent } from "../../utils/impression";
+import { completerEtablissement } from "../../utils/etablissementCourant";
 
 // Relances des impayes (GET /frais/relances) : familles en retard et echeances proches, contacts
 // des parents, message WhatsApp / SMS pret a envoyer, lettres imprimables et suivi des relances.
@@ -19,15 +20,35 @@ function numeroInternational(telephone) {
   return n.length >= 11 ? n : "";
 }
 
-function messageRelance(ligne, ecole) {
-  const parent = ligne.contacts?.[0]?.nom;
-  const montant = `${formaterGNF(ligne.montant_du)}`;
+// Message WhatsApp / SMS, courtois, adresse au parent contacte (Monsieur / Madame selon le lien).
+function messageRelance(ligne, contact, etablissement) {
+  const ecole = completerEtablissement(etablissement);
+  const nomEcole = ecole.nom || "L'établissement";
+  const civ = civiliteParent(contact);
+  const montant = formaterGNF(ligne.montant_du);
   const enfant = `${ligne.prenom} ${ligne.nom}`;
-  const debut = `Bonjour${parent ? ` ${parent}` : ""},`;
-  const corps = ligne.motif === "retard"
-    ? `${ecole || "L'établissement"} vous informe que la scolarité de ${enfant} (${ligne.classe || ""}) présente un montant impayé de ${montant} depuis le ${formaterDate(ligne.date_limite)} (${ligne.echeance}). Merci de passer à la caisse pour régulariser.`
-    : `${ecole || "L'établissement"} vous rappelle que l'échéance « ${ligne.echeance} » de la scolarité de ${enfant} (${ligne.classe || ""}), soit ${montant}, est à régler avant le ${formaterDate(ligne.date_limite)}.`;
-  return `${debut}\n${corps}\nSi vous avez déjà payé, merci de ne pas tenir compte de ce message.\nLa comptabilité.`;
+  const lignes = [`Bonjour ${civ.salutation},`, "", "Nous espérons que vous vous portez bien.", ""];
+  if (ligne.motif === "retard") {
+    lignes.push(
+      `Nous nous permettons de vous informer respectueusement que, sauf erreur de notre part, la scolarité de votre enfant ${enfant} (${ligne.classe || ""}) présente un reste à payer de ${montant} depuis le ${formaterDate(ligne.date_limite)} (${ligne.echeance}).`,
+      "",
+      "Nous vous serions très reconnaissants de bien vouloir passer à la caisse de l'établissement afin de régulariser cette situation dès que possible. En cas de difficulté, n'hésitez pas à nous contacter : nous restons à votre écoute."
+    );
+  } else {
+    lignes.push(
+      `Nous nous permettons de vous rappeler respectueusement que l'échéance « ${ligne.echeance} » de la scolarité de votre enfant ${enfant} (${ligne.classe || ""}), d'un montant de ${montant}, arrive à terme le ${formaterDate(ligne.date_limite)}.`,
+      "",
+      "Nous vous serions reconnaissants de bien vouloir effectuer ce règlement à la caisse de l'établissement avant cette date."
+    );
+  }
+  lignes.push(
+    "",
+    "Si le paiement a déjà été effectué, veuillez ne pas tenir compte de ce message, avec nos remerciements.",
+    "",
+    "Avec nos salutations respectueuses,",
+    `Le service de comptabilité — ${nomEcole}${ecole.telephone ? `\nTél. ${ecole.telephone}` : ""}`
+  );
+  return lignes.join("\n");
 }
 
 export default function Relances({ etablissement = null, permissions = [] }) {
@@ -131,7 +152,7 @@ export default function Relances({ etablissement = null, permissions = [] }) {
       setErreur("Numéro de téléphone du parent manquant ou invalide.");
       return;
     }
-    window.open(`https://wa.me/${numero}?text=${encodeURIComponent(messageRelance(ligne, etablissement?.nom))}`, "_blank", "noopener");
+    window.open(`https://wa.me/${numero}?text=${encodeURIComponent(messageRelance(ligne, contact, etablissement?.nom))}`, "_blank", "noopener");
     enregistrer([ligne], "whatsapp");
   };
 
