@@ -3,7 +3,7 @@ import { Search, Printer, MessageCircle, Phone, CheckCheck, X, AlertTriangle, Cl
 import api from "../../services/api";
 import { STYLE_CARTE, formaterGNF, formaterDateCourte, normaliser, telechargerCsv } from "../../components/frais/configFrais";
 import { messageErreurApi } from "../../utils/erreurs";
-import { imprimerDocument, genererLettresRelanceHtml, formaterDate, civiliteParent } from "../../utils/impression";
+import { imprimerDocument, genererLettresRelanceHtml, formaterDate, civiliteParent, formaterTelephone } from "../../utils/impression";
 import { completerEtablissement } from "../../utils/etablissementCourant";
 
 // Relances des impayes (GET /frais/relances) : familles en retard et echeances proches, contacts
@@ -44,9 +44,11 @@ function messageRelance(ligne, contact, etablissement) {
   lignes.push(
     "",
     "Si le paiement a déjà été effectué, veuillez ne pas tenir compte de ce message, avec nos remerciements.",
+    ...(ecole.whatsapp_relance ? ["", `Pour toute question, vous pouvez nous écrire ou nous appeler sur ce numéro WhatsApp : ${formaterTelephone(ecole.whatsapp_relance)}.`] : []),
     "",
     "Avec nos salutations respectueuses,",
-    `Le service de comptabilité — ${nomEcole}${ecole.telephone ? `\nTél. ${ecole.telephone}` : ""}`
+    `Le service de comptabilité — ${nomEcole}`,
+    ...(ecole.telephone ? [`Tél. ${formaterTelephone(ecole.telephone)}`] : [])
   );
   return lignes.join("\n");
 }

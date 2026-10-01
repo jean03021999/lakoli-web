@@ -1321,6 +1321,13 @@ export function genererRapportFinancierHtml({ etablissement, donnees, moisDetail
   </div>`;
 }
 
+// Numero guineen lisible : "621513672" -> "621 51 36 72" (autres formats laisses tels quels).
+export function formaterTelephone(numero) {
+  const n = String(numero || "").replace(/\D/g, "");
+  const local = n.length === 12 && n.startsWith("224") ? n.slice(3) : n;
+  return local.length === 9 ? `${local.slice(0, 3)} ${local.slice(3, 5)} ${local.slice(5, 7)} ${local.slice(7)}` : String(numero || "").trim();
+}
+
 // Civilite du parent selon son lien avec l'eleve : « Monsieur » (pere), « Madame » (mere),
 // « Madame, Monsieur » (tuteur ou inconnu). Utilisee par les lettres et les messages de relance.
 export function civiliteParent(contact) {
@@ -1356,6 +1363,9 @@ export function genererLettresRelanceHtml({ etablissement, lignes }) {
         : `Nous avons l'honneur de vous rappeler que l'échéance <strong>${echapperHtml(l.echeance || "")}</strong> des frais de scolarité de votre enfant
            <strong>${eleve}</strong>, élève en <strong>${echapperHtml(l.classe || "—")}</strong>, arrive à son terme le <strong>${formaterDate(l.date_limite)}</strong>,
            pour un montant de <strong>${formaterMontant(l.montant_du)} GNF</strong>.`;
+      const contactCompta = ecole.whatsapp_relance
+        ? ` Pour toute question, vous pouvez joindre notre service de comptabilité sur WhatsApp au <strong>${echapperHtml(formaterTelephone(ecole.whatsapp_relance))}</strong>.`
+        : "";
       const demande = retard
         ? `Nous vous serions très reconnaissants de bien vouloir passer à la caisse de l'établissement afin de régulariser cette situation dès que possible.
            Si vous rencontrez une difficulté, n'hésitez pas à venir nous en parler : nous restons à votre écoute pour trouver ensemble une solution.
@@ -1387,7 +1397,7 @@ export function genererLettresRelanceHtml({ etablissement, lignes }) {
         <thead><tr><th>Échéance</th><th>Date limite</th><th class="droite">Montant dû (GNF)</th><th class="droite">Reste sur l'année (GNF)</th></tr></thead>
         <tbody><tr><td>${echapperHtml(l.echeance || "—")}</td><td>${formaterDate(l.date_limite)}</td><td class="droite"><strong>${formaterMontant(l.montant_du)}</strong></td><td class="droite">${formaterMontant(l.reste_annee)}</td></tr></tbody>
       </table>
-      <p>${demande}</p>
+      <p>${demande}${contactCompta}</p>
       <p>Nous vous prions d'agréer, ${echapperHtml(civ.titre)}, l'expression de nos salutations respectueuses.</p>
     </div>
     <div class="signature-zone">

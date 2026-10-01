@@ -20,7 +20,7 @@ const CYCLES = [
 
 const CHAMPS_FORMULAIRE = [
   "nom", "type", "ville", "quartier", "region", "prefecture", "coordonnees_gps", "adresse",
-  "telephone", "telephone_secondaire", "email", "cycles", "capacite_accueil", "agrement", "slogan",
+  "telephone", "telephone_secondaire", "whatsapp_relance", "email", "cycles", "capacite_accueil", "agrement", "slogan",
 ];
 
 function versFormulaire(e) {
@@ -178,6 +178,12 @@ export default function SectionEtablissement({ etablissement, effectif, peutAdmi
               <AvecIcone icone={Phone}>
                 <input type="tel" value={form.telephone_secondaire} disabled={lecture} onChange={(e) => maj("telephone_secondaire", e.target.value)} placeholder="+224 664 00 00 00" className={`${CHAMP} pl-10`} />
               </AvecIcone>
+            </Champ>
+            <Champ libelle="WhatsApp de la comptabilité (relances)">
+              <AvecIcone icone={Phone}>
+                <input type="tel" value={form.whatsapp_relance} disabled={lecture} onChange={(e) => maj("whatsapp_relance", e.target.value)} placeholder="+224 621 00 00 00" className={`${CHAMP} pl-10`} />
+              </AvecIcone>
+              <p className="mt-1 text-[11px] text-slate-400">Indiqué aux parents dans les messages et lettres de relance.</p>
             </Champ>
           </div>
 
