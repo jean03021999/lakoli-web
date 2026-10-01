@@ -243,6 +243,12 @@ const STYLES = `
   .doc-releve.rapport tr.annulee td { color: #94a3b8; }
   .doc-releve.rapport .alerte-caisse { margin-top: 8px; padding: 8px 12px; border-radius: 8px; background: #fee2e2; color: #b91c1c; font-size: 12px; font-weight: bold; }
   .doc-releve .signature-zone.double { justify-content: space-between; }
+  .doc-releve.lettre-relance .entete-premium .nom { font-size: 19px; letter-spacing: 0.5px; line-height: 1.25; }
+  .doc-releve.lettre-relance .corps-lettre { margin-top: 22px; font-size: 13px; line-height: 1.6; color: #1e293b; }
+  .doc-releve.lettre-relance .corps-lettre p { margin: 0 0 12px; }
+  .doc-releve.lettre-relance .droite-lettre { text-align: right; }
+  .doc-releve.lettre-relance .destinataire { margin: 18px 0 20px auto !important; width: 55%; padding: 10px 14px; border-left: 3px solid #0C447C; background: #f8fafc; }
+  .doc-releve.lettre-relance table { margin: 6px 0 16px; }
 
   .doc-releve .signature-zone { display: flex; justify-content: flex-end; margin-top: 50px; }
   .doc-releve .signature-zone .cadre { width: 260px; text-align: center; }
@@ -1211,6 +1217,68 @@ export function genererJournalCaisseHtml({ etablissement, filtres = [], versemen
       Imprimé le ${echapperHtml(dateImpression())}
     </div>
   </div>`;
+}
+
+// ---------------------------------------------------------------------------
+// Lettres de relance aux familles (GET /frais/relances) : une page par eleve, rappel d'echeance
+// proche ou retard de paiement, avec le montant du et la date limite. A passer a imprimerDocument().
+// ---------------------------------------------------------------------------
+export function genererLettresRelanceHtml({ etablissement, lignes }) {
+  const ecole = completerEtablissement(etablissement);
+  const coordonnees = [ecole.adresse, ecole.telephone && `Tél. ${ecole.telephone}`, ecole.email].filter(Boolean).map(echapperHtml).join(" · ");
+  const aujourdhui = new Date().toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
+
+  return lignes
+    .map((l) => {
+      const parent = l.contacts?.[0];
+      const retard = l.motif === "retard";
+      const eleve = `${echapperHtml(l.prenom)} ${echapperHtml((l.nom || "").toUpperCase())}`;
+      const corps = retard
+        ? `Sauf erreur de notre part, les frais de scolarité de votre enfant <strong>${eleve}</strong>, élève en <strong>${echapperHtml(l.classe || "—")}</strong>,
+           présentent un montant de <strong>${formaterMontant(l.montant_du)} GNF</strong> resté impayé depuis le <strong>${formaterDate(l.date_limite)}</strong>
+           (${echapperHtml(l.echeance || "échéance")}${l.nombre_echeances > 1 ? ` et ${l.nombre_echeances - 1} autre(s) échéance(s)` : ""}).`
+        : `Nous vous rappelons que l'échéance <strong>${echapperHtml(l.echeance || "")}</strong> des frais de scolarité de votre enfant <strong>${eleve}</strong>,
+           élève en <strong>${echapperHtml(l.classe || "—")}</strong>, arrive à son terme le <strong>${formaterDate(l.date_limite)}</strong>,
+           pour un montant de <strong>${formaterMontant(l.montant_du)} GNF</strong>.`;
+      const demande = retard
+        ? "Nous vous prions de bien vouloir régulariser cette situation dans les meilleurs délais en vous présentant à la caisse de l'établissement. Si le paiement a déjà été effectué, merci de ne pas tenir compte de ce courrier et de nous présenter votre reçu."
+        : "Nous vous remercions de bien vouloir effectuer ce paiement avant cette date à la caisse de l'établissement.";
+      return `
+  <div class="doc-releve liste-classe lettre-relance">
+    <div class="entete-premium">
+      <div class="logo">
+        ${logoEcoleHtml(ecole, "logo-premium")}
+        <div>
+          <div class="nom">${echapperHtml(ecole.nom || "LAKOLI")}</div>
+          ${coordonnees ? `<div class="mentions-premium">${coordonnees}</div>` : ""}
+        </div>
+      </div>
+      <div class="titre">
+        <h1>${retard ? "RELANCE DE PAIEMENT" : "RAPPEL D'ÉCHÉANCE"}</h1>
+        <div class="session">Matricule ${echapperHtml(l.matricule || "—")}</div>
+      </div>
+    </div>
+    <div class="corps-lettre">
+      <p class="droite-lettre">${echapperHtml(ecole.ville || "")}${ecole.ville ? ", le " : "Le "}${aujourdhui}</p>
+      <p class="destinataire">À l'attention de ${parent?.nom ? `<strong>${echapperHtml(parent.nom)}</strong>` : "<strong>Monsieur / Madame les parents</strong>"}<br>
+        Parent de ${eleve} — ${echapperHtml(l.classe || "")}${parent?.telephone ? `<br>Tél. ${echapperHtml(parent.telephone)}` : ""}</p>
+      <p><strong>Objet :</strong> ${retard ? "Relance — frais de scolarité impayés" : "Rappel — prochaine échéance de scolarité"}</p>
+      <p>Madame, Monsieur,</p>
+      <p>${corps}</p>
+      <table class="tableau-premium compact">
+        <thead><tr><th>Échéance</th><th>Date limite</th><th class="droite">Montant dû (GNF)</th><th class="droite">Reste sur l'année (GNF)</th></tr></thead>
+        <tbody><tr><td>${echapperHtml(l.echeance || "—")}</td><td>${formaterDate(l.date_limite)}</td><td class="droite"><strong>${formaterMontant(l.montant_du)}</strong></td><td class="droite">${formaterMontant(l.reste_annee)}</td></tr></tbody>
+      </table>
+      <p>${demande}</p>
+      <p>Veuillez agréer, Madame, Monsieur, l'expression de nos salutations distinguées.</p>
+    </div>
+    <div class="signature-zone">
+      <div class="cadre"><div class="ligne"></div><div class="libelle">Le service de comptabilité</div></div>
+    </div>
+    <div class="pied-premium">Document LAKOLI · ${echapperHtml(ecole.nom || "")}</div>
+  </div>`;
+    })
+    .join("");
 }
 
 // ---------------------------------------------------------------------------

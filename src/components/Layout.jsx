@@ -27,6 +27,7 @@ import {
   AlertTriangle,
   WifiOff,
   Receipt,
+  BellRing,
 } from "lucide-react";
 
 const COULEURS = {
@@ -55,6 +56,7 @@ const MODULES = [
   { nom: "Gestion des Notes", icone: Award, chemin: "/notes", permission: "notes.voir" },
   { nom: "Bulletins", icone: FileSpreadsheet, chemin: "/bulletins", permission: "bulletins.voir" },
   { nom: "Frais de Scolarité", icone: Wallet, chemin: "/frais-scolarite", permission: "frais.voir" },
+  { nom: "Relances des Impayés", icone: BellRing, chemin: "/relances", permission: "frais.voir" },
   { nom: "Gestion des Salaires", icone: DollarSign, chemin: "/salaires", permission: "enseignants.salaires.voir" },
   { nom: "Journal de Caisse", icone: CreditCard, chemin: "/paiements", permission: "frais.voir" },
   { nom: "Dépenses & Justificatifs", icone: Receipt, chemin: "/depenses", permission: "frais.voir" },
