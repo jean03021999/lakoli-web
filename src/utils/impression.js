@@ -1214,6 +1214,114 @@ export function genererJournalCaisseHtml({ etablissement, filtres = [], versemen
 }
 
 // ---------------------------------------------------------------------------
+// Fiche d'arrete de caisse journalier (GET /caisse/arretes/preparer + arrete enregistre) :
+// mouvements du jour par moyen, calcul des especes attendues, billetage, ecart, operations.
+// ---------------------------------------------------------------------------
+export function genererArreteCaisseHtml({ etablissement, situation, arrete }) {
+  const ecole = completerEtablissement(etablissement);
+  const tiret = "—";
+  const s = situation;
+  const moyens = [["especes", "Espèces"], ["mobile_money", "Mobile Money"], ["virement", "Virement"], ["cheque", "Chèque"]];
+  const lignesMoyens = moyens
+    .map(([m, lib]) => {
+      const entree = s.entrees?.[m] || 0;
+      const sortie = (s.sorties?.[m]?.salaires || 0) + (s.sorties?.[m]?.depenses || 0);
+      if (!entree && !sortie) return "";
+      return `<tr><td>${lib}</td><td class="droite">${formaterMontant(entree)}</td><td class="droite">${formaterMontant(sortie)}</td><td class="droite"><strong>${formaterMontant(entree - sortie)}</strong></td></tr>`;
+    })
+    .join("");
+  const totalEntrees = moyens.reduce((t, [m]) => t + (s.entrees?.[m] || 0), 0);
+  const totalSorties = moyens.reduce((t, [m]) => t + (s.sorties?.[m]?.salaires || 0) + (s.sorties?.[m]?.depenses || 0), 0);
+  const sortiesEspeces = (s.sorties?.especes?.salaires || 0) + (s.sorties?.especes?.depenses || 0);
+
+  const billetage = Object.entries(arrete?.billetage || {})
+    .filter(([, n]) => n > 0)
+    .sort((a, b) => Number(b[0]) - Number(a[0]))
+    .map(([c, n]) => `<tr><td>Billet de ${formaterMontant(c)} GNF</td><td class="droite">${n}</td><td class="droite">${formaterMontant(Number(c) * n)}</td></tr>`)
+    .join("");
+  const ecart = arrete ? arrete.ecart : null;
+  const etatEcart = ecart === null
+    ? ""
+    : Math.abs(ecart) < 1
+      ? `<span class="badge-statut badge-paye">Caisse juste</span>`
+      : `<span class="badge-statut badge-retard">${ecart > 0 ? "Excédent" : "Manquant"} de ${formaterMontant(Math.abs(ecart))} GNF</span>`;
+
+  const operations = (s.operations || [])
+    .map((o, i) => `<tr>
+      <td class="num">${i + 1}</td>
+      <td>${o.type === "entree" ? "Entrée" : "Sortie"}</td>
+      <td><strong>${echapperHtml(o.libelle || tiret)}</strong>${o.detail ? `<br><span class="gris">${echapperHtml(o.detail)}</span>` : ""}</td>
+      <td class="mono" style="font-size:10px">${echapperHtml(o.reference || tiret)}</td>
+      <td>${echapperHtml(MOYENS_PAIEMENT[o.moyen_paiement] || o.moyen_paiement || tiret)}</td>
+      <td class="droite" style="white-space:nowrap">${o.type === "entree" ? "+" : "−"}${formaterMontant(o.montant)}</td>
+    </tr>`)
+    .join("");
+
+  return `
+  <div class="doc-releve liste-classe rapport">
+    <div class="entete-premium">
+      <div class="logo">
+        ${logoEcoleHtml(ecole, "logo-premium")}
+        <div>
+          <div class="nom">LAKOLI</div>
+          ${ecole.nom ? `<span class="badge-etablissement">${echapperHtml(ecole.nom)}</span>` : ""}
+          ${ecole.agrement || ecole.slogan ? `<div class="mentions-premium">${[ecole.agrement && `Agrément n° ${echapperHtml(ecole.agrement)}`, ecole.slogan && `<span class="slogan">« ${echapperHtml(ecole.slogan)} »</span>`].filter(Boolean).join(" · ")}</div>` : ""}
+        </div>
+      </div>
+      <div class="titre">
+        <h1>ARRÊTÉ DE CAISSE</h1>
+        <div class="classe">${echapperHtml(formaterDate(s.date))}</div>
+        <div class="session">${arrete ? `Arrêté par ${echapperHtml(arrete.arrete_par || tiret)}` : "Non encore arrêté"}</div>
+      </div>
+    </div>
+
+    <h2 class="section">Mouvements de la journée</h2>
+    <table class="tableau-premium compact">
+      <thead><tr><th>Moyen</th><th class="droite">Entrées (GNF)</th><th class="droite">Sorties (GNF)</th><th class="droite">Net (GNF)</th></tr></thead>
+      <tbody>${lignesMoyens || `<tr><td colspan="4" class="gris">Aucun mouvement ce jour.</td></tr>`}
+        <tr class="total"><td>TOTAL</td><td class="droite">${formaterMontant(totalEntrees)}</td><td class="droite">${formaterMontant(totalSorties)}</td><td class="droite">${formaterMontant(totalEntrees - totalSorties)}</td></tr>
+      </tbody>
+    </table>
+    <p class="note">${s.nombre_versements || 0} versement(s) de familles encaissé(s) ce jour.</p>
+
+    <h2 class="section">Contrôle des espèces</h2>
+    <table class="tableau-premium compact">
+      <tbody>
+        <tr><td>Espèces en caisse à l'ouverture (fin de la veille)</td><td class="droite">${formaterMontant(s.especes_veille)}</td></tr>
+        <tr><td>+ Encaissements en espèces du jour</td><td class="droite">${formaterMontant(s.entrees?.especes || 0)}</td></tr>
+        <tr><td>− Salaires et dépenses payés en espèces</td><td class="droite">${formaterMontant(sortiesEspeces)}</td></tr>
+        <tr class="total"><td>ESPÈCES ATTENDUES</td><td class="droite">${formaterMontant(s.especes_theoriques)}</td></tr>
+        ${arrete ? `<tr><td><strong>Espèces comptées</strong></td><td class="droite"><strong>${formaterMontant(arrete.especes_comptees)}</strong></td></tr>
+        <tr><td><strong>Écart</strong></td><td class="droite">${etatEcart}</td></tr>` : ""}
+      </tbody>
+    </table>
+    ${arrete?.observation ? `<p class="note"><strong>Observation :</strong> ${echapperHtml(arrete.observation)}</p>` : ""}
+
+    ${billetage ? `<h2 class="section">Billetage</h2>
+    <table class="tableau-premium compact">
+      <thead><tr><th>Coupure</th><th class="droite">Nombre</th><th class="droite">Montant (GNF)</th></tr></thead>
+      <tbody>${billetage}<tr class="total"><td colspan="2">TOTAL COMPTÉ</td><td class="droite">${formaterMontant(arrete.especes_comptees)}</td></tr></tbody>
+    </table>` : ""}
+
+    ${operations ? `<h2 class="section">Opérations du jour</h2>
+    <table class="tableau-premium compact">
+      <thead><tr><th>N°</th><th>Sens</th><th>Élève / objet</th><th>Référence</th><th>Moyen</th><th class="droite">Montant (GNF)</th></tr></thead>
+      <tbody>${operations}</tbody>
+    </table>` : ""}
+
+    <div class="signature-zone double">
+      <div class="cadre"><div class="ligne"></div><div class="libelle">Le caissier / comptable</div></div>
+      <div class="cadre"><div class="ligne"></div><div class="libelle">Visa de la direction</div></div>
+    </div>
+
+    <div class="pied-premium">
+      Document officiel LAKOLI · Arrêté de caisse du ${echapperHtml(formaterDate(s.date))}${arrete?.arrete_le ? ` enregistré le ${echapperHtml(formaterDate(arrete.arrete_le))}` : ""}<br>
+      Imprimé le ${echapperHtml(dateImpression())}
+    </div>
+  </div>`;
+}
+
+// ---------------------------------------------------------------------------
 // Caisse — sections communes au rapport comptable et au journal de caisse : solde par moyen de
 // paiement (encaissements - salaires - depenses), sorties par categorie, depenses sans piece
 // justificative et dernieres sorties.

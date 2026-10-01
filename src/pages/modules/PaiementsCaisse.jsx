@@ -4,6 +4,7 @@ import { FileSpreadsheet, FileText, Search, Printer, ChevronLeft, ChevronRight, 
 import { regrouperVersements } from "../../utils/versements";
 import CarteSoldeCaisse from "../../components/caisse/CarteSoldeCaisse";
 import SortiesCaisse from "../../components/caisse/SortiesCaisse";
+import ArreteCaisse from "../../components/caisse/ArreteCaisse";
 import { situationGlobaleDepuisSuivi } from "../../utils/situationFrais";
 import {
   imprimerDocument,
@@ -58,7 +59,7 @@ export default function PaiementsCaisse({ etablissement = null, permissions = []
   const [annulation, setAnnulation] = useState({ envoi: false, erreur: "" });
   const [succes, setSucces] = useState("");
   const [rechargement, setRechargement] = useState(0);
-  const [onglet, setOnglet] = useState("encaissements");
+  const [onglet, setOnglet] = useState(() => new URLSearchParams(window.location.search).get("onglet") || "encaissements");
   const [synthese, setSynthese] = useState(null);
   const [sortiesCaisse, setSortiesCaisse] = useState(null);
 
@@ -302,6 +303,7 @@ export default function PaiementsCaisse({ etablissement = null, permissions = []
         {[
           ["encaissements", "Encaissements"],
           ["sorties", "Sorties de caisse (salaires & dépenses)"],
+          ["arrete", "Arrêté de caisse"],
         ].map(([cle, libelle]) => (
           <button
             key={cle}
@@ -316,6 +318,10 @@ export default function PaiementsCaisse({ etablissement = null, permissions = []
 
       {onglet === "sorties" && (
         <SortiesCaisse synthese={synthese} peutEnregistrer={peutAnnuler} onModifiee={() => setRechargement((n) => n + 1)} />
+      )}
+
+      {onglet === "arrete" && (
+        <ArreteCaisse etablissement={etablissement} peutArreter={peutAnnuler} onArrete={() => setRechargement((n) => n + 1)} />
       )}
 
       {onglet === "encaissements" && (
