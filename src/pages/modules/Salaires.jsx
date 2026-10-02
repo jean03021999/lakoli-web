@@ -37,6 +37,7 @@ export default function Salaires({ permissions = [] }) {
   const [historique, setHistorique] = useState({ enseignant: idUrl("enseignant"), annee: ANNEE_COURANTE });
   const [panneau, setPanneau] = useState(null); // { enseignant } quand le panneau est ouvert
   const [aPayer, setAPayer] = useState(null); // { salaire, moyen }
+  const [aAnnuler, setAAnnuler] = useState(null); // { salaire, motif, envoi, erreur }
   const [paiementEnCours, setPaiementEnCours] = useState(false);
   // Argent disponible en caisse par moyen (les salaires sont payes avec l'argent encaisse).
   const [caisse, setCaisse] = useState(null);
@@ -127,7 +128,7 @@ export default function Salaires({ permissions = [] }) {
     const fenetre = payer ? ouvrirFenetreVierge() : null;
     setErreur("");
     try {
-      const res = await api.post("/salaires", { ...donnees, payer });
+      const res = await avecConfirmationAvance((confirmer_avance) => api.post("/salaires", { ...donnees, payer, confirmer_avance }));
       setPanneau(null);
       const nom = `${res.data.enseignant?.prenom ?? ""} ${res.data.enseignant?.nom ?? ""}`.trim();
       setToast(`Salaire ${payer ? "enregistré et payé" : "enregistré"} pour ${nom} (${libellePeriode(res.data)}).`);
@@ -145,7 +146,7 @@ export default function Salaires({ permissions = [] }) {
     setPaiementEnCours(true);
     setErreur("");
     try {
-      await api.post(`/salaires/${salaire.id}/payer`, { moyen_paiement: moyen });
+      await avecConfirmationAvance((confirmer_avance) => api.post(`/salaires/${salaire.id}/payer`, { moyen_paiement: moyen, confirmer_avance }));
       setAPayer(null);
       setToast(`Salaire ${salaire.reference} réglé : ${formaterGNF(salaire.montant_net)}.`);
       recharger();
@@ -156,6 +157,30 @@ export default function Salaires({ permissions = [] }) {
       setErreur(messageErreur(err, "Erreur lors du paiement."));
     } finally {
       setPaiementEnCours(false);
+    }
+  }
+
+  // Le serveur refuse un paiement d'avance (mois pas encore commence) sans confirmation explicite :
+  // on affiche sa question, et on renvoie avec confirmer_avance si l'utilisateur accepte.
+  async function avecConfirmationAvance(envoyer) {
+    try {
+      return await envoyer(false);
+    } catch (err) {
+      if (err.response?.data?.code === "avance" && window.confirm(err.response.data.message)) return envoyer(true);
+      throw err;
+    }
+  }
+
+  // Annulation d'un salaire paye par erreur (motif obligatoire) : il reste visible, barre.
+  async function confirmerAnnulation() {
+    setAAnnuler((a) => ({ ...a, envoi: true, erreur: "" }));
+    try {
+      const res = await api.post(`/salaires/${aAnnuler.salaire.id}/annuler`, { motif: aAnnuler.motif.trim() });
+      setAAnnuler(null);
+      setToast(res.data.message);
+      recharger();
+    } catch (err) {
+      setAAnnuler((a) => ({ ...a, envoi: false, erreur: messageErreur(err, "Annulation impossible.") }));
     }
   }
 
@@ -245,6 +270,7 @@ export default function Salaires({ permissions = [] }) {
           onPayer={(s) => setAPayer({ salaire: s, moyen: s.moyen_paiement })}
           onModifier={(s) => setPanneau({ enseignant: s.enseignant_id, salaire: s })}
           onSupprimer={supprimer}
+          onAnnuler={(salaire) => setAAnnuler({ salaire, motif: "", envoi: false, erreur: "" })}
           onHistorique={ouvrirHistorique}
         />
       ) : (
@@ -344,6 +370,43 @@ export default function Salaires({ permissions = [] }) {
         <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-2xl flex items-center gap-2.5 text-xs sm:text-sm border border-slate-700">
           <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
           <span>{toast}</span>
+        </div>
+      )}
+      {aAnnuler && (
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-[2px] flex items-center justify-center p-4" onClick={() => !aAnnuler.envoi && setAAnnuler(null)}>
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4" onClick={(e) => e.stopPropagation()}>
+            <div>
+              <h3 className="text-base font-bold text-slate-900">Annuler le salaire {aAnnuler.salaire.reference} ?</h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                {`${aAnnuler.salaire.enseignant?.prenom ?? ""} ${aAnnuler.salaire.enseignant?.nom ?? ""}`.trim()} · {libellePeriode(aAnnuler.salaire)} · {formaterGNF(aAnnuler.salaire.montant_net)}
+              </p>
+            </div>
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Le salaire reste visible, barré, avec votre nom et le motif. Le montant revient dans la caisse et vous pourrez saisir le bon salaire pour ce mois.
+              Si l'argent a réellement été remis à l'enseignant, récupérez-le d'abord.
+            </p>
+            <div>
+              <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1.5">Motif de l'annulation *</label>
+              <input
+                autoFocus
+                value={aAnnuler.motif}
+                onChange={(e) => setAAnnuler((a) => ({ ...a, motif: e.target.value }))}
+                placeholder="Ex : montant erroné, mauvais enseignant, mois en double…"
+                className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-red-200 focus:border-red-400"
+              />
+            </div>
+            {aAnnuler.erreur && <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-xs text-red-700">{aAnnuler.erreur}</div>}
+            <div className="flex justify-end gap-3">
+              <button onClick={() => setAAnnuler(null)} disabled={aAnnuler.envoi} className="px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 cursor-pointer">Retour</button>
+              <button
+                onClick={confirmerAnnulation}
+                disabled={aAnnuler.envoi || aAnnuler.motif.trim().length < 3}
+                className="px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold disabled:opacity-50 cursor-pointer"
+              >
+                {aAnnuler.envoi ? "Annulation…" : "Annuler le salaire"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

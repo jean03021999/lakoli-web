@@ -1,6 +1,13 @@
 // Badges du module Salaires (statut de paiement, type de remuneration).
 
 export function BadgeStatutSalaire({ statut }) {
+  if (statut === "annule") {
+    return (
+      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-500 border border-slate-300 whitespace-nowrap">
+        ✕ Annulé
+      </span>
+    );
+  }
   return statut === "paye" ? (
     <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-[#dcfce7] text-[#15803d] border border-[#86efac] whitespace-nowrap">
       ✓ Payé

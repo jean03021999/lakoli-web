@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Wallet, CheckCircle, Clock, TrendingUp, Calendar, Download, Printer, Check, ArrowRight, Trash2, Pencil } from "lucide-react";
+import { Wallet, CheckCircle, Clock, TrendingUp, Calendar, Download, Printer, Check, ArrowRight, Trash2, Pencil, Ban } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { degradeEnseignant, initialesEnseignant, formaterGNF } from "../enseignants/theme";
 import { MOYENS, telechargerCsv } from "../frais/configFrais";
@@ -37,7 +37,7 @@ function CarteStat({ libelle, valeur, detail, pourcentage, degrade, icone: Icone
 
 // Onglet "Liste des salaires" : 4 compteurs de la periode, filtres, tableau, recapitulatif et
 // evolution de la masse salariale sur les 6 mois se terminant a la periode affichee.
-export default function ListeSalaires({ salaires, enseignants, chargement, peutGerer, annees, filtres, setFiltres, onNouveau, onFiche, onPayer, onModifier, onSupprimer, onHistorique }) {
+export default function ListeSalaires({ salaires, enseignants, chargement, peutGerer, annees, filtres, setFiltres, onNouveau, onFiche, onPayer, onModifier, onSupprimer, onAnnuler, onHistorique }) {
   const { mois, annee, enseignant, statut } = filtres;
   const maj = (champ, v) => setFiltres((f) => ({ ...f, [champ]: v }));
 
@@ -46,22 +46,25 @@ export default function ListeSalaires({ salaires, enseignants, chargement, peutG
   // Compteurs calcules sur toute la periode (mois + annee), independamment des autres filtres.
   const dePeriode = useMemo(() => salaires.filter((s) => s.annee === annee && (mois === "tous" || s.mois === mois)), [salaires, mois, annee]);
   const affiches = dePeriode.filter((s) => (enseignant === "tous" || s.enseignant_id === enseignant) && (statut === "tous" || s.statut === statut));
+  // Les salaires annules restent affiches (barres) mais ne comptent dans aucun total.
+  const actifs = dePeriode.filter((s) => s.statut !== "annule");
+  const affichesActifs = affiches.filter((s) => s.statut !== "annule");
 
   const somme = (liste, f) => liste.reduce((t, s) => t + f(s), 0);
   const net = (s) => Number(s.montant_net) || 0;
-  const total = somme(dePeriode, net);
+  const total = somme(actifs, net);
   const paye = somme(dePeriode.filter((s) => s.statut === "paye"), net);
   const enAttente = dePeriode.filter((s) => s.statut === "en_attente");
   const attente = somme(enAttente, net);
-  const supp = somme(dePeriode, montantHeuresSupp);
-  const heuresSupp = somme(dePeriode, (s) => Number(s.nb_heures_supp) || 0);
+  const supp = somme(actifs, montantHeuresSupp);
+  const heuresSupp = somme(actifs, (s) => Number(s.nb_heures_supp) || 0);
   const pct = (v) => (total > 0 ? Math.round((v / total) * 100) : 0);
   const libelleSelection = mois === "tous" ? `Année ${annee}` : `${MOIS[mois - 1]} ${annee}`;
 
   const recap = {
-    base: somme(affiches, montantBase),
-    supp: somme(affiches, montantHeuresSupp),
-    net: somme(affiches, net),
+    base: somme(affichesActifs, montantBase),
+    supp: somme(affichesActifs, montantHeuresSupp),
+    net: somme(affichesActifs, net),
     payes: affiches.filter((s) => s.statut === "paye").length,
   };
 
@@ -72,7 +75,7 @@ export default function ListeSalaires({ salaires, enseignants, chargement, peutG
     return Array.from({ length: 6 }, (_, i) => {
       const rang = rangFin - 5 + i;
       const [a, m] = [Math.floor(rang / 12), (rang % 12) + 1];
-      const duMois = salaires.filter((s) => s.annee === a && s.mois === m);
+      const duMois = salaires.filter((s) => s.annee === a && s.mois === m && s.statut !== "annule");
       return {
         libelle: `${MOIS_COURTS[m - 1]}${a !== annee ? ` ${String(a).slice(2)}` : ""}`,
         complet: `${MOIS[m - 1]} ${a}`,
@@ -112,7 +115,7 @@ export default function ListeSalaires({ salaires, enseignants, chargement, peutG
           Math.round(montantHeuresSupp(s)),
           Math.round(net(s)),
           MOYENS[s.moyen_paiement]?.libelle || s.moyen_paiement,
-          s.statut === "paye" ? "Payé" : "En attente",
+          s.statut === "paye" ? "Payé" : s.statut === "annule" ? `Annulé : ${s.motif_annulation || ""}` : "En attente",
           s.date_paiement ? formaterDate(s.date_paiement) : "",
           s.caissier?.name || "",
           s.observation || "",
@@ -179,7 +182,7 @@ export default function ListeSalaires({ salaires, enseignants, chargement, peutG
             ))}
           </select>
           <div className="flex items-center p-1 bg-slate-100 rounded-xl border border-slate-200 text-xs font-semibold">
-            {[["tous", "Tous"], ["paye", "Payé"], ["en_attente", "En attente"]].map(([cle, libelle]) => (
+            {[["tous", "Tous"], ["paye", "Payé"], ["en_attente", "En attente"], ["annule", "Annulé"]].map(([cle, libelle]) => (
               <button
                 key={cle}
                 onClick={() => maj("statut", cle)}
@@ -244,7 +247,7 @@ export default function ListeSalaires({ salaires, enseignants, chargement, peutG
                   const hs = montantHeuresSupp(s);
                   const moyen = MOYENS[s.moyen_paiement];
                   return (
-                    <tr key={s.id} className="hover:bg-[#f8fafc] transition-colors group">
+                    <tr key={s.id} className={`hover:bg-[#f8fafc] transition-colors group ${s.statut === "annule" ? "opacity-60" : ""}`}>
                       <td className="py-3.5 px-4 sm:px-6">
                         <div className="flex items-center gap-3">
                           <button
@@ -284,24 +287,34 @@ export default function ListeSalaires({ salaires, enseignants, chargement, peutG
                       <td className="py-3.5 px-4 text-right font-mono tabular-nums whitespace-nowrap">
                         {hs > 0 ? <span className="font-semibold text-emerald-600">+ {formaterGNF(hs)}</span> : <span className="text-slate-300">—</span>}
                       </td>
-                      <td className="py-3.5 px-4 text-right font-mono font-bold text-[#0C447C] tabular-nums whitespace-nowrap text-[15px]">{formaterGNF(s.montant_net)}</td>
+                      <td className="py-3.5 px-4 text-right font-mono font-bold text-[#0C447C] tabular-nums whitespace-nowrap text-[15px]"><span className={s.statut === "annule" ? "line-through" : ""}>{formaterGNF(s.montant_net)}</span></td>
                       <td className="py-3.5 px-4 whitespace-nowrap text-xs font-medium text-slate-700">
                         <span className="flex items-center gap-1.5"><span>{moyen?.emoji}</span><span>{moyen?.libelle || s.moyen_paiement}</span></span>
                       </td>
                       <td className="py-3.5 px-4 whitespace-nowrap">
                         <BadgeStatutSalaire statut={s.statut} />
                         {s.statut === "paye" && s.date_paiement && <div className="text-[10px] text-slate-400 mt-1">le {formaterDate(s.date_paiement)}</div>}
+                        {s.statut === "annule" && (
+                          <div className="text-[10px] text-slate-500 mt-1 max-w-[220px] whitespace-normal">
+                            par {s.annulateur?.name || "—"} le {formaterDate(s.annule_le)} : {s.motif_annulation}
+                          </div>
+                        )}
                       </td>
                       <td className="py-3.5 px-4 sm:px-6 whitespace-nowrap">
                         <div className="flex items-center justify-center gap-2">
-                          <button
+                          {s.statut !== "annule" && <button
                             onClick={() => onFiche(s)}
                             className="p-1.5 px-2 text-xs font-medium text-slate-700 hover:text-[#0C447C] bg-slate-100 hover:bg-blue-50 border border-slate-200 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
                             title="Imprimer la fiche de paie"
                           >
                             <Printer className="w-3.5 h-3.5" />
                             <span className="hidden xl:inline">Fiche</span>
-                          </button>
+                          </button>}
+                          {peutGerer && s.statut === "paye" && (
+                            <button onClick={() => onAnnuler(s)} title="Annuler ce salaire payé par erreur" className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 cursor-pointer">
+                              <Ban className="w-4 h-4" />
+                            </button>
+                          )}
                           {peutGerer && s.statut === "en_attente" && (
                             <>
                               <button

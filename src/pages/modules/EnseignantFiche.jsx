@@ -135,7 +135,7 @@ export default function EnseignantFiche({ permissions = [], etablissement = null
   const joursAffiches = heuresParJour.samedi > 0 ? JOURS : JOURS.slice(0, 5);
   const stats = enseignant.statistiques || {};
   const tauxValidation = stats.evaluations > 0 ? Math.round((stats.evaluations_validees / stats.evaluations) * 100) : 0;
-  const totalPercu = salaires.filter((s) => s.statut === "paye").reduce((t, s) => t + Number(s.montant_net), 0);
+  const totalPercu = salaires.filter((s) => s.statut === "paye").reduce((t, s) => t + Number(s.montant_net), 0); // annules exclus
   const anc = libelleAnciennete(contrat?.date_debut);
   const degrade = degradeEnseignant(enseignant.matricule || enseignant.nom);
 
@@ -616,8 +616,8 @@ export default function EnseignantFiche({ permissions = [], etablissement = null
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">
                           <span className="font-bold text-slate-800 text-xs">{MOIS[s.mois - 1]} {s.annee}</span>
-                          <span className={`text-[10px] font-bold px-1.5 rounded ${s.statut === "paye" ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}`}>
-                            {s.statut === "paye" ? "Payé" : "En attente"}
+                          <span className={`text-[10px] font-bold px-1.5 rounded ${s.statut === "paye" ? "bg-emerald-100 text-emerald-800" : s.statut === "annule" ? "bg-slate-100 text-slate-500 line-through" : "bg-amber-100 text-amber-800"}`}>
+                            {s.statut === "paye" ? "Payé" : s.statut === "annule" ? "Annulé" : "En attente"}
                           </span>
                         </div>
                         <p className="text-[11px] font-mono font-bold text-[#0C447C] mt-0.5">{formaterGNF(s.montant_net)}</p>

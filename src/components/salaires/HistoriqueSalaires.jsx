@@ -35,7 +35,7 @@ export default function HistoriqueSalaires({ salaires, enseignants, enseignantId
       net: s ? net(s) : 0,
       base: s ? montantBase(s) : 0,
       supp: s ? montantHeuresSupp(s) : 0,
-      statut: s ? (s.statut === "paye" ? "Payé" : "En attente") : "Non saisi",
+      statut: s ? (s.statut === "paye" ? "Payé" : s.statut === "annule" ? "Annulé" : "En attente") : "Non saisi",
     };
   });
 

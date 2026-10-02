@@ -6,8 +6,9 @@ import { MOYENS } from "../frais/configFrais";
 import { MOIS, libellePeriode, montantNet, rangPeriode } from "./configSalaires";
 
 // Panneau lateral "Nouveau salaire" : monte uniquement quand il est ouvert (etat initial frais a
-// chaque ouverture). Les montants sont pre-remplis depuis le dernier salaire de l'enseignant, ou a
-// defaut depuis son contrat actif ; le serveur recalcule le net a l'enregistrement.
+// chaque ouverture). Les montants sont pre-remplis depuis le CONTRAT actif de l'enseignant (le
+// dernier salaire ne sert qu'aux heures / taux d'un vacataire) : une erreur de saisie ne se recopie
+// plus de mois en mois. Tout ecart au contrat doit etre justifie ; le serveur recalcule le net.
 
 const CHAMP_NOMBRE = "w-full text-sm font-semibold px-3 py-2 bg-white border border-slate-200 rounded-lg focus:outline-none font-mono tabular-nums";
 const LIBELLE = "text-xs font-bold uppercase tracking-wider text-slate-500";
@@ -19,33 +20,46 @@ function valeur(v) {
 // Valeurs proposees pour un enseignant, avec la source affichee sous le selecteur.
 function preremplissage(enseignant, salaires) {
   const dernier = salaires
-    .filter((s) => s.enseignant_id === enseignant?.id)
+    .filter((x) => x.enseignant_id === enseignant?.id && x.statut !== "annule")
     .sort((a, b) => rangPeriode(b.annee, b.mois) - rangPeriode(a.annee, a.mois))[0];
-  if (dernier) {
+  if (enseignant?.statut_contrat === "actif") {
+    const vacataire = enseignant.type_contrat === "vacataire";
+    const horaireDernier = vacataire && dernier?.type_remuneration === "horaire" ? dernier : null;
     return {
-      source: `Montants repris du salaire de ${libellePeriode(dernier)}`,
+      source: vacataire
+        ? `Contrat vacataire${horaireDernier ? ` · heures et taux repris de ${libellePeriode(horaireDernier)}` : " : saisissez les heures et le taux"}`
+        : `Montants du contrat ${String(enseignant.type_contrat || "").toUpperCase()} · base ${formaterGNF(enseignant.salaire_base)}`,
       champs: {
-        type_remuneration: dernier.type_remuneration,
-        salaire_base: valeur(dernier.salaire_base),
-        nb_heures: valeur(dernier.nb_heures),
-        taux_horaire: valeur(dernier.taux_horaire),
-        taux_heure_supp: valeur(dernier.taux_heure_supp ?? enseignant?.taux_horaire_heures_sup),
-        moyen_paiement: dernier.moyen_paiement,
+        type_remuneration: vacataire ? "horaire" : "fixe",
+        salaire_base: vacataire ? "" : valeur(enseignant.salaire_base),
+        nb_heures: horaireDernier ? valeur(horaireDernier.nb_heures) : "",
+        taux_horaire: horaireDernier ? valeur(horaireDernier.taux_horaire) : "",
+        taux_heure_supp: valeur(enseignant.taux_horaire_heures_sup),
+        moyen_paiement: dernier?.moyen_paiement || "especes",
       },
     };
   }
-  const vacataire = enseignant?.type_contrat === "vacataire";
   return {
-    source: enseignant?.statut_contrat === "actif" ? "Montants repris du contrat actif" : "Aucun contrat actif : saisissez les montants",
-    champs: {
-      type_remuneration: vacataire ? "horaire" : "fixe",
-      salaire_base: vacataire ? "" : valeur(enseignant?.salaire_base),
-      nb_heures: "",
-      taux_horaire: "",
-      taux_heure_supp: valeur(enseignant?.taux_horaire_heures_sup),
-      moyen_paiement: "especes",
-    },
+    source: "Aucun contrat actif : enregistrez d'abord le contrat de l'enseignant",
+    champs: { type_remuneration: "fixe", salaire_base: "", nb_heures: "", taux_horaire: "", taux_heure_supp: "", moyen_paiement: "especes" },
   };
+}
+
+// Ecarts entre la saisie et le contrat actif (memes regles que le serveur) : a justifier.
+function ecartsContrat(enseignant, form, avecHeuresSupp) {
+  if (!enseignant || enseignant.statut_contrat !== "actif") return [];
+  const ecarts = [];
+  const attendu = enseignant.type_contrat === "vacataire" ? "horaire" : "fixe";
+  if (form.type_remuneration !== attendu) {
+    ecarts.push(`rémunération ${form.type_remuneration === "horaire" ? "à l'heure" : "fixe"} pour un contrat ${String(enseignant.type_contrat).toUpperCase()}`);
+  }
+  if (form.type_remuneration === "fixe" && enseignant.salaire_base != null && form.salaire_base !== "" && Math.abs(Number(form.salaire_base) - Number(enseignant.salaire_base)) >= 1) {
+    ecarts.push(`salaire de base ${formaterGNF(form.salaire_base)} au lieu de ${formaterGNF(enseignant.salaire_base)} (contrat)`);
+  }
+  if (avecHeuresSupp && Number(form.nb_heures_supp) > 0 && enseignant.taux_horaire_heures_sup != null && form.taux_heure_supp !== "" && Math.abs(Number(form.taux_heure_supp) - Number(enseignant.taux_horaire_heures_sup)) >= 1) {
+    ecarts.push(`taux d'heure sup ${formaterGNF(form.taux_heure_supp)} au lieu de ${formaterGNF(enseignant.taux_horaire_heures_sup)} (contrat)`);
+  }
+  return ecarts;
 }
 
 // Avec `salaireAModifier` : correction d'un salaire en attente (enseignant fixe, pas de paiement).
@@ -100,8 +114,9 @@ export default function PanneauNouveauSalaire({ enseignants, salaires, enseignan
   });
 
   const doublon = salaires.some(
-    (s) => s.id !== salaireAModifier?.id && s.enseignant_id === enseignantId && s.mois === Number(form.mois) && s.annee === Number(form.annee)
+    (s) => s.id !== salaireAModifier?.id && s.statut !== "annule" && s.enseignant_id === enseignantId && s.mois === Number(form.mois) && s.annee === Number(form.annee)
   );
+  const ecarts = ecartsContrat(enseignant, form, avecHeuresSupp);
   const estFixe = form.type_remuneration === "fixe";
   const calcul = {
     type_remuneration: form.type_remuneration,
@@ -122,6 +137,9 @@ export default function PanneauNouveauSalaire({ enseignants, salaires, enseignan
     if (!estFixe && (form.nb_heures === "" || form.taux_horaire === "")) return setErreur("Indiquez le nombre d'heures et le taux horaire.");
     if (avecHeuresSupp && (!Number(form.nb_heures_supp) || form.taux_heure_supp === "")) {
       return setErreur("Indiquez le nombre d'heures supplémentaires et leur taux.");
+    }
+    if (ecarts.length && form.observation.trim().length < 5) {
+      return setErreur("Écart avec le contrat : justifiez-le dans l'observation (prime, rattrapage, avenant…).");
     }
     setEnvoi(true);
     try {
@@ -395,9 +413,18 @@ export default function PanneauNouveauSalaire({ enseignants, salaires, enseignan
             </div>
           </div>
 
+          {/* Ecart au contrat : justification obligatoire */}
+          {ecarts.length > 0 && (
+            <div className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2.5 text-xs text-amber-900 space-y-1">
+              <p className="font-bold flex items-center gap-1.5"><AlertTriangle className="w-3.5 h-3.5" /> Écart avec le contrat de l'enseignant</p>
+              <ul className="list-disc pl-5">{ecarts.map((e) => <li key={e}>{e}</li>)}</ul>
+              <p>Justifiez cet écart dans l'observation, ou revenez aux montants du contrat.</p>
+            </div>
+          )}
+
           {/* Observation */}
           <div className="space-y-1.5">
-            <label className={LIBELLE}>Observation (optionnel)</label>
+            <label className={LIBELLE}>Observation {ecarts.length ? <span className="text-amber-700">(obligatoire : motif de l'écart)</span> : "(optionnel)"}</label>
             <textarea
               rows={2}
               value={form.observation}
