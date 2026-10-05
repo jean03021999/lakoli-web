@@ -209,7 +209,9 @@ const STYLES = `
   .doc-releve .entete-premium .logo-premium img { width: 100%; height: 100%; object-fit: contain; }
   .doc-releve .entete-premium .mentions-premium { margin-top: 4px; font-size: 10px; color: rgba(255, 255, 255, 0.85); }
   .doc-releve .entete-premium .mentions-premium .slogan { font-style: italic; }
-  .doc-releve .entete-premium .nom { font-size: 22px; font-weight: bold; letter-spacing: 3px; color: #fff; }
+  .doc-releve .entete-premium .nom { font-size: 20px; font-weight: bold; letter-spacing: 0.5px; line-height: 1.25; color: #fff; }
+  /* LAKOLI en simple signature discrete au pied des documents. */
+  .signe-lakoli { font-style: italic; font-size: 9px; color: #94a3b8; letter-spacing: 0.3px; }
   .doc-releve .entete-premium .badge-etablissement {
     display: inline-block; margin-top: 5px; padding: 3px 10px; border-radius: 999px;
     background: rgba(255, 255, 255, 0.2); color: #fff; font-size: 11px; font-weight: 600;
@@ -516,7 +518,7 @@ export function genererRecuHtml(data) {
 
   const qr = qrCodeSvg(
     [
-      "LAKOLI - Reçu de paiement",
+      "Reçu de paiement",
       etablissement.nom,
       `Réf : ${data.reference}`,
       `Élève : ${nomComplet}${eleve.matricule ? ` (${eleve.matricule})` : ""}`,
@@ -763,7 +765,7 @@ export function genererReleveHtml({ etablissement: etablissementFourni = {}, ele
 
   const qr = qrCodeSvg(
     [
-      `LAKOLI - Relevé ${reference}`,
+      `Relevé ${reference}`,
       etablissement.nom,
       `Élève : ${eleve.nom} ${eleve.prenom} (${eleve.matricule || "-"})`,
       eleve.classe && `Classe : ${eleve.classe}${eleve.session ? ` - ${eleve.session}` : ""}`,
@@ -974,8 +976,7 @@ export function genererListeElevesHtml({ etablissement, session, classes, filtre
       <div class="logo">
         ${logoEcoleHtml(ecole, "logo-premium")}
         <div>
-          <div class="nom">LAKOLI</div>
-          ${ecole.nom ? `<span class="badge-etablissement">${echapperHtml(ecole.nom)}</span>` : ""}
+          <div class="nom">${echapperHtml(ecole.nom || "LAKOLI")}</div>
           ${ecole.agrement || ecole.slogan ? `<div class="mentions-premium">${[ecole.agrement && `Agrément n° ${echapperHtml(ecole.agrement)}`, ecole.slogan && `<span class="slogan">« ${echapperHtml(ecole.slogan)} »</span>`].filter(Boolean).join(" · ")}</div>` : ""}
         </div>
       </div>
@@ -1016,10 +1017,10 @@ export function genererListeElevesHtml({ etablissement, session, classes, filtre
     </div>
 
     <div class="pied-premium">
-      Document officiel LAKOLI · Liste arrêtée à ${tries.length} élève${tries.length > 1 ? "s" : ""}${
+      Document officiel · Liste arrêtée à ${tries.length} élève${tries.length > 1 ? "s" : ""}${
         filtreStatut ? ` (paiement : ${echapperHtml(filtreStatut)})` : ""
       }<br>
-      Imprimé le ${echapperHtml(dateImpression())}
+      Imprimé le ${echapperHtml(dateImpression())} · <span class="signe-lakoli">édité avec LAKOLI</span>
     </div>
   </div>`;
     })
@@ -1065,8 +1066,7 @@ export function genererListeEnseignantsHtml({ etablissement, session, enseignant
       <div class="logo">
         ${logoEcoleHtml(ecole, "logo-premium")}
         <div>
-          <div class="nom">LAKOLI</div>
-          ${ecole.nom ? `<span class="badge-etablissement">${echapperHtml(ecole.nom)}</span>` : ""}
+          <div class="nom">${echapperHtml(ecole.nom || "LAKOLI")}</div>
           ${ecole.agrement || ecole.slogan ? `<div class="mentions-premium">${[ecole.agrement && `Agrément n° ${echapperHtml(ecole.agrement)}`, ecole.slogan && `<span class="slogan">« ${echapperHtml(ecole.slogan)} »</span>`].filter(Boolean).join(" · ")}</div>` : ""}
         </div>
       </div>
@@ -1116,8 +1116,8 @@ export function genererListeEnseignantsHtml({ etablissement, session, enseignant
     </div>
 
     <div class="pied-premium">
-      Document officiel LAKOLI · Liste arrêtée à ${tries.length} enseignant${tries.length > 1 ? "s" : ""}<br>
-      Imprimé le ${echapperHtml(dateImpression())}
+      Document officiel · Liste arrêtée à ${tries.length} enseignant${tries.length > 1 ? "s" : ""}<br>
+      Imprimé le ${echapperHtml(dateImpression())} · <span class="signe-lakoli">édité avec LAKOLI</span>
     </div>
   </div>`;
 }
@@ -1159,8 +1159,7 @@ export function genererJournalCaisseHtml({ etablissement, filtres = [], versemen
       <div class="logo">
         ${logoEcoleHtml(ecole, "logo-premium")}
         <div>
-          <div class="nom">LAKOLI</div>
-          ${ecole.nom ? `<span class="badge-etablissement">${echapperHtml(ecole.nom)}</span>` : ""}
+          <div class="nom">${echapperHtml(ecole.nom || "LAKOLI")}</div>
           ${ecole.agrement || ecole.slogan ? `<div class="mentions-premium">${[ecole.agrement && `Agrément n° ${echapperHtml(ecole.agrement)}`, ecole.slogan && `<span class="slogan">« ${echapperHtml(ecole.slogan)} »</span>`].filter(Boolean).join(" · ")}</div>` : ""}
         </div>
       </div>
@@ -1213,8 +1212,8 @@ export function genererJournalCaisseHtml({ etablissement, filtres = [], versemen
     </div>
 
     <div class="pied-premium">
-      Document officiel LAKOLI · Journal arrêté à ${versements.length} versement${versements.length > 1 ? "s" : ""} pour ${formaterMontant(total)} GNF<br>
-      Imprimé le ${echapperHtml(dateImpression())}
+      Document officiel · Journal arrêté à ${versements.length} versement${versements.length > 1 ? "s" : ""} pour ${formaterMontant(total)} GNF<br>
+      Imprimé le ${echapperHtml(dateImpression())} · <span class="signe-lakoli">édité avec LAKOLI</span>
     </div>
   </div>`;
 }
@@ -1233,8 +1232,7 @@ export function genererRapportFinancierHtml({ etablissement, donnees, moisDetail
       <div class="logo">
         ${logoEcoleHtml(ecole, "logo-premium")}
         <div>
-          <div class="nom">LAKOLI</div>
-          ${ecole.nom ? `<span class="badge-etablissement">${echapperHtml(ecole.nom)}</span>` : ""}
+          <div class="nom">${echapperHtml(ecole.nom || "LAKOLI")}</div>
           ${ecole.agrement || ecole.slogan ? `<div class="mentions-premium">${[ecole.agrement && `Agrément n° ${echapperHtml(ecole.agrement)}`, ecole.slogan && `<span class="slogan">« ${echapperHtml(ecole.slogan)} »</span>`].filter(Boolean).join(" · ")}</div>` : ""}
         </div>
       </div>
@@ -1248,7 +1246,7 @@ export function genererRapportFinancierHtml({ etablissement, donnees, moisDetail
       <div class="cadre"><div class="ligne"></div><div class="libelle">Le comptable</div></div>
       <div class="cadre"><div class="ligne"></div><div class="libelle">Visa de la direction</div></div>
     </div>
-    <div class="pied-premium">Document officiel LAKOLI · Rapport établi à partir des données enregistrées dans l'application<br>Imprimé le ${echapperHtml(dateImpression())}</div>`;
+    <div class="pied-premium">Document officiel · Rapport établi à partir des données enregistrées dans l'application<br>Imprimé le ${echapperHtml(dateImpression())} · <span class="signe-lakoli">édité avec LAKOLI</span></div>`;
 
   if (moisDetail) {
     const m = donnees.mois.find((x) => x.mois === moisDetail);
@@ -1407,7 +1405,7 @@ export function genererLettresRelanceHtml({ etablissement, lignes }) {
     <div class="signature-zone">
       <div class="cadre"><div class="ligne"></div><div class="libelle">Le service de comptabilité</div></div>
     </div>
-    <div class="pied-premium">Document LAKOLI · ${echapperHtml(ecole.nom || "")}</div>
+    <div class="pied-premium">${echapperHtml(ecole.nom || "")} · <span class="signe-lakoli">édité avec LAKOLI</span></div>
   </div>`;
     })
     .join("");
@@ -1463,8 +1461,7 @@ export function genererArreteCaisseHtml({ etablissement, situation, arrete }) {
       <div class="logo">
         ${logoEcoleHtml(ecole, "logo-premium")}
         <div>
-          <div class="nom">LAKOLI</div>
-          ${ecole.nom ? `<span class="badge-etablissement">${echapperHtml(ecole.nom)}</span>` : ""}
+          <div class="nom">${echapperHtml(ecole.nom || "LAKOLI")}</div>
           ${ecole.agrement || ecole.slogan ? `<div class="mentions-premium">${[ecole.agrement && `Agrément n° ${echapperHtml(ecole.agrement)}`, ecole.slogan && `<span class="slogan">« ${echapperHtml(ecole.slogan)} »</span>`].filter(Boolean).join(" · ")}</div>` : ""}
         </div>
       </div>
@@ -1515,8 +1512,8 @@ export function genererArreteCaisseHtml({ etablissement, situation, arrete }) {
     </div>
 
     <div class="pied-premium">
-      Document officiel LAKOLI · Arrêté de caisse du ${echapperHtml(formaterDate(s.date))}${arrete?.arrete_le ? ` enregistré le ${echapperHtml(formaterDate(arrete.arrete_le))}` : ""}<br>
-      Imprimé le ${echapperHtml(dateImpression())}
+      Document officiel · Arrêté de caisse du ${echapperHtml(formaterDate(s.date))}${arrete?.arrete_le ? ` enregistré le ${echapperHtml(formaterDate(arrete.arrete_le))}` : ""}<br>
+      Imprimé le ${echapperHtml(dateImpression())} · <span class="signe-lakoli">édité avec LAKOLI</span>
     </div>
   </div>`;
 }
@@ -1696,8 +1693,7 @@ export function genererEtatDepensesHtml({ etablissement, filtres = [], depenses,
       <div class="logo">
         ${logoEcoleHtml(ecole, "logo-premium")}
         <div>
-          <div class="nom">LAKOLI</div>
-          ${ecole.nom ? `<span class="badge-etablissement">${echapperHtml(ecole.nom)}</span>` : ""}
+          <div class="nom">${echapperHtml(ecole.nom || "LAKOLI")}</div>
           ${ecole.agrement || ecole.slogan ? `<div class="mentions-premium">${[ecole.agrement && `Agrément n° ${echapperHtml(ecole.agrement)}`, ecole.slogan && `<span class="slogan">« ${echapperHtml(ecole.slogan)} »</span>`].filter(Boolean).join(" · ")}</div>` : ""}
         </div>
       </div>
@@ -1737,8 +1733,8 @@ export function genererEtatDepensesHtml({ etablissement, filtres = [], depenses,
     </div>
 
     <div class="pied-premium">
-      Document officiel LAKOLI · Les pièces justificatives sont conservées dans l'application (module Dépenses)<br>
-      Imprimé le ${echapperHtml(dateImpression())}
+      Document officiel · Les pièces justificatives sont conservées dans l'application (module Dépenses)<br>
+      Imprimé le ${echapperHtml(dateImpression())} · <span class="signe-lakoli">édité avec LAKOLI</span>
     </div>
   </div>`;
 }
@@ -1917,8 +1913,7 @@ export function genererRapportComptableHtml({
       <div class="logo">
         ${logoEcoleHtml(ecole, "logo-premium")}
         <div>
-          <div class="nom">LAKOLI</div>
-          ${ecole.nom ? `<span class="badge-etablissement">${echapperHtml(ecole.nom)}</span>` : ""}
+          <div class="nom">${echapperHtml(ecole.nom || "LAKOLI")}</div>
           ${ecole.agrement || ecole.slogan ? `<div class="mentions-premium">${[ecole.agrement && `Agrément n° ${echapperHtml(ecole.agrement)}`, ecole.slogan && `<span class="slogan">« ${echapperHtml(ecole.slogan)} »</span>`].filter(Boolean).join(" · ")}</div>` : ""}
         </div>
       </div>
@@ -1957,8 +1952,8 @@ export function genererRapportComptableHtml({
     </div>
 
     <div class="pied-premium">
-      Document officiel LAKOLI · Rapport établi à partir des données enregistrées dans l'application<br>
-      Imprimé le ${echapperHtml(dateImpression())}
+      Document officiel · Rapport établi à partir des données enregistrées dans l'application<br>
+      Imprimé le ${echapperHtml(dateImpression())} · <span class="signe-lakoli">édité avec LAKOLI</span>
     </div>
   </div>`;
 }
@@ -2039,7 +2034,7 @@ export function genererEtImprimerFichePaie(salaire, fenetrePreouverte) {
     .logo.avec-image { background: #fff; padding: 3px; }
     .logo img { width: 100%; height: 100%; object-fit: contain; }
     .marque-mentions { font-size: 10px; color: rgba(255,255,255,0.7); margin-top: 2px; }
-    .marque-nom { font-size: 22px; font-weight: 900; letter-spacing: -0.5px; display: flex; align-items: center; gap: 8px; }
+    .marque-nom { font-size: 20px; font-weight: 900; letter-spacing: -0.3px; line-height: 1.2; display: flex; align-items: center; gap: 8px; }
     .marque-tag { font-size: 10px; text-transform: uppercase; font-weight: 700; padding: 2px 8px; border-radius: 4px; background: rgba(16,185,129,0.2); color: #6ee7b7; border: 1px solid rgba(52,211,153,0.3); }
     .marque-sous { font-size: 11px; color: rgba(255,255,255,0.75); margin-top: 2px; }
     .titre { text-align: right; }
@@ -2091,6 +2086,7 @@ export function genererEtImprimerFichePaie(salaire, fenetrePreouverte) {
     .qr-code { width: 76px; height: 76px; flex-shrink: 0; }
     .qr-code svg { display: block; }
     .pied-texte { flex: 1; display: flex; justify-content: space-between; gap: 12px; font-size: 10px; color: #94a3b8; }
+    .signe-lakoli { font-style: italic; font-size: 9px; color: #94a3b8; }
     .btn-group { display: flex; gap: 10px; justify-content: center; padding: 12px; border-top: 1px solid #e2e8f0; background: #f8fafc; }
     .btn { padding: 7px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; border: none; }
     .btn-print { background: #0C447C; color: white; }
@@ -2109,8 +2105,8 @@ export function genererEtImprimerFichePaie(salaire, fenetrePreouverte) {
     <div class="marque">
       ${ecole.logo_url ? `<div class="logo avec-image"><img src="${echapperHtml(ecole.logo_url)}" alt=""></div>` : `<div class="logo">🎓</div>`}
       <div>
-        <div class="marque-nom">LAKOLI <span class="marque-tag">Scolaire</span></div>
-        <div class="marque-sous">${echapperHtml(ecole.nom || "Gestion scolaire · République de Guinée")}</div>
+        <div class="marque-nom">${echapperHtml(ecole.nom || "LAKOLI")}</div>
+        <div class="marque-sous">République de Guinée</div>
         ${ecole.agrement || ecole.slogan ? `<div class="marque-mentions">${[ecole.agrement && `Agrément n° ${echapperHtml(ecole.agrement)}`, ecole.slogan && `« ${echapperHtml(ecole.slogan)} »`].filter(Boolean).join(" · ")}</div>` : ""}
       </div>
     </div>
@@ -2181,7 +2177,7 @@ export function genererEtImprimerFichePaie(salaire, fenetrePreouverte) {
 
     <div class="pied">
       <div class="qr-code">${qrCodeSvg([
-        "LAKOLI - Fiche de paie",
+        "Fiche de paie",
         `Réf : ${salaire.reference}`,
         `Enseignant : ${nomComplet}${ens.matricule ? ` (${ens.matricule})` : ""}`,
         `Période : ${periode}`,
@@ -2189,7 +2185,7 @@ export function genererEtImprimerFichePaie(salaire, fenetrePreouverte) {
         `Statut : ${estPaye ? `Payé le ${formaterDate(salaire.date_paiement)}` : "En attente"}`,
       ].join("\n"), 76)}</div>
       <div class="pied-texte">
-        <span>Document officiel LAKOLI · Fiche de paie · République de Guinée</span>
+        <span>Document officiel · Fiche de paie · <span class="signe-lakoli">édité avec LAKOLI</span></span>
         <span class="mono">Édité le ${echapperHtml(dateImpression())}</span>
       </div>
     </div>
