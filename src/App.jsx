@@ -75,8 +75,11 @@ function AppContent() {
   const estPageAuth = AUTH_PATHS.includes(location.pathname);
 
   useEffect(() => {
+    // Ecrans de connexion : on repart d'un etat « en chargement » pour que l'arrivee sur le tableau
+    // de bord attende la reponse de /user au lieu de renvoyer a l'accueil faute de role.
     if (estPageAuth) {
-      setChargementRole(false);
+      setRole(null);
+      setChargementRole(true);
       return;
     }
     const token = localStorage.getItem("auth_token");
