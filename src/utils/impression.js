@@ -1346,7 +1346,11 @@ export function civiliteParent(contact) {
 // ---------------------------------------------------------------------------
 export function genererLettresRelanceHtml({ etablissement, lignes }) {
   const ecole = completerEtablissement(etablissement);
-  const coordonnees = [ecole.adresse, ecole.telephone && `Tél. ${ecole.telephone}`, ecole.email].filter(Boolean).map(echapperHtml).join(" · ");
+  // En-tete : le WhatsApp de la comptabilite remplace le telephone general quand il est renseigne.
+  const telephoneEnTete = ecole.whatsapp_relance
+    ? `WhatsApp comptabilité : ${formaterTelephone(ecole.whatsapp_relance)}`
+    : ecole.telephone && `Tél. ${formaterTelephone(ecole.telephone)}`;
+  const coordonnees = [ecole.adresse, telephoneEnTete, ecole.email].filter(Boolean).map(echapperHtml).join(" · ");
   const aujourdhui = new Date().toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
 
   return lignes

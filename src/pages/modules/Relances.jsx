@@ -48,7 +48,10 @@ function messageRelance(ligne, contact, etablissement) {
     "",
     "Avec nos salutations respectueuses,",
     `Le service de comptabilité — ${nomEcole}`,
-    ...(ecole.telephone ? [`Tél. ${formaterTelephone(ecole.telephone)}`] : [])
+    // Numero de la comptabilite en signature quand il est renseigne, sinon celui de l'etablissement.
+    ...(ecole.whatsapp_relance
+      ? [`WhatsApp : ${formaterTelephone(ecole.whatsapp_relance)}`]
+      : ecole.telephone ? [`Tél. ${formaterTelephone(ecole.telephone)}`] : [])
   );
   return lignes.join("\n");
 }
