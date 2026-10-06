@@ -344,6 +344,12 @@ export default function ImporterExcel() {
             </div>
           )}
 
+          {resultat.feuilles?.length > 1 && (
+            <p className="text-xs text-slate-500">
+              {resultat.feuilles.length} feuilles lues : {resultat.feuilles.join(", ")}.
+            </p>
+          )}
+
           <Card className="p-0 overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
