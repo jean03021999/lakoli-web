@@ -344,6 +344,13 @@ export default function ImporterExcel() {
             </div>
           )}
 
+          {resultat.nom_complet && (
+            <p className="text-xs p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800">
+              Nom et prénoms sont dans une seule colonne : le nom de famille est le mot écrit en MAJUSCULES, sinon le premier mot
+              (le dernier pour une colonne « Prénoms et nom »). Vérifiez les colonnes Nom et Prénom de l'aperçu avant d'importer.
+            </p>
+          )}
+
           {resultat.feuilles?.length > 1 && (
             <p className="text-xs text-slate-500">
               {resultat.feuilles.length} feuilles lues : {resultat.feuilles.join(", ")}.
