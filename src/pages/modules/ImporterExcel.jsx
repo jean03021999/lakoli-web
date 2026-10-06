@@ -364,7 +364,13 @@ export default function ImporterExcel() {
                       <td className="py-3 px-5">{badgeStatut(ligne.statut)}</td>
                       <td className="py-3 px-5 text-slate-800">{ligne.nom}</td>
                       <td className="py-3 px-5 text-slate-800">{ligne.prenom}</td>
-                      <td className="py-3 px-5 text-slate-800">{ligne.classe_nom}</td>
+                      <td className="py-3 px-5 text-slate-800">
+                        {ligne.classe_nom}
+                        {/* Ecriture du fichier differente de la classe retenue (« 7e » -> « 7ème Année ») */}
+                        {ligne.classe_saisie && ligne.classe_saisie !== ligne.classe_nom && (
+                          <span className="block text-[11px] text-slate-400">écrit « {ligne.classe_saisie} »</span>
+                        )}
+                      </td>
                       <td className="py-3 px-5">{badgeInscription(ligne)}</td>
                       <td className="py-3 px-5 text-right text-slate-700 tabular-nums whitespace-nowrap">
                         {ligne.frais_inscription ? `${Number(ligne.frais_inscription).toLocaleString("fr-FR")} GNF` : "—"}
