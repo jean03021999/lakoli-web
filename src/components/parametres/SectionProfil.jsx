@@ -5,7 +5,36 @@ import AvatarUtilisateur from "../AvatarUtilisateur";
 import { Carte, Champ, AvecIcone, BoutonEnregistrer } from "./ui";
 import { CHAMP, LIBELLES_ROLES, dateLongue, messageErreur } from "./outils";
 
-const TAILLE_MAX_PHOTO = 2 * 1024 * 1024;
+// Photo de telephone (souvent 3 a 6 Mo) : reduite dans le navigateur avant l'envoi, le serveur
+// n'accepte que 2 Mo. Un avatar n'a pas besoin de plus de 512 px.
+const COTE_MAX_PHOTO = 512;
+const TAILLE_MAX_SOURCE = 25 * 1024 * 1024;
+
+async function reduirePhoto(fichier) {
+  let image;
+  try {
+    image = await createImageBitmap(fichier, { imageOrientation: "from-image" });
+  } catch {
+    const heic = /\.(heic|heif)$/i.test(fichier.name) || /hei[cf]/i.test(fichier.type);
+    throw new Error(
+      heic
+        ? "Format HEIC (iPhone) non pris en charge : envoyez la photo en JPG (sur l'iPhone, Réglages > Appareil photo > Formats > « Le plus compatible »)."
+        : "Ce fichier n'est pas une image lisible. Formats acceptés : JPG, PNG ou WebP."
+    );
+  }
+  const echelle = Math.min(1, COTE_MAX_PHOTO / Math.max(image.width, image.height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round(image.width * echelle);
+  canvas.height = Math.round(image.height * echelle);
+  const ctx = canvas.getContext("2d");
+  ctx.fillStyle = "#fff"; // fond blanc sous une image PNG transparente
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+  image.close();
+  const blob = await new Promise((ok) => canvas.toBlob(ok, "image/jpeg", 0.85));
+  if (!blob) throw new Error("Impossible de préparer cette photo.");
+  return new File([blob], "photo.jpg", { type: "image/jpeg" });
+}
 
 // Profil du compte connecte (tous les roles) : photo, nom, e-mail et telephone.
 export default function SectionProfil({ profil, onMaj, onToast }) {
@@ -34,13 +63,21 @@ export default function SectionProfil({ profil, onMaj, onToast }) {
     const fichier = e.target.files?.[0];
     e.target.value = "";
     if (!fichier) return;
-    if (fichier.size > TAILLE_MAX_PHOTO) {
-      onToast("Photo trop lourde", "La photo ne doit pas dépasser 2 Mo.", "warning");
+    if (fichier.size > TAILLE_MAX_SOURCE) {
+      onToast("Photo trop lourde", "La photo ne doit pas dépasser 25 Mo.", "warning");
+      return;
+    }
+    setEnvoiPhoto(true);
+    let photo;
+    try {
+      photo = await reduirePhoto(fichier);
+    } catch (err) {
+      onToast("Photo refusée", err.message, "warning");
+      setEnvoiPhoto(false);
       return;
     }
     const donnees = new FormData();
-    donnees.append("photo", fichier);
-    setEnvoiPhoto(true);
+    donnees.append("photo", photo);
     try {
       const res = await api.post("/parametres/profil/photo", donnees);
       onMaj(res.data);
@@ -67,7 +104,7 @@ export default function SectionProfil({ profil, onMaj, onToast }) {
     <div className="space-y-6">
       <Carte icone={User} titre="Photo de profil" description="Visible dans l'en-tête et par le personnel de l'établissement">
         <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6">
-          <input ref={refFichier} type="file" accept="image/png,image/jpeg,image/webp" onChange={envoyerPhoto} className="hidden" />
+          <input ref={refFichier} type="file" accept="image/*" onChange={envoyerPhoto} className="hidden" />
           <div className="relative">
             <AvatarUtilisateur nom={form.name} photoUrl={profil.photo_url} className="w-20 h-20 rounded-2xl text-2xl tracking-wider shadow-md border-2 border-slate-200" />
             {envoiPhoto && (
@@ -109,7 +146,7 @@ export default function SectionProfil({ profil, onMaj, onToast }) {
                 </button>
               )}
             </div>
-            <p className="text-xs text-slate-400">Image carrée de préférence (PNG, JPG ou WebP, 2 Mo maximum).</p>
+            <p className="text-xs text-slate-400">Image carrée de préférence (JPG, PNG ou WebP). Les photos de téléphone sont réduites automatiquement.</p>
           </div>
         </div>
       </Carte>
