@@ -60,10 +60,20 @@ export default function GrillesTarifaires({ classes, typesFrais, grilles, peutCr
   const parEleve = type && estParEleve(type.nom);
   const montantNum = Number(montant) || 0;
   const lignes = parEleve ? [{ libelle: type.nom, pourcentage: 100, date_limite: echeances[0]?.date_limite || "" }] : echeances;
-  const totalPct = lignes.reduce((s, e) => s + (Number(e.pourcentage) || 0), 0);
+  // Arrondi : 33.4 + 33.3 + 33.3 vaut 99.99999999999999 en virgule flottante.
+  const totalPct = Math.round(lignes.reduce((s, e) => s + (Number(e.pourcentage) || 0), 0) * 100) / 100;
   const montants = repartir(montantNum, lignes);
   const classeChoisie = classes.find((c) => String(c.id) === String(classeId));
-  const valide = type && classeId && montantNum > 0 && totalPct === 100 && lignes.every((e) => e.libelle && e.date_limite);
+  // Ce qui empeche la creation, affiche sous le bouton tant qu'il est grise.
+  const manquants = [
+    !type && "le type de frais",
+    !classeId && "la classe",
+    montantNum <= 0 && "le montant annuel",
+    totalPct !== 100 && "des pourcentages totalisant 100 %",
+    lignes.some((e) => !e.libelle) && "le libellé de chaque échéance",
+    lignes.some((e) => !e.date_limite) && "la date limite de chaque échéance",
+  ].filter(Boolean);
+  const valide = manquants.length === 0;
 
   const choisirType = (t) => {
     setTypeId(String(t.id));
@@ -353,6 +363,7 @@ export default function GrillesTarifaires({ classes, typesFrais, grilles, peutCr
               <Plus className="w-4 h-4" />
               {envoi ? "Création..." : "Créer la grille tarifaire"}
             </button>
+            {!valide && <p className="text-[11px] text-slate-500 text-center">À compléter : {manquants.join(", ")}.</p>}
           </form>
         </div>
       )}
