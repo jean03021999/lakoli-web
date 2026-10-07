@@ -19,7 +19,7 @@ const CYCLES = [
 ];
 
 const CHAMPS_FORMULAIRE = [
-  "nom", "type", "ville", "quartier", "region", "prefecture", "coordonnees_gps", "adresse",
+  "nom", "sigle", "type", "ville", "quartier", "region", "prefecture", "coordonnees_gps", "adresse",
   "telephone", "telephone_secondaire", "whatsapp_relance", "email", "cycles", "capacite_accueil", "agrement", "slogan",
 ];
 
@@ -136,8 +136,23 @@ export default function SectionEtablissement({ etablissement, effectif, peutAdmi
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-12 gap-5">
-            <Champ libelle="Nom de l'établissement" requis className="md:col-span-6">
+            <Champ libelle="Nom de l'établissement" requis className="md:col-span-4">
               <input type="text" value={form.nom} disabled={lecture} onChange={(e) => maj("nom", e.target.value)} className={`${CHAMP} font-medium`} />
+            </Champ>
+            <Champ
+              libelle="Sigle"
+              className="md:col-span-2"
+              aide={`Préfixe des matricules et références : ${form.sigle || "…"}-${new Date().getFullYear()}-001. Un changement ne vaut que pour les prochains.`}
+            >
+              <input
+                type="text"
+                value={form.sigle}
+                disabled={lecture}
+                maxLength={8}
+                onChange={(e) => maj("sigle", e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""))}
+                placeholder="GSSE"
+                className={`${CHAMP} font-mono font-bold tracking-wider`}
+              />
             </Champ>
             <Champ libelle="Type d'établissement" requis className="md:col-span-6">
               <div className="grid grid-cols-4 gap-2">
