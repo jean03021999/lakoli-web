@@ -453,6 +453,8 @@ export const MOYENS_PAIEMENT = {
   mobile_money: "Mobile Money",
   virement: "Virement",
   cheque: "Chèque",
+  // Paiement fait avant LAKOLI, repris a l'import Excel (hors caisse).
+  reprise: "Reprise (payé avant LAKOLI)",
 };
 
 // ---------------------------------------------------------------------------

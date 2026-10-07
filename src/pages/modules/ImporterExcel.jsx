@@ -177,7 +177,12 @@ export default function ImporterExcel() {
             {termine.reinscrits > 0 && ` · ${termine.reinscrits} ancien(s) élève(s) réinscrit(s)`}
           </p>
           {termine.frais_enregistres > 0 && (
-            <p className="text-sm text-slate-500 mb-1">{termine.frais_enregistres} paiement(s) de frais d'inscription enregistré(s)</p>
+            <p className="text-sm text-slate-500 mb-1">{termine.frais_enregistres} paiement(s) de frais d'inscription repris</p>
+          )}
+          {termine.scolarites_reprises > 0 && (
+            <p className="text-sm text-slate-500 mb-1">
+              {termine.scolarites_reprises} scolarité(s) déjà payée(s) reprise(s) · {Number(termine.montant_scolarite_repris).toLocaleString("fr-FR")} GNF (hors caisse)
+            </p>
           )}
           {termine.erreurs?.length > 0 && (
             <div className="max-w-lg mx-auto mt-3 mb-2 text-left p-3 rounded-xl bg-rose-50 border border-rose-100">
@@ -336,12 +341,24 @@ export default function ImporterExcel() {
                 {resultat.stats.frais_payes ?? 0} frais d'inscription payé(s)
                 {resultat.stats.montant_frais_payes > 0 && ` · ${Number(resultat.stats.montant_frais_payes).toLocaleString("fr-FR")} GNF`}
               </span>
+              {resultat.stats.scolarites_payees > 0 && (
+                <span className="px-3 py-1.5 rounded-full bg-teal-50 text-teal-700 font-bold">
+                  {resultat.stats.scolarites_payees} scolarité(s) déjà payée(s) · {Number(resultat.stats.montant_scolarite_payee).toLocaleString("fr-FR")} GNF
+                </span>
+              )}
               {!resultat.colonnes_detectees.includes("type_inscription") && (
                 <span className="text-slate-400">
                   Colonne « Type d'inscription » absente : les nouveaux élèves sont enregistrés comme inscriptions.
                 </span>
               )}
             </div>
+          )}
+
+          {(resultat.stats.scolarites_payees > 0 || resultat.stats.frais_payes > 0) && (
+            <p className="text-xs p-3 rounded-xl bg-teal-50 border border-teal-200 text-teal-800">
+              Les montants déjà payés sont enregistrés comme « Reprise » : ils soldent les échéances des élèves (de la plus ancienne à la
+              plus récente, ou tranche par tranche si le fichier les détaille) mais n'entrent pas dans la caisse ni dans l'arrêté de caisse du jour.
+            </p>
           )}
 
           {resultat.nom_complet && (
@@ -368,6 +385,7 @@ export default function ImporterExcel() {
                     <th className="py-3 px-5">Classe</th>
                     <th className="py-3 px-5">Type</th>
                     <th className="py-3 px-5 text-right">Frais payés</th>
+                    <th className="py-3 px-5 text-right">Scolarité payée</th>
                     <th className="py-3 px-5">Détail</th>
                   </tr>
                 </thead>
@@ -388,11 +406,19 @@ export default function ImporterExcel() {
                       <td className="py-3 px-5 text-right text-slate-700 tabular-nums whitespace-nowrap">
                         {ligne.frais_inscription ? `${Number(ligne.frais_inscription).toLocaleString("fr-FR")} GNF` : "—"}
                       </td>
+                      <td className="py-3 px-5 text-right text-slate-700 tabular-nums whitespace-nowrap">
+                        {ligne.scolarite_payee ? `${Number(ligne.scolarite_payee).toLocaleString("fr-FR")} GNF` : "—"}
+                        {ligne.scolarite_par_tranche && (
+                          <span className="block text-[11px] text-slate-400">
+                            {Object.entries(ligne.scolarite_par_tranche).map(([n, m]) => `T${n} : ${Number(m).toLocaleString("fr-FR")}`).join(" · ")}
+                          </span>
+                        )}
+                      </td>
                       <td className="py-3 px-5 text-xs text-slate-400">{ligne.message}</td>
                     </tr>
                   ))}
                   {lignesPage.length === 0 && (
-                    <tr><td colSpan="7" className="py-8 text-center text-sm text-slate-400">Aucune ligne dans cette catégorie.</td></tr>
+                    <tr><td colSpan="8" className="py-8 text-center text-sm text-slate-400">Aucune ligne dans cette catégorie.</td></tr>
                   )}
                 </tbody>
               </table>
