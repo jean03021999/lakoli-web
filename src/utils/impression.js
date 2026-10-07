@@ -648,17 +648,14 @@ export function genererRecuHtml(data) {
     </table>` : ""}
 
     <div class="signatures-a4">
-      <div class="sig">
-        <span class="role">Le Caissier</span>
-        <span class="note">Signature et cachet</span>
-        <span class="ligne-sig"></span>
-      </div>
+      <div class="sig"></div>
       <div class="sig centre">
         <span class="note">Document généré par LAKOLI</span>
       </div>
       <div class="sig droite">
-        <span class="role">Le Chef d'Établissement</span>
-        <span class="note">${etablissement.ville ? `${echapperHtml(etablissement.ville)}, le ` : "Le "}${e(data.date)}</span>
+        <!-- Reçu : seule la signature du comptable est requise. -->
+        <span class="role">Le Comptable</span>
+        <span class="note">${etablissement.ville ? `${echapperHtml(etablissement.ville)}, le ` : "Le "}${e(data.date)} — signature et cachet</span>
         <span class="ligne-sig"></span>
       </div>
     </div>
