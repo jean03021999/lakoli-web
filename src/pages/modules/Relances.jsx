@@ -31,6 +31,8 @@ function messageRelance(ligne, contact, etablissement) {
   if (ligne.motif === "retard") {
     lignes.push(
       `Nous nous permettons de vous informer respectueusement que, sauf erreur de notre part, la scolarité de votre enfant ${enfant} (${ligne.classe || ""}) présente un reste à payer de ${montant} depuis le ${formaterDate(ligne.date_limite)} (${ligne.echeance}).`,
+      // Arriere d'une annee passee compris dans le montant (sauf si c'est tout le montant).
+      ...(ligne.arrieres > 0 && ligne.arrieres < ligne.montant_du ? ["", `Ce montant comprend ${formaterGNF(ligne.arrieres)} restant dû sur l'année scolaire précédente.`] : []),
       "",
       "Nous vous serions très reconnaissants de bien vouloir passer à la caisse de l'établissement afin de régulariser cette situation dès que possible. En cas de difficulté, n'hésitez pas à nous contacter : nous restons à votre écoute."
     );
@@ -312,6 +314,7 @@ export default function Relances({ etablissement = null, permissions = [] }) {
                       <td className="py-3 px-3 text-right whitespace-nowrap">
                         <p className={`font-extrabold tabular-nums ${l.motif === "retard" ? "text-rose-600" : "text-slate-900"}`}>{formaterGNF(l.montant_du)}</p>
                         <p className="text-[10px] text-slate-400 tabular-nums">reste année {formaterGNF(l.reste_annee)}</p>
+                        {l.arrieres > 0 && <p className="text-[10px] font-bold text-amber-700 tabular-nums">dont arriéré {formaterGNF(l.arrieres)}</p>}
                       </td>
                       <td className="py-3 px-3">
                         {parent ? (

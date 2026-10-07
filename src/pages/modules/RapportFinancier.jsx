@@ -65,7 +65,7 @@ export default function RapportFinancier({ etablissement = null }) {
 
   const tauxEchu = t ? pourcentage(t.recouvre_echu, t.attendu_echu) : null;
   const cartes = t ? [
-    { libelle: "Total encaissé", valeur: formaterGNF(t.entrees), detail: `Année ${donnees.session.libelle}`, icone: ArrowDownCircle, couleur: "text-emerald-600", fond: "bg-emerald-50", bord: "border-emerald-100" },
+    { libelle: "Total encaissé", valeur: formaterGNF(t.entrees), detail: t.dont_reprises > 0 ? `dont ${formaterGNF(t.dont_reprises)} payés avant LAKOLI (hors caisse)` : `Année ${donnees.session.libelle}`, icone: ArrowDownCircle, couleur: "text-emerald-600", fond: "bg-emerald-50", bord: "border-emerald-100" },
     { libelle: "Total des sorties", valeur: formaterGNF(t.salaires + t.depenses), detail: `Salaires ${formaterGNF(t.salaires)} · dépenses ${formaterGNF(t.depenses)}`, icone: ArrowUpCircle, couleur: "text-rose-600", fond: "bg-rose-50", bord: "border-rose-100" },
     { libelle: "Solde de l'année", valeur: formaterGNF(t.solde), detail: "Encaissé − sorties", icone: Wallet, couleur: "text-[#0C447C]", fond: "bg-blue-50", bord: "border-blue-100" },
     { libelle: "Recouvrement échu", valeur: tauxEchu === null ? "—" : `${tauxEchu} %`, detail: `${formaterGNF(t.recouvre_echu)} sur ${formaterGNF(t.attendu_echu)} attendus à ce jour`, icone: Target, couleur: "text-amber-700", fond: "bg-amber-50", bord: "border-amber-100" },
@@ -184,7 +184,7 @@ export default function RapportFinancier({ etablissement = null }) {
                 </div>
                 <div className="p-5 space-y-5 text-xs">
                   <div className="grid grid-cols-2 gap-3">
-                    <div className="rounded-xl bg-emerald-50 p-3"><p className="text-[10px] font-bold uppercase text-emerald-700">Encaissé</p><p className="text-base font-extrabold tabular-nums text-slate-900">{formaterGNF(detail.entrees)}</p></div>
+                    <div className="rounded-xl bg-emerald-50 p-3"><p className="text-[10px] font-bold uppercase text-emerald-700">Encaissé</p><p className="text-base font-extrabold tabular-nums text-slate-900">{formaterGNF(detail.entrees)}</p>{detail.dont_reprises > 0 && <p className="text-[10px] text-emerald-700">dont {formaterGNF(detail.dont_reprises)} de reprise</p>}</div>
                     <div className="rounded-xl bg-rose-50 p-3"><p className="text-[10px] font-bold uppercase text-rose-600">Sorties</p><p className="text-base font-extrabold tabular-nums text-slate-900">{formaterGNF(detail.salaires + detail.depenses)}</p></div>
                     <div className="rounded-xl bg-blue-50 p-3"><p className="text-[10px] font-bold uppercase text-[#0C447C]">Solde du mois</p><p className="text-base font-extrabold tabular-nums text-slate-900">{formaterGNF(detail.solde)}</p></div>
                     <div className="rounded-xl bg-amber-50 p-3"><p className="text-[10px] font-bold uppercase text-amber-700">Reste à recouvrer</p><p className="text-base font-extrabold tabular-nums text-slate-900">{formaterGNF(Math.max(0, detail.attendu - detail.recouvre))}</p></div>

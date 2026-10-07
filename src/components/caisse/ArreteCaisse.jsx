@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, Loader2, Lock, Printer, CheckCircle2, AlertTriangle, ArrowDownCircle, ArrowUpCircle, Wallet, Sunrise } from "lucide-react";
+import { ChevronLeft, ChevronRight, Loader2, Lock, Unlock, Printer, CheckCircle2, AlertTriangle, ArrowDownCircle, ArrowUpCircle, Wallet, Sunrise } from "lucide-react";
 import api from "../../services/api";
 import { MOYENS, STYLE_CARTE, formaterGNF } from "../frais/configFrais";
 import { messageErreurApi } from "../../utils/erreurs";
@@ -82,6 +82,25 @@ export default function ArreteCaisse({ etablissement, peutArreter, onArrete }) {
     }
   };
 
+  // Rouvrir le dernier arrete (motif obligatoire) pour corriger une operation de cette journee.
+  const rouvrir = async () => {
+    const motif = window.prompt(`Pourquoi rouvrir la caisse du ${formaterDate(date)} ?
+(ex : paiement oublié, erreur de montant)`);
+    if (!motif || !motif.trim()) return;
+    setEnvoi(true);
+    setErreur("");
+    try {
+      const res = await api.post("/caisse/arretes/rouvrir", { date, motif: motif.trim() });
+      setMessage(res.data.message);
+      setRechargement((n) => n + 1);
+      onArrete?.();
+    } catch (err) {
+      setErreur(messageErreurApi(err, "Impossible de rouvrir la caisse."));
+    } finally {
+      setEnvoi(false);
+    }
+  };
+
   const imprimer = (sit, arr) => {
     if (!imprimerDocument(`Arrêté de caisse ${formaterDate(sit.date)}`, genererArreteCaisseHtml({ etablissement: etablissement?.nom, situation: sit, arrete: arr }))) {
       setErreur("Le navigateur a bloqué la fenêtre d'impression. Autorisez les pop-ups pour ce site.");
@@ -130,6 +149,10 @@ export default function ArreteCaisse({ etablissement, peutArreter, onArrete }) {
         {arrete ? (
           <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 text-xs font-bold">
             <Lock className="w-3.5 h-3.5" /> Arrêtée par {arrete.arrete_par || "—"} · {formaterDate(arrete.arrete_le)} à {String(arrete.arrete_le || "").slice(11, 16)}
+          </span>
+        ) : situation?.dernier_arrete && date < situation.dernier_arrete ? (
+          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 text-slate-600 text-xs font-bold">
+            <Lock className="w-3.5 h-3.5" /> Non arrêtée, mais verrouillée : la caisse est arrêtée jusqu'au {formaterDate(situation.dernier_arrete)}
           </span>
         ) : (
           <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-50 text-amber-800 text-xs font-bold">
@@ -197,6 +220,11 @@ export default function ArreteCaisse({ etablissement, peutArreter, onArrete }) {
                   {situation && (
                     <button onClick={() => imprimer(situation, arrete)} className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50 cursor-pointer">
                       <Printer className="w-4 h-4" /> Imprimer la fiche
+                    </button>
+                  )}
+                  {arrete && situation?.dernier_arrete === date && (
+                    <button onClick={rouvrir} disabled={envoi} className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-amber-300 text-xs font-bold text-amber-800 hover:bg-amber-50 cursor-pointer disabled:opacity-40">
+                      <Unlock className="w-4 h-4" /> Rouvrir la caisse
                     </button>
                   )}
                   <button onClick={enregistrer} disabled={envoi || chargement || !saisi || (!juste && !observation.trim())} className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#0C447C] hover:bg-[#093663] text-white text-xs font-bold disabled:opacity-40 cursor-pointer">

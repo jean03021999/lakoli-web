@@ -43,7 +43,7 @@ function getInitiales(nom, prenom) {
 // Reste a payer sur l'ensemble du frais (toutes tranches) auquel appartient l'echeance : c'est le
 // plafond d'un versement, le surplus au-dela de l'echeance etant reporte sur les tranches suivantes.
 function resteTotalDuFrais(suivi, echeanceId) {
-  const frais = (suivi?.frais || []).find((f) => f.echeances.some((e) => String(e.id) === String(echeanceId)));
+  const frais = [...(suivi?.frais || []), ...(suivi?.arrieres || [])].find((f) => f.echeances.some((e) => String(e.id) === String(echeanceId)));
   return (frais?.echeances || []).reduce((s, e) => s + Math.max(0, Number(e.solde)), 0);
 }
 
@@ -483,10 +483,14 @@ export default function FraisScolarite({ permissions = [], etablissement = null 
     ? Number(formInscription.montantInscription || 0) + (formInscription.echeanceId ? Number(formInscription.montantEcheance || 0) : 0)
     : 0;
 
-  // Frais a echeances de l'eleve : scolarite d'abord, puis les autres (cantine, transport...).
-  const fraisAEcheances = (suivi?.frais || [])
-    .filter((f) => !normaliser(f.type_frais).includes("inscription"))
-    .sort((a, b) => Number(!normaliser(a.type_frais).startsWith("scolarit")) - Number(!normaliser(b.type_frais).startsWith("scolarit")));
+  // Frais a echeances de l'eleve : scolarite d'abord, puis les autres (cantine, transport...), puis
+  // les arrieres des annees passees (payables ici, hors totaux de l'annee).
+  const fraisAEcheances = [
+    ...(suivi?.frais || [])
+      .filter((f) => !normaliser(f.type_frais).includes("inscription"))
+      .sort((a, b) => Number(!normaliser(a.type_frais).startsWith("scolarit")) - Number(!normaliser(b.type_frais).startsWith("scolarit"))),
+    ...(suivi?.arrieres || []).map((f) => ({ ...f, type_frais: `Arriéré ${f.session} — ${f.type_frais}`, arriere: true })),
+  ];
   const inscriptionReglee = !!fraisInscription?.echeances?.length && fraisInscription.echeances.every((e) => Number(e.solde) <= 0);
   const estAncien = eleveInfos?.inscription_active?.type_inscription === "reinscription" || eleveInfos?.inscription_reglee === "reinscription";
   const totalDuGlobal = (suivi?.frais || []).reduce((s, f) => s + f.echeances.reduce((t, e) => t + Number(e.montant), 0), 0);
@@ -1157,6 +1161,13 @@ export default function FraisScolarite({ permissions = [], etablissement = null 
                           <span className="text-[11px] text-slate-400">{resteGlobal === 0 ? "Tout est réglé" : "Échéances en cours"}</span>
                         </div>
                       </div>
+
+                      {suivi.montant_arrieres > 0 && (
+                        <div className="mb-5 p-3.5 rounded-xl bg-amber-50 border border-amber-300 text-xs text-amber-900">
+                          <strong>Arriéré des années passées : {formaterGNF(suivi.montant_arrieres)}</strong>
+                          {" "}({suivi.arrieres.map((f) => `${f.type_frais} ${f.session}`).join(", ")}). Non compris dans les totaux de l'année ci-dessus ; payable dans les frais à échéances.
+                        </div>
+                      )}
 
                       <div className="border border-slate-200 rounded-xl overflow-hidden">
                         <div className="bg-slate-50 px-4 py-2.5 text-[11px] font-bold text-slate-600 uppercase tracking-wider grid grid-cols-12 gap-2 border-b border-slate-200">
