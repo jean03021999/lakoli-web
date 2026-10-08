@@ -19,6 +19,7 @@ import {
   Receipt,
   Search,
   Ban,
+  Printer,
 } from "lucide-react";
 import { calculerStatutEcheance } from "../../constants/statutEcheance";
 import { situationGlobaleDepuisSuivi } from "../../utils/situationFrais";
@@ -42,6 +43,30 @@ function getInitiales(nom, prenom) {
 
 // Reste a payer sur l'ensemble du frais (toutes tranches) auquel appartient l'echeance : c'est le
 // plafond d'un versement, le surplus au-dela de l'echeance etant reporte sur les tranches suivantes.
+// Dernier recu du compte connecte, garde dans le navigateur : reimprimable apres un changement
+// d'eleve, un rechargement ou une reconnexion, jusqu'au paiement suivant qui le remplace.
+function cleDernierRecu() {
+  try {
+    return `lakoli_dernier_recu_${JSON.parse(localStorage.getItem("lakoli_session") || "{}")?.user?.id ?? ""}`;
+  } catch {
+    return "lakoli_dernier_recu_";
+  }
+}
+function lireDernierRecu() {
+  try {
+    return JSON.parse(localStorage.getItem(cleDernierRecu()) || "null");
+  } catch {
+    return null;
+  }
+}
+function memoriserDernierRecu(recu) {
+  try {
+    localStorage.setItem(cleDernierRecu(), JSON.stringify(recu));
+  } catch {
+    // stockage indisponible : le recu reste reimprimable jusqu'au rechargement de la page
+  }
+}
+
 function resteTotalDuFrais(suivi, echeanceId) {
   const frais = [...(suivi?.frais || []), ...(suivi?.arrieres || [])].find((f) => f.echeances.some((e) => String(e.id) === String(echeanceId)));
   return (frais?.echeances || []).reduce((s, e) => s + Math.max(0, Number(e.solde)), 0);
@@ -148,7 +173,11 @@ export default function FraisScolarite({ permissions = [], etablissement = null 
   const [suivi, setSuivi] = useState(null);
   const [typesFrais, setTypesFrais] = useState([]);
   const [inscriptionEnCours, setInscriptionEnCours] = useState(null);
-  const [dernierRecu, setDernierRecu] = useState(null);
+  const [dernierRecu, setDernierRecuEtat] = useState(lireDernierRecu);
+  const setDernierRecu = (recu) => {
+    setDernierRecuEtat(recu);
+    memoriserDernierRecu(recu);
+  };
 
   // Formulaire d'inscription / reinscription (bouton d'en-tete).
   const [formInscription, setFormInscription] = useState(null);
@@ -609,14 +638,25 @@ export default function FraisScolarite({ permissions = [], etablissement = null 
         <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-50 border border-emerald-100 text-sm text-emerald-600 font-medium">
           <CheckCircle2 className="h-4 w-4 shrink-0" />
           {succes}
-          {peutImprimer && dernierRecu && onglet === "suivi" && (
-            <button
-              onClick={() => genererEtImprimerRecu(dernierRecu)}
-              className="ml-auto px-3 py-1 rounded-lg border border-emerald-200 bg-white text-emerald-700 text-xs font-semibold hover:bg-emerald-100 transition-colors cursor-pointer"
-            >
-              Réimprimer le reçu
-            </button>
-          )}
+        </div>
+      )}
+
+      {/* Dernier recu : toujours reimprimable, jusqu'au paiement suivant. */}
+      {peutImprimer && dernierRecu && onglet === "suivi" && (
+        <div className="flex flex-wrap items-center gap-3 px-4 py-2.5 rounded-xl bg-white border border-slate-200 text-sm" style={STYLE_CARTE}>
+          <Printer className="h-4 w-4 shrink-0 text-[#0C447C]" />
+          <span className="text-slate-600">
+            Dernier reçu : <strong className="text-slate-800">{dernierRecu.eleve?.prenom} {dernierRecu.eleve?.nom}</strong>
+            {" · "}<span className="tabular-nums font-semibold">{formaterGNF(dernierRecu.total)}</span>
+            {" · "}{dernierRecu.date}{dernierRecu.heure ? ` à ${String(dernierRecu.heure).slice(0, 5)}` : ""}
+            {dernierRecu.reference ? <span className="text-slate-400"> · {dernierRecu.reference}</span> : null}
+          </span>
+          <button
+            onClick={() => { if (!genererEtImprimerRecu(dernierRecu)) setErreur(MESSAGE_POPUP_BLOQUE); }}
+            className="ml-auto px-3 py-1.5 rounded-lg bg-[#0C447C] hover:bg-[#093663] text-white text-xs font-bold transition-colors cursor-pointer"
+          >
+            Réimprimer le dernier reçu
+          </button>
         </div>
       )}
 
