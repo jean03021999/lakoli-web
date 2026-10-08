@@ -26,6 +26,7 @@ import {
   Building,
   AlertTriangle,
   WifiOff,
+  Lock,
   Receipt,
   BellRing,
   TrendingUp,
@@ -181,7 +182,38 @@ function ContenuSidebar({ modules, estActif, onNaviguer, etablissement, session,
   );
 }
 
-export default function Layout({ children, role, permissions = [], etablissement = null, session = null, utilisateur = null }) {
+// Periode d'essai : rappel pendant les 7 derniers jours, puis lecture seule (le serveur refuse
+// toute ecriture, voir LectureSeuleAbonnement) ; compte suspendu : lecture seule aussi.
+function BandeauAbonnement({ abonnement }) {
+  if (!abonnement) return null;
+  const fin = abonnement.date_fin_essai ? new Date(`${abonnement.date_fin_essai}T00:00:00`).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" }) : "";
+  if (abonnement.lecture_seule) {
+    return (
+      <div className="flex items-start gap-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+        <Lock className="h-4 w-4 mt-0.5 shrink-0" />
+        <p>
+          <strong>{abonnement.statut === "suspendu" ? "Compte suspendu." : `Période d'essai terminée${fin ? ` le ${fin}` : ""}.`}</strong> LAKOLI est en lecture seule : vous pouvez consulter et
+          imprimer vos données, mais plus rien enregistrer. Contactez LAKOLI pour activer votre abonnement.
+        </p>
+      </div>
+    );
+  }
+  if (abonnement.rappel) {
+    const n = abonnement.jours_restants;
+    return (
+      <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+        <Clock className="h-4 w-4 mt-0.5 shrink-0" />
+        <p>
+          <strong>{n === 1 ? "Dernier jour de votre période d'essai." : `Votre période d'essai se termine dans ${n} jours`}</strong>
+          {n === 1 ? "" : ` (le ${fin} inclus)`}. Ensuite, LAKOLI passera en lecture seule : contactez LAKOLI pour activer votre abonnement et continuer à enregistrer.
+        </p>
+      </div>
+    );
+  }
+  return null;
+}
+
+export default function Layout({ children, role, permissions = [], etablissement = null, session = null, utilisateur = null, abonnement = null }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [menuMobileOuvert, setMenuMobileOuvert] = useState(false);
@@ -390,6 +422,7 @@ export default function Layout({ children, role, permissions = [], etablissement
               </p>
             </div>
           )}
+          <BandeauAbonnement abonnement={abonnement} />
           {children}
         </main>
         </div>

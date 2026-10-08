@@ -66,6 +66,8 @@ function AppContent() {
   const [role, setRole] = useState(null);
   const [permissions, setPermissions] = useState([]);
   const [etablissement, setEtablissement] = useState(null);
+  // Periode d'essai : rappel (7 derniers jours) et lecture seule une fois terminee.
+  const [abonnement, setAbonnement] = useState(null);
   const [session, setSession] = useState(null);
   const [utilisateur, setUtilisateur] = useState(null);
   const [chargementRole, setChargementRole] = useState(true);
@@ -91,6 +93,7 @@ function AppContent() {
       setRole(donnees.role);
       setPermissions(donnees.permissions || []);
       setEtablissement(donnees.etablissement || null);
+      setAbonnement(donnees.abonnement || null);
       definirEtablissement(donnees.etablissement);
       setSession(donnees.session || null);
       setUtilisateur(donnees.user || null);
@@ -169,7 +172,7 @@ function AppContent() {
   }
 
   return (
-    <Layout role={role} permissions={permissions} etablissement={etablissement} session={session} utilisateur={utilisateur}>
+    <Layout role={role} permissions={permissions} etablissement={etablissement} session={session} utilisateur={utilisateur} abonnement={abonnement}>
       <Routes>
         <Route path="/tableau-de-bord" element={<TableauDeBord role={role} />} />
         <Route path="/eleves" element={<Eleves permissions={permissions} />} />
