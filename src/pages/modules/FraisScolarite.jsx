@@ -185,10 +185,6 @@ export default function FraisScolarite({ permissions = [], etablissement = null 
   const [paiement, setPaiement] = useState(null);
   // Annulation d'une inscription / reinscription faite par erreur : { frais, motif, envoi, erreur }.
   const [annulInscription, setAnnulInscription] = useState(null);
-  // Remise sur un frais : { fraisId, type: "pourcentage" | "montant", valeur, motif, envoi }.
-  const [remiseForm, setRemiseForm] = useState(null);
-  // Dispense des frais d'inscription : { type: "inscription" | "reinscription", motif, envoi }.
-  const [dispenseForm, setDispenseForm] = useState(null);
 
   const [erreur, setErreur] = useState("");
   const [succes, setSucces] = useState("");
@@ -274,37 +270,6 @@ export default function FraisScolarite({ permissions = [], etablissement = null 
       setGrillesExistantes(res.data);
     } catch (err) {
       setGrillesExistantes([]);
-    }
-  };
-
-  // Remise (ou annulation si payload.type est vide), puis suivi recharge.
-  const envoyerRemise = async (fraisId, payload) => {
-    setErreur(""); setSucces("");
-    setRemiseForm((r) => (r ? { ...r, envoi: true } : r));
-    try {
-      const res = await api.post(`/frais/eleves-frais/${fraisId}/remise`, payload);
-      setSucces(res.data.message);
-      setRemiseForm(null);
-      await chargerSuivi(eleveSelectionne);
-    } catch (err) {
-      setErreur(err.response?.data?.message || "Remise impossible.");
-      setRemiseForm((r) => (r ? { ...r, envoi: false } : r));
-    }
-  };
-
-  const envoyerDispense = async (e) => {
-    e.preventDefault();
-    setErreur(""); setSucces("");
-    setDispenseForm((d) => ({ ...d, envoi: true }));
-    try {
-      const res = await api.post("/frais/dispenser-inscription", { eleve_id: eleveSelectionne, type: dispenseForm.type, motif: dispenseForm.motif.trim() });
-      setSucces(res.data.message);
-      setDispenseForm(null);
-      setEleves((liste) => liste.map((el) => (el.id === eleveSelectionne ? { ...el, inscription_reglee: dispenseForm.type } : el)));
-      await chargerSuivi(eleveSelectionne);
-    } catch (err) {
-      setErreur(err.response?.data?.message || "Dispense impossible.");
-      setDispenseForm((d) => ({ ...d, envoi: false }));
     }
   };
 
@@ -925,43 +890,9 @@ export default function FraisScolarite({ permissions = [], etablissement = null 
                             <UserCheck className="w-3.5 h-3.5" />
                             Réinscrire{libelleMontant(montantGrille(typeReinscription))}
                           </button>
-                          <button
-                            type="button"
-                            onClick={() => setDispenseForm(dispenseForm ? null : { type: estAncien ? "reinscription" : "inscription", motif: "", envoi: false })}
-                            className="px-3 py-2 text-xs font-semibold rounded-xl border border-slate-300 text-slate-600 hover:bg-slate-50 cursor-pointer"
-                            title="Aucun frais d'inscription à payer (ex. enfant du personnel)"
-                          >
-                            Dispenser
-                          </button>
                         </div>
                       )}
                     </div>
-
-                    {dispenseForm && !fraisInscription && (
-                      <form onSubmit={envoyerDispense} className="mt-4 p-4 rounded-xl border border-slate-200 bg-slate-50 space-y-3">
-                        <p className="text-xs font-extrabold text-slate-700 uppercase tracking-wider">Dispense des frais d'inscription</p>
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                          <select value={dispenseForm.type} onChange={(e) => setDispenseForm({ ...dispenseForm, type: e.target.value })} className="bg-white border border-slate-300 rounded-lg px-2 py-2 text-xs font-semibold">
-                            <option value="inscription">Inscription</option>
-                            <option value="reinscription">Réinscription</option>
-                          </select>
-                          <input
-                            value={dispenseForm.motif}
-                            onChange={(e) => setDispenseForm({ ...dispenseForm, motif: e.target.value })}
-                            placeholder="Motif (ex. enfant du personnel)"
-                            aria-label="Motif de la dispense"
-                            className="sm:col-span-2 bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs"
-                            required
-                          />
-                        </div>
-                        <div className="flex justify-end gap-2">
-                          <button type="button" onClick={() => setDispenseForm(null)} className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 border border-slate-200 hover:bg-white cursor-pointer">Annuler</button>
-                          <button type="submit" disabled={dispenseForm.envoi || dispenseForm.motif.trim().length < 3} className="px-4 py-2 bg-[#0C447C] hover:bg-[#093663] text-white text-xs font-bold rounded-xl cursor-pointer disabled:opacity-50">
-                            Confirmer la dispense
-                          </button>
-                        </div>
-                      </form>
-                    )}
 
                     {formInscription && (
                       <form onSubmit={confirmerInscription} className="mt-4 p-4 rounded-xl border border-blue-200 bg-blue-50/50 space-y-4">
@@ -1134,77 +1065,6 @@ export default function FraisScolarite({ permissions = [], etablissement = null 
                           </div>
                           <span className={`inline-block px-3 py-1 rounded-xl text-xs tabular-nums font-bold ${cfg.classe}`}>{formaterGNF(f.montant_total)}</span>
                         </div>
-
-                        {(f.remise_type || (peutInscrire && !f.arriere)) && (
-                          <div className="flex flex-wrap items-center justify-between gap-2 -mt-2 mb-4 text-xs">
-                            {f.remise_type ? (
-                              <span className="px-2.5 py-1 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 font-semibold">
-                                Remise {f.remise_type === "pourcentage" ? `de ${Number(f.remise_valeur)} %` : `de ${formaterGNF(f.remise_valeur)}`}
-                                {" "}({f.motif_remise}) · tarif avant remise {formaterGNF(f.montant_original)}
-                              </span>
-                            ) : (
-                              <span className="text-slate-400">Tarif de la grille</span>
-                            )}
-                            {peutInscrire && !f.arriere && (
-                              f.remise_type ? (
-                                <button type="button" onClick={() => envoyerRemise(f.id, { type: null })} className="font-semibold text-rose-600 hover:underline cursor-pointer">
-                                  Annuler la remise
-                                </button>
-                              ) : (
-                                <button
-                                  type="button"
-                                  onClick={() => setRemiseForm(remiseForm?.fraisId === f.id ? null : { fraisId: f.id, type: "pourcentage", valeur: "", motif: "", envoi: false })}
-                                  className="font-semibold text-[#0C447C] hover:underline cursor-pointer"
-                                >
-                                  Accorder une remise
-                                </button>
-                              )
-                            )}
-                          </div>
-                        )}
-
-                        {remiseForm?.fraisId === f.id && (
-                          <form
-                            onSubmit={(e) => { e.preventDefault(); envoyerRemise(f.id, { type: remiseForm.type, valeur: Number(remiseForm.valeur), motif: remiseForm.motif.trim() }); }}
-                            className="mb-4 p-4 rounded-xl border border-amber-200 bg-amber-50/50 space-y-3"
-                          >
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                              <select value={remiseForm.type} onChange={(e) => setRemiseForm({ ...remiseForm, type: e.target.value })} aria-label="Type de remise" className="bg-white border border-slate-300 rounded-lg px-2 py-2 text-xs font-semibold">
-                                <option value="pourcentage">En pourcentage (50 = demi-tarif)</option>
-                                <option value="montant">En montant (GNF)</option>
-                              </select>
-                              <input
-                                type="number"
-                                min="0"
-                                value={remiseForm.valeur}
-                                onChange={(e) => setRemiseForm({ ...remiseForm, valeur: e.target.value })}
-                                placeholder={remiseForm.type === "pourcentage" ? "ex : 50" : "ex : 450000"}
-                                aria-label="Valeur de la remise"
-                                className="bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs tabular-nums"
-                                required
-                              />
-                              <input
-                                value={remiseForm.motif}
-                                onChange={(e) => setRemiseForm({ ...remiseForm, motif: e.target.value })}
-                                placeholder="Motif (ex. fratrie, enfant du personnel)"
-                                aria-label="Motif de la remise"
-                                className="bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs"
-                                required
-                              />
-                            </div>
-                            <p className="text-[11px] text-slate-500">
-                              {remiseForm.type === "pourcentage"
-                                ? "Chaque échéance est réduite de ce pourcentage."
-                                : "Le montant est retiré des dernières échéances d'abord (les premières restent au tarif normal)."}
-                            </p>
-                            <div className="flex justify-end gap-2">
-                              <button type="button" onClick={() => setRemiseForm(null)} className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 border border-slate-200 hover:bg-white cursor-pointer">Annuler</button>
-                              <button type="submit" disabled={remiseForm.envoi || !(Number(remiseForm.valeur) > 0) || remiseForm.motif.trim().length < 3} className="px-4 py-2 bg-[#0C447C] hover:bg-[#093663] text-white text-xs font-bold rounded-xl cursor-pointer disabled:opacity-50">
-                                Appliquer la remise
-                              </button>
-                            </div>
-                          </form>
-                        )}
 
                         <div className="space-y-3">
                           {f.echeances.map((ech) => {
@@ -1389,7 +1249,6 @@ export default function FraisScolarite({ permissions = [], etablissement = null 
       {onglet === "grilles" && (
         <GrillesTarifaires
           classes={classes}
-          etablissement={etablissement}
           typesFrais={typesFrais}
           grilles={grillesExistantes}
           peutCreer={peutInscrire}

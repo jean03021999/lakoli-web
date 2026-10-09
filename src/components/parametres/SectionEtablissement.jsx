@@ -1,9 +1,8 @@
 import { useRef, useState } from "react";
-import { Building2, GraduationCap, MapPin, Upload, X, Phone, Mail, FileCheck2, Sparkles, CalendarDays } from "lucide-react";
+import { Building2, GraduationCap, MapPin, Upload, X, Phone, Mail, FileCheck2, Sparkles } from "lucide-react";
 import api from "../../services/api";
 import { Carte, Champ, AvecIcone, BoutonEnregistrer, BandeauLectureSeule } from "./ui";
 import { CHAMP, REGIONS_GUINEE, messageErreur } from "./outils";
-import { NOMS_MOIS, MOIS_ANNEE_SCOLAIRE, DECOUPAGE_DEFAUT, lireDecoupage, datesDesMois, anneeScolaireEnCours, libelleDecoupage } from "../frais/decoupage";
 
 const TYPES = [
   { valeur: "ecole_privee", libelle: "Privé", icone: "🏛️" },
@@ -13,7 +12,7 @@ const TYPES = [
 ];
 
 const CYCLES = [
-  { id: "maternelle", libelle: "Maternelle", icone: "🧸", description: "Crèche, petite, moyenne et grande section" },
+  { id: "maternelle", libelle: "Maternelle", icone: "🧸", description: "Petite, moyenne et grande section" },
   { id: "primaire", libelle: "Primaire", icone: "🎒", description: "Du CP1 à la 6e année (CEE)" },
   { id: "college", libelle: "Collège", icone: "📚", description: "De la 7e à la 10e année (BEPC)" },
   { id: "lycee", libelle: "Lycée", icone: "🎓", description: "11e, 12e et Terminale (BAC)" },
@@ -22,20 +21,10 @@ const CYCLES = [
 const CHAMPS_FORMULAIRE = [
   "nom", "sigle", "type", "ville", "quartier", "region", "prefecture", "coordonnees_gps", "adresse",
   "telephone", "telephone_secondaire", "whatsapp_relance", "email", "cycles", "capacite_accueil", "agrement", "slogan",
-  "decoupage_frais",
-];
-
-const MODES = [
-  { id: "trimestriel", libelle: "Trimestres", desc: "3 échéances (40 %, 35 %, 25 %)" },
-  { id: "mensuel", libelle: "Mensualités", desc: "Une échéance par mois choisi" },
-  { id: "libre", libelle: "Libre", desc: "Découpage saisi grille par grille" },
 ];
 
 function versFormulaire(e) {
-  return Object.fromEntries(CHAMPS_FORMULAIRE.map((c) => [
-    c,
-    c === "cycles" ? e[c] || [] : c === "decoupage_frais" ? lireDecoupage(e) : e[c] ?? "",
-  ]));
+  return Object.fromEntries(CHAMPS_FORMULAIRE.map((c) => [c, c === "cycles" ? e[c] || [] : e[c] ?? ""]));
 }
 
 export default function SectionEtablissement({ etablissement, effectif, peutAdministrer, onMaj, onToast }) {
@@ -45,17 +34,6 @@ export default function SectionEtablissement({ etablissement, effectif, peutAdmi
   const lecture = !peutAdministrer;
 
   const maj = (champ, valeur) => setForm((f) => ({ ...f, [champ]: valeur }));
-  const decoupage = form.decoupage_frais || DECOUPAGE_DEFAUT;
-  const majDecoupage = (champs) => maj("decoupage_frais", { ...decoupage, ...champs });
-  // Mois coches, ranges dans l'ordre de paiement : a partir du « premier mois », dans l'ordre du calendrier.
-  const ordonnerMois = (mois, premier) => {
-    const depart = mois.includes(premier) ? premier : mois[0];
-    return [...mois].sort((a, b) => ((a - depart + 12) % 12) - ((b - depart + 12) % 12));
-  };
-  const basculerMois = (m) => {
-    const mois = decoupage.mois.includes(m) ? decoupage.mois.filter((x) => x !== m) : [...decoupage.mois, m];
-    majDecoupage({ mois: ordonnerMois(mois, decoupage.mois[0] ?? m) });
-  };
   const basculerCycle = (id) => maj("cycles", form.cycles.includes(id) ? form.cycles.filter((c) => c !== id) : [...form.cycles, id]);
   const prefectures = REGIONS_GUINEE[form.region] || [];
 
@@ -295,69 +273,6 @@ export default function SectionEtablissement({ etablissement, effectif, peutAdmi
           <Champ libelle={<span className="inline-flex items-center gap-1.5"><Sparkles className="w-3.5 h-3.5 text-amber-500" />Devise / slogan de l'établissement</span>}>
             <textarea rows={2} value={form.slogan} disabled={lecture} onChange={(e) => maj("slogan", e.target.value)} placeholder="Ex : Discipline — Rigueur — Excellence" className={CHAMP} />
           </Champ>
-        </div>
-      </Carte>
-
-      <Carte icone={CalendarDays} titre="Paiement de la scolarité" description="Découpage proposé à la création des grilles tarifaires (chaque grille reste modifiable)">
-        <div className="space-y-5">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-            {MODES.map((m) => {
-              const choisi = decoupage.mode === m.id;
-              return (
-                <button
-                  key={m.id}
-                  type="button"
-                  disabled={lecture}
-                  onClick={() => majDecoupage({ mode: m.id, mois: m.id === "mensuel" && decoupage.mois.length < 2 ? [10, 11, 12, 1, 2, 3, 4, 5, 6] : decoupage.mois })}
-                  className={`p-3 rounded-xl border text-left transition-all disabled:cursor-not-allowed ${choisi ? "border-2 border-[#0C447C] bg-[#0C447C]/5" : "border-slate-200 bg-slate-50 enabled:hover:bg-slate-100 enabled:cursor-pointer"}`}
-                >
-                  <span className={`block text-sm font-bold ${choisi ? "text-[#0C447C]" : "text-slate-800"}`}>{m.libelle}</span>
-                  <span className="text-[11px] text-slate-500">{m.desc}</span>
-                </button>
-              );
-            })}
-          </div>
-
-          {decoupage.mode === "mensuel" && (
-            <>
-              <Champ libelle="Mois payés" aide="Cochez les mois de paiement, y compris ceux réglés avant la rentrée (ex. Mai, Juin).">
-                <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
-                  {MOIS_ANNEE_SCOLAIRE.map((m) => {
-                    const coche = decoupage.mois.includes(m);
-                    return (
-                      <label key={m} className={`flex items-center gap-1.5 px-2.5 py-2 rounded-lg border text-xs font-semibold ${coche ? "border-[#0C447C] bg-[#0C447C]/5 text-[#0C447C]" : "border-slate-200 text-slate-600"} ${lecture ? "" : "cursor-pointer"}`}>
-                        <input type="checkbox" checked={coche} disabled={lecture} onChange={() => basculerMois(m)} className="accent-[#0C447C]" />
-                        {NOMS_MOIS[m - 1]}
-                      </label>
-                    );
-                  })}
-                </div>
-              </Champ>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                <Champ libelle="Premier mois payé de l'année scolaire" aide="Les mois suivants se comptent à partir de celui-ci (ex. Mai : Mai et Juin avant la rentrée, puis Octobre…).">
-                  <select
-                    value={decoupage.mois[0] ?? ""}
-                    disabled={lecture || decoupage.mois.length === 0}
-                    onChange={(e) => majDecoupage({ mois: ordonnerMois(decoupage.mois, Number(e.target.value)) })}
-                    className={CHAMP}
-                  >
-                    {decoupage.mois.map((m) => <option key={m} value={m}>{NOMS_MOIS[m - 1]}</option>)}
-                  </select>
-                </Champ>
-                <Champ libelle="Jour limite de paiement de chaque mois" aide="Au-delà, l'élève passe « En retard ».">
-                  <input type="number" min="1" max="28" value={decoupage.jour_limite} disabled={lecture} onChange={(e) => majDecoupage({ jour_limite: Number(e.target.value) || 10 })} className={CHAMP} />
-                </Champ>
-              </div>
-            </>
-          )}
-
-          <p className="text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2">
-            {libelleDecoupage(decoupage)}
-            {decoupage.mode === "mensuel" && decoupage.mois.length >= 2 && (() => {
-              const dates = datesDesMois(decoupage.mois, anneeScolaireEnCours(), decoupage.jour_limite);
-              return ` — cette année : du ${new Date(`${dates[0]}T00:00:00`).toLocaleDateString("fr-FR")} au ${new Date(`${dates[dates.length - 1]}T00:00:00`).toLocaleDateString("fr-FR")}.`;
-            })()}
-          </p>
         </div>
       </Carte>
 

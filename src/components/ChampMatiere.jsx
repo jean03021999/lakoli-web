@@ -12,7 +12,6 @@ const MATIERES_PAR_NIVEAU = {
 };
 
 const NIVEAU_VERS_CATEGORIE = {
-  "Crèche": "maternelle",
   "Petite Section": "maternelle",
   "Moyenne Section": "maternelle",
   "Grande Section": "maternelle",
@@ -26,14 +25,6 @@ const NIVEAU_VERS_CATEGORIE = {
   "8ème Année": "college",
   "9ème Année": "college",
   "10ème Année": "college",
-  // 11e et 12e : matieres de la serie (comme la Terminale correspondante).
-  "11ème Année - Sciences Mathématiques": "terminale_maths",
-  "11ème Année - Sciences Expérimentales": "terminale_experimentales",
-  "11ème Année - Sciences Sociales": "terminale_sociales",
-  "12ème Année - Sciences Mathématiques": "terminale_maths",
-  "12ème Année - Sciences Expérimentales": "terminale_experimentales",
-  "12ème Année - Sciences Sociales": "terminale_sociales",
-  // Anciens niveaux (classes creees avant les series SM, SE, SS).
   "11ème Année - Série Scientifique": "lycee_scientifique",
   "11ème Année - Série Littéraire": "lycee_litteraire",
   "12ème Année - Série Scientifique": "lycee_scientifique",

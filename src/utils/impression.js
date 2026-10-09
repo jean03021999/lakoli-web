@@ -500,7 +500,6 @@ function etatDepuisLibelle(statut) {
   if (s === "partiel") return { libelle: "Partiel", classe: "etat-partiel" };
   if (s === "en retard") return { libelle: "Échu", classe: "etat-retard" };
   if (s === "non paye") return { libelle: "Non payé", classe: "etat-retard" };
-  if (s === "dispense") return { libelle: "Dispensé", classe: "etat-paye" };
   return { libelle: "À échoir", classe: "etat-echoir" };
 }
 
@@ -640,7 +639,7 @@ export function genererRecuHtml(data) {
     ${situation ? `
     <div class="titre-livre espace">
       <span>Situation globale de l'élève</span>
-      <span class="devise-legale">Scolarité annuelle : ${formaterMontant(situation.totalScolarite)} GNF${situation.remise > 0 ? ` (après remise de ${formaterMontant(situation.remise)} GNF${situation.motifRemise ? ` : ${e(situation.motifRemise)}` : ""})` : ""}</span>
+      <span class="devise-legale">Scolarité annuelle : ${formaterMontant(situation.totalScolarite)} GNF</span>
     </div>
     <table class="livre">
       <thead><tr><th class="num">N°</th><th>Rubrique</th><th>Échéance</th><th class="droite">Exigible</th><th class="droite">Payé</th><th class="droite">Reste</th><th class="centre">État</th></tr></thead>

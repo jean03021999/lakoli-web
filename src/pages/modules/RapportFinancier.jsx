@@ -68,7 +68,7 @@ export default function RapportFinancier({ etablissement = null }) {
     { libelle: "Total encaissé", valeur: formaterGNF(t.entrees), detail: t.dont_reprises > 0 ? `dont ${formaterGNF(t.dont_reprises)} payés avant LAKOLI (hors caisse)` : `Année ${donnees.session.libelle}`, icone: ArrowDownCircle, couleur: "text-emerald-600", fond: "bg-emerald-50", bord: "border-emerald-100" },
     { libelle: "Total des sorties", valeur: formaterGNF(t.salaires + t.depenses), detail: `Salaires ${formaterGNF(t.salaires)} · dépenses ${formaterGNF(t.depenses)}`, icone: ArrowUpCircle, couleur: "text-rose-600", fond: "bg-rose-50", bord: "border-rose-100" },
     { libelle: "Solde de l'année", valeur: formaterGNF(t.solde), detail: "Encaissé − sorties", icone: Wallet, couleur: "text-[#0C447C]", fond: "bg-blue-50", bord: "border-blue-100" },
-    { libelle: "Recouvrement échu", valeur: tauxEchu === null ? "—" : `${tauxEchu} %`, detail: `${formaterGNF(t.recouvre_echu)} sur ${formaterGNF(t.attendu_echu)} attendus à ce jour${t.remises > 0 ? ` · remises accordées : ${formaterGNF(t.remises)} (${t.nombre_remises} élève${t.nombre_remises > 1 ? "s" : ""})` : ""}`, icone: Target, couleur: "text-amber-700", fond: "bg-amber-50", bord: "border-amber-100" },
+    { libelle: "Recouvrement échu", valeur: tauxEchu === null ? "—" : `${tauxEchu} %`, detail: `${formaterGNF(t.recouvre_echu)} sur ${formaterGNF(t.attendu_echu)} attendus à ce jour`, icone: Target, couleur: "text-amber-700", fond: "bg-amber-50", bord: "border-amber-100" },
   ] : [];
 
   return (
