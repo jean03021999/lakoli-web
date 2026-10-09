@@ -4,6 +4,7 @@ import api from "../../services/api";
 import AvatarUtilisateur from "../AvatarUtilisateur";
 import { Carte } from "./ui";
 import { ModaleUtilisateur, ModaleMotDePasse } from "./ModalesUtilisateur";
+import ModaleRole, { MODULES } from "./ModaleRole";
 import { LIBELLES_ROLES, momentRelatif, messageErreur } from "./outils";
 
 const STYLES_ROLES = {
@@ -15,19 +16,14 @@ const STYLES_ROLES = {
 };
 const COULEURS_AVATAR = ["bg-blue-600", "bg-emerald-600", "bg-amber-600", "bg-indigo-600", "bg-purple-600", "bg-sky-700", "bg-rose-600"];
 
-// Libelles des modules de permissions (colonne permissions.module).
-const MODULES = {
-  eleves: "Élèves", enseignants: "Enseignants", matieres: "Matières", classes: "Classes", affectations: "Affectations",
-  emploi_du_temps: "Emploi du temps", periodes: "Périodes", notes: "Notes", bulletins: "Bulletins", frais: "Frais & caisse", abonnement: "Abonnement",
-};
-
 function libelleRole(nom) {
   return LIBELLES_ROLES[String(nom || "").toUpperCase()] || nom;
 }
 
 // Utilisateurs de l'etablissement (GET /utilisateurs) et roles avec leurs permissions reelles. La
 // direction peut ajouter, modifier, suspendre un compte et generer un mot de passe provisoire.
-export default function SectionUtilisateurs({ roles, peutAdministrer = false, onToast = () => {} }) {
+// peutGererRoles (droit roles.gerer) : creer un role, modifier ses droits ou le supprimer.
+export default function SectionUtilisateurs({ roles, peutAdministrer = false, peutGererRoles = false, onRolesModifies = () => {}, onToast = () => {} }) {
   const [utilisateurs, setUtilisateurs] = useState(null);
   const [erreur, setErreur] = useState("");
   const [recherche, setRecherche] = useState("");
@@ -37,6 +33,7 @@ export default function SectionUtilisateurs({ roles, peutAdministrer = false, on
   const [motDePasse, setMotDePasse] = useState(null); // { nom, email, motDePasse }
   const [enCours, setEnCours] = useState(null);
   const [rechargement, setRechargement] = useState(0);
+  const [roleEdite, setRoleEdite] = useState(null); // { role } (role null = nouveau role)
 
   useEffect(() => {
     api.get("/utilisateurs")
@@ -205,7 +202,23 @@ export default function SectionUtilisateurs({ roles, peutAdministrer = false, on
         </div>
       </Carte>
 
-      <Carte icone={ShieldCheck} titre="Rôles et permissions" description="Droits d'accès réellement accordés à chaque rôle de l'établissement">
+      <Carte
+        icone={ShieldCheck}
+        titre="Rôles et permissions"
+        description="Droits d'accès réellement accordés à chaque rôle de l'établissement"
+        action={
+          peutGererRoles && (
+            <button
+              type="button"
+              onClick={() => setRoleEdite({ role: null })}
+              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[#0C447C] text-white text-xs font-bold shadow-md hover:brightness-110 cursor-pointer shrink-0"
+            >
+              <ShieldCheck className="w-4 h-4" />
+              Nouveau rôle
+            </button>
+          )
+        }
+      >
         <div className="space-y-3">
           {roles.map((role) => {
             const ouvert = roleOuvert === role.id;
@@ -233,6 +246,17 @@ export default function SectionUtilisateurs({ roles, peutAdministrer = false, on
                 </button>
                 {ouvert && (
                   <div className="p-5 bg-white border-t border-slate-100 space-y-4">
+                    {peutGererRoles && (
+                      <div className="flex justify-end">
+                        <button
+                          type="button"
+                          onClick={() => setRoleEdite({ role })}
+                          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-[#0C447C] text-[#0C447C] text-xs font-bold hover:bg-[#0C447C]/5 cursor-pointer"
+                        >
+                          <Pencil className="w-3.5 h-3.5" /> Modifier les droits
+                        </button>
+                      </div>
+                    )}
                     {role.permissions.length === 0 && <p className="text-xs text-slate-400 italic">Aucune permission accordée à ce rôle.</p>}
                     {Object.entries(parModule).map(([module, permissions]) => (
                       <div key={module} className="space-y-2">
@@ -276,6 +300,18 @@ export default function SectionUtilisateurs({ roles, peutAdministrer = false, on
         />
       )}
       {motDePasse && <ModaleMotDePasse {...motDePasse} onFermer={() => setMotDePasse(null)} />}
+      {roleEdite && (
+        <ModaleRole
+          role={roleEdite.role}
+          onFermer={() => setRoleEdite(null)}
+          onEnregistre={(message) => {
+            setRoleEdite(null);
+            onToast("Rôles mis à jour", message);
+            onRolesModifies();
+            setRechargement((n) => n + 1);
+          }}
+        />
+      )}
     </div>
   );
 }

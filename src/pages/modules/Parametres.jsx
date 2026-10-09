@@ -57,6 +57,9 @@ export default function Parametres({ permissions = [], onUtilisateurMaj, onEtabl
   };
 
   const maj = (cle, valeur) => setDonnees((d) => ({ ...d, [cle]: typeof valeur === "function" ? valeur(d[cle]) : valeur }));
+  // Roles modifies (creation, droits, suppression) : liste des roles et droits rechargee.
+  const rechargerRoles = () =>
+    api.get("/parametres").then((res) => setDonnees((d) => ({ ...d, roles: res.data.roles, droits: res.data.droits }))).catch(() => {});
 
   if (erreur) {
     return <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{erreur}</div>;
@@ -154,7 +157,9 @@ export default function Parametres({ permissions = [], onUtilisateurMaj, onEtabl
                 <p className="text-xs font-semibold text-slate-700">Connecté à {etablissement.nom}</p>
               </div>
               <p className="text-[11px] text-slate-500 leading-relaxed">
-                {donnees.peut_administrer ? "Vous pouvez modifier la fiche de l'établissement et les sessions." : "La fiche de l'établissement et les sessions sont gérées par la direction."}
+                {donnees.droits?.etablissement || donnees.droits?.sessions
+                  ? "Votre rôle vous permet de modifier des paramètres de l'établissement."
+                  : "La fiche de l'établissement et les sessions sont gérées par les rôles qui en ont le droit."}
               </p>
             </div>
           </div>
@@ -166,7 +171,7 @@ export default function Parametres({ permissions = [], onUtilisateurMaj, onEtabl
             <SectionEtablissement
               etablissement={etablissement}
               effectif={donnees.consommation.eleves}
-              peutAdministrer={donnees.peut_administrer}
+              peutAdministrer={!!donnees.droits?.etablissement}
               onToast={toast}
               onMaj={(e) => {
                 maj("etablissement", e);
@@ -185,11 +190,19 @@ export default function Parametres({ permissions = [], onUtilisateurMaj, onEtabl
             />
           )}
           {section === "securite" && <SectionSecurite securite={donnees.securite} email={donnees.profil.email} onToast={toast} onMaj={(s) => maj("securite", s)} />}
-          {section === "utilisateurs" && <SectionUtilisateurs roles={donnees.roles} peutAdministrer={donnees.peut_administrer} onToast={toast} />}
+          {section === "utilisateurs" && (
+            <SectionUtilisateurs
+              roles={donnees.roles}
+              peutAdministrer={!!donnees.droits?.utilisateurs}
+              peutGererRoles={!!donnees.droits?.roles}
+              onRolesModifies={rechargerRoles}
+              onToast={toast}
+            />
+          )}
           {section === "session" && (
             <SectionSessions
               sessions={donnees.sessions}
-              peutAdministrer={donnees.peut_administrer}
+              peutAdministrer={!!donnees.droits?.sessions}
               onToast={toast}
               onMaj={(sessions, nouvelleActive) => {
                 maj("sessions", sessions);
