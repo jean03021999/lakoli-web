@@ -12,6 +12,7 @@ const MATIERES_PAR_NIVEAU = {
 };
 
 const NIVEAU_VERS_CATEGORIE = {
+  "Crèche": "maternelle",
   "Petite Section": "maternelle",
   "Moyenne Section": "maternelle",
   "Grande Section": "maternelle",

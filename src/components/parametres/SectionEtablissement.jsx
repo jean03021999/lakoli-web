@@ -12,7 +12,7 @@ const TYPES = [
 ];
 
 const CYCLES = [
-  { id: "maternelle", libelle: "Maternelle", icone: "🧸", description: "Petite, moyenne et grande section" },
+  { id: "maternelle", libelle: "Maternelle", icone: "🧸", description: "Crèche, petite, moyenne et grande section" },
   { id: "primaire", libelle: "Primaire", icone: "🎒", description: "Du CP1 à la 6e année (CEE)" },
   { id: "college", libelle: "Collège", icone: "📚", description: "De la 7e à la 10e année (BEPC)" },
   { id: "lycee", libelle: "Lycée", icone: "🎓", description: "11e, 12e et Terminale (BAC)" },
