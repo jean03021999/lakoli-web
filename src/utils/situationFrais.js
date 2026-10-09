@@ -12,9 +12,11 @@ function normaliser(texte) {
 export function situationGlobaleDepuisSuivi(suivi) {
   if (!suivi) return null;
 
-  const echeancesScolarite = (suivi.frais || [])
-    .filter((f) => normaliser(f.type_frais).startsWith("scolarit"))
-    .flatMap((f) => f.echeances);
+  const fraisScolarite = (suivi.frais || []).filter((f) => normaliser(f.type_frais).startsWith("scolarit"));
+  const echeancesScolarite = fraisScolarite.flatMap((f) => f.echeances);
+  // Remise accordee sur la scolarite (deja deduite des echeances) et son motif.
+  const remise = fraisScolarite.filter((f) => f.remise_type).reduce((s, f) => s + Math.max(0, Number(f.montant_original) - Number(f.montant_total)), 0);
+  const motifRemise = fraisScolarite.filter((f) => f.remise_type).map((f) => f.motif_remise).filter(Boolean).join(", ");
   const totalScolarite = echeancesScolarite.reduce((s, e) => s + Number(e.montant), 0);
   const totalPaye = echeancesScolarite.reduce((s, e) => s + Number(e.montant_paye), 0);
   const echeances = echeancesScolarite.map((e) => ({
@@ -33,10 +35,13 @@ export function situationGlobaleDepuisSuivi(suivi) {
         libelle: fraisInscription.type_frais,
         montant: Number(echInscription?.montant || 0),
         montant_paye: Number(echInscription?.montant_paye || 0),
+        // Dispense : frais ramenes a 0 par une remise de 100 %.
         statut:
-          Number(echInscription?.montant_paye || 0) > 0 && Number(echInscription?.montant_paye || 0) >= Number(echInscription?.montant || 0)
-            ? "Payé"
-            : "Non payé",
+          fraisInscription.remise_type && Number(fraisInscription.montant_total) === 0
+            ? "Dispensé"
+            : Number(echInscription?.montant_paye || 0) > 0 && Number(echInscription?.montant_paye || 0) >= Number(echInscription?.montant || 0)
+              ? "Payé"
+              : "Non payé",
       }
     : null;
 
@@ -44,6 +49,8 @@ export function situationGlobaleDepuisSuivi(suivi) {
     totalScolarite,
     totalPaye,
     resteGlobal: totalScolarite - totalPaye,
+    remise,
+    motifRemise,
     echeances,
     inscription,
   };
