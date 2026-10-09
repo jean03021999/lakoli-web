@@ -341,6 +341,11 @@ export default function ImporterExcel() {
                 {resultat.stats.frais_payes ?? 0} frais d'inscription payé(s)
                 {resultat.stats.montant_frais_payes > 0 && ` · ${Number(resultat.stats.montant_frais_payes).toLocaleString("fr-FR")} GNF`}
               </span>
+              {resultat.stats.sans_date > 0 && (
+                <span className="px-3 py-1.5 rounded-full bg-amber-50 text-amber-800 font-bold">
+                  {resultat.stats.sans_date} fiche(s) sans date de naissance, à compléter ensuite (Gestion des élèves, filtre « Fiches à compléter »)
+                </span>
+              )}
               {resultat.stats.scolarites_payees > 0 && (
                 <span className="px-3 py-1.5 rounded-full bg-teal-50 text-teal-700 font-bold">
                   {resultat.stats.scolarites_payees} scolarité(s) déjà payée(s) · {Number(resultat.stats.montant_scolarite_payee).toLocaleString("fr-FR")} GNF

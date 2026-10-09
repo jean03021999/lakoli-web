@@ -33,12 +33,15 @@ const LIBELLES_FILTRE_STATUT = {
   partiel: "Partiel",
   a_echoir: "À échoir",
   en_retard: "En retard",
+  fiche_incomplete: "Fiche à compléter",
 };
 
-function correspondStatut(statutEleve, filtre) {
+// « fiche_incomplete » : eleves sans date de naissance (import d'un registre sans dates), a completer.
+function correspondStatut(eleve, filtre) {
   if (filtre === "all") return true;
-  if (filtre === "non_a_jour") return statutEleve !== "a_jour";
-  return statutEleve === filtre;
+  if (filtre === "fiche_incomplete") return !!eleve.fiche_incomplete;
+  if (filtre === "non_a_jour") return eleve.statut_paiement !== "a_jour";
+  return eleve.statut_paiement === filtre;
 }
 
 // Minuscules et sans accents, pour que "aminata" trouve "Aminata" et "hélène" trouve "Helene".
@@ -140,7 +143,7 @@ export default function Eleves({ permissions = [] }) {
   const termes = normaliser(recherche).split(/\s+/).filter(Boolean);
   const elevesFiltres = eleves.filter((e) => {
     const matchClasse = classeFiltre === "all" || e.classe === classeFiltre;
-    const matchStatut = correspondStatut(e.statut_paiement, statutFiltre);
+    const matchStatut = correspondStatut(e, statutFiltre);
     const cible = normaliser(`${e.nom} ${e.prenom} ${e.matricule}`);
     const matchRecherche = termes.every((t) => cible.includes(t));
     return matchClasse && matchStatut && matchRecherche;
@@ -156,7 +159,7 @@ export default function Eleves({ permissions = [] }) {
     const classes = nomsClasses
       .map((nom) => ({
         nom,
-        eleves: eleves.filter((e) => e.classe === nom && correspondStatut(e.statut_paiement, statutFiltre)),
+        eleves: eleves.filter((e) => e.classe === nom && correspondStatut(e, statutFiltre)),
       }))
       .filter((c) => c.eleves.length > 0);
     if (classes.length === 0) {
@@ -319,6 +322,9 @@ export default function Eleves({ permissions = [] }) {
           <option value="partiel">Partiel</option>
           <option value="a_echoir">À échoir</option>
           <option value="en_retard">En retard</option>
+          {eleves.some((e) => e.fiche_incomplete) && (
+            <option value="fiche_incomplete">Fiches à compléter ({eleves.filter((e) => e.fiche_incomplete).length})</option>
+          )}
         </select>
 
         <button
