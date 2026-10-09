@@ -265,7 +265,8 @@ const STYLES = `
   .doc-releve .resume-classe { display: flex; gap: 24px; font-size: 12px; color: #475569; margin: 14px 0; }
   .doc-releve .resume-classe strong { color: #0C447C; font-size: 14px; }
   table.tableau-premium td.num { width: 36px; text-align: center; color: #64748b; }
-  table.tableau-premium td.mono { font-family: "Courier New", monospace; font-size: 12px; }
+  /* Montants : police nette, chiffres alignes, en gras (et non plus Courier, fin et peu lisible). */
+  table.tableau-premium td.mono { font-family: "Segoe UI", Arial, Helvetica, sans-serif; font-variant-numeric: tabular-nums; white-space: nowrap; font-size: 12.5px; font-weight: 600; }
 
   /* Rapport comptable : titres de section, tuiles d'indicateurs, tableaux compacts. */
   .doc-releve.rapport h2.section {
@@ -308,6 +309,8 @@ const STYLES = `
   .releve-a4 .coin.bg { bottom: -5px; left: -5px; border-bottom-width: 2px; border-left-width: 2px; }
   .releve-a4 .coin.bd { bottom: -5px; right: -5px; border-bottom-width: 2px; border-right-width: 2px; }
   .releve-a4 .mono { font-family: "Courier New", monospace; }
+  /* Montants des tableaux : police nette, chiffres alignes, en gras. */
+  .releve-a4 td.mono { font-family: "Segoe UI", Arial, Helvetica, sans-serif; font-variant-numeric: tabular-nums; white-space: nowrap; font-size: 10.5px; font-weight: 700; }
   .releve-a4 .bleu { color: #0C447C; }
   .releve-a4 .vert { color: #047857; }
   .releve-a4 .maj { text-transform: uppercase; }
@@ -365,7 +368,7 @@ const STYLES = `
   .releve-a4 .pastille.rouge { background: #ffe4e6; color: #9f1239; border-color: #fda4af; }
 
   .releve-a4 .titre-livre { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; font-size: 10.5px; font-weight: 800; text-transform: uppercase; color: #0C447C; }
-  .releve-a4 .titre-livre .devise-legale { font-family: "Courier New", monospace; font-size: 8px; font-weight: normal; text-transform: none; color: #64748b; }
+  .releve-a4 .titre-livre .devise-legale { font-family: "Segoe UI", Arial, Helvetica, sans-serif; font-variant-numeric: tabular-nums; white-space: nowrap; font-size: 9px; font-weight: 600; text-transform: none; color: #475569; }
   .releve-a4 table.livre { width: 100%; border-collapse: collapse; font-size: 9.5px; border: 1px solid #cbd5e1; }
   .releve-a4 table.livre th { background: #0C447C; color: #fff; padding: 5px 5px; font-size: 8px; text-transform: uppercase; text-align: left; }
   .releve-a4 table.livre th.droite { text-align: right; }
@@ -656,6 +659,7 @@ export function genererRecuHtml(data) {
         <!-- Reçu : seule la signature du comptable est requise. -->
         <span class="role">Le Comptable</span>
         <span class="note">${etablissement.ville ? `${echapperHtml(etablissement.ville)}, le ` : "Le "}${e(data.date)} — signature et cachet</span>
+        ${etablissement.whatsapp_relance ? `<span class="note">Tél. comptabilité : ${echapperHtml(formaterTelephone(etablissement.whatsapp_relance))}</span>` : ""}
         <span class="ligne-sig"></span>
       </div>
     </div>
@@ -900,6 +904,7 @@ export function genererReleveHtml({ etablissement: etablissementFourni = {}, ele
       <div class="sig">
         <span class="role">Le Comptable / Caissier</span>
         <span class="note">Vu et certifié conforme à la caisse</span>
+        ${etablissement.whatsapp_relance ? `<span class="note">Tél. comptabilité : ${echapperHtml(formaterTelephone(etablissement.whatsapp_relance))}</span>` : ""}
         <span class="ligne-sig"></span>
       </div>
       <div class="sig centre">
@@ -2026,6 +2031,7 @@ export function genererEtImprimerFichePaie(salaire, fenetrePreouverte) {
     body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 12px; color: #1e293b; background: #f1f5f9; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     .doc { max-width: 760px; margin: 20px auto; background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 40px rgba(0,0,0,0.15); border: 1px solid #e2e8f0; }
     .mono { font-family: Consolas, 'Courier New', monospace; }
+    td.mono, .mono.montant { font-family: "Segoe UI", Arial, sans-serif; font-variant-numeric: tabular-nums; font-weight: 600; }
     .header { position: relative; background: #0C447C; color: white; padding: 24px 28px 22px; display: flex; justify-content: space-between; align-items: center; gap: 16px; }
     .header::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 4px; background: linear-gradient(to right, #0C447C, #10b981); }
     .marque { display: flex; align-items: center; gap: 12px; }
@@ -2056,7 +2062,7 @@ export function genererEtImprimerFichePaie(salaire, fenetrePreouverte) {
     .ligne { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 6px 12px; border-radius: 8px; }
     .ligne-titre { font-size: 13px; font-weight: 600; color: #1e293b; }
     .ligne-detail { font-size: 11px; color: #64748b; margin-top: 1px; }
-    .mt { font-family: Consolas, 'Courier New', monospace; font-size: 14px; font-weight: 700; color: #0f172a; white-space: nowrap; }
+    .mt { font-family: "Segoe UI", Arial, sans-serif; font-variant-numeric: tabular-nums; font-size: 14px; font-weight: 700; color: #0f172a; white-space: nowrap; }
     .pointille { border-top: 1px dashed #cbd5e1; margin: 8px 0; }
     .ligne.supp { background: #ecfdf5; border: 1px solid #d1fae5; padding: 8px 12px; }
     .ligne.supp .ligne-titre { color: #065f46; }
@@ -2065,7 +2071,7 @@ export function genererEtImprimerFichePaie(salaire, fenetrePreouverte) {
     .separateur { border-top: 2px solid #e2e8f0; margin: 12px 0; }
     .total { background: #ecfdf5; border: 2px solid #a7f3d0; border-radius: 12px; padding: 14px 16px; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
     .total-libelle { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #065f46; }
-    .total-montant { font-family: Consolas, 'Courier New', monospace; font-size: 28px; font-weight: 800; color: #047857; margin-top: 2px; }
+    .total-montant { font-family: "Segoe UI", Arial, sans-serif; font-variant-numeric: tabular-nums; font-size: 28px; font-weight: 800; color: #047857; margin-top: 2px; }
     .statut { display: inline-block; padding: 6px 12px; border-radius: 999px; font-size: 11px; font-weight: 700; white-space: nowrap; }
     .statut.paye { background: #dcfce7; color: #15803d; border: 1px solid #86efac; }
     .statut.attente { background: #fef9c3; color: #a16207; border: 1px solid #fcd34d; }

@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import useActualisation from "../../hooks/useActualisation";
 import { useNavigate } from "react-router-dom";
 import {
   GraduationCap,
@@ -332,6 +333,8 @@ function TableauDeBordComptable({ role }) {
   const [versementsDemo, setVersementsDemo] = useState(false);
   const [dateMaj, setDateMaj] = useState(null);
   const [rafraichissement, setRafraichissement] = useState(0);
+  const actualisation = useActualisation();
+  const derniereActualisation = useRef(actualisation);
   const [enChargement, setEnChargement] = useState(true);
   const [etablissement, setEtablissement] = useState("");
   const [elevesSession, setElevesSession] = useState("");
@@ -350,8 +353,11 @@ function TableauDeBordComptable({ role }) {
   const [inscriptionsDisponibles, setInscriptionsDisponibles] = useState(true);
 
   useEffect(() => {
+    // Actualisation automatique : en silence (pas de sablier).
+    const silencieux = derniereActualisation.current !== actualisation;
+    derniereActualisation.current = actualisation;
     async function charger() {
-      setEnChargement(true);
+      if (!silencieux) setEnChargement(true);
       const [eleves, paiements, parClasse, recents, caisse, sorties] = await Promise.allSettled([
         api.get("/eleves"),
         api.get("/frais/paiements"),
@@ -440,7 +446,8 @@ function TableauDeBordComptable({ role }) {
       setEnChargement(false);
     }
     charger();
-  }, [rafraichissement]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rafraichissement, actualisation]);
 
   const enRetard = typeof stats.enRetard === "number" ? stats.enRetard : 0;
   const totalEleves = typeof stats.totalEleves === "number" ? stats.totalEleves : 0;
@@ -1078,6 +1085,7 @@ function TableauDeBordComptable({ role }) {
 
 function TableauDeBordGenerique({ role }) {
   const navigate = useNavigate();
+  const actualisation = useActualisation();
 
   const [stats, setStats] = useState({
     totalEleves: "—",
@@ -1156,7 +1164,7 @@ function TableauDeBordGenerique({ role }) {
       }
     }
     charger();
-  }, []);
+  }, [actualisation]);
 
   // Poids de chaque catégorie de frais dans le total, pour les barres de progression
   const totalFinances = finances.inscriptions + finances.reinscriptions + finances.scolarite + finances.autres;

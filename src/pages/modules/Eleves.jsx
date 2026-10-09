@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import useActualisation from "../../hooks/useActualisation";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import api from "../../services/api";
 import {
@@ -96,9 +97,12 @@ export default function Eleves({ permissions = [] }) {
   const [impressionEnCours, setImpressionEnCours] = useState(null);
   const navigate = useNavigate();
 
-  const chargerEleves = async () => {
-    setChargement(true);
-    setErreur("");
+  // silencieux : actualisation automatique, sans sablier ni message efface.
+  const chargerEleves = async (silencieux = false) => {
+    if (!silencieux) {
+      setChargement(true);
+      setErreur("");
+    }
     try {
       // Liste complete : la recherche, la classe et le statut filtrent ensuite cote client.
       const response = await api.get("/eleves");
@@ -106,11 +110,17 @@ export default function Eleves({ permissions = [] }) {
       setStats(response.data.stats);
       setEtablissement(response.data.etablissement || "");
     } catch (err) {
-      setErreur(err.response?.data?.message || "Impossible de charger les élèves.");
+      if (!silencieux) setErreur(err.response?.data?.message || "Impossible de charger les élèves.");
     } finally {
       setChargement(false);
     }
   };
+
+  const actualisation = useActualisation();
+  useEffect(() => {
+    if (actualisation > 0) chargerEleves(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [actualisation]);
 
   useEffect(() => {
     chargerEleves();

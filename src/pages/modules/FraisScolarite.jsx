@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import useActualisation from "../../hooks/useActualisation";
 import { useLocation, useNavigate } from "react-router-dom";
 import api from "../../services/api";
 import {
@@ -208,7 +209,12 @@ export default function FraisScolarite({ permissions = [], etablissement = null 
 
   // Les eleves ne sont charges que pour la classe choisie, ou pour toute l'ecole sur demande
   // ("Toutes les classes").
+  const actualisation = useActualisation();
+  const derniereActualisation = useRef(actualisation);
   useEffect(() => {
+    // Actualisation automatique : liste rechargee en silence (sans sablier ni message efface).
+    const silencieux = derniereActualisation.current !== actualisation;
+    derniereActualisation.current = actualisation;
     if (!classeId) {
       setEleves([]);
       setChargementEleves(false);
@@ -216,15 +222,17 @@ export default function FraisScolarite({ permissions = [], etablissement = null 
     }
 
     let annule = false;
-    setChargementEleves(true);
-    setErreur("");
+    if (!silencieux) {
+      setChargementEleves(true);
+      setErreur("");
+    }
     api
       .get("/eleves", { params: classeId === "tous" ? {} : { classe_id: classeId } })
       .then((res) => {
         if (!annule) setEleves(res.data.eleves);
       })
       .catch(() => {
-        if (!annule) {
+        if (!annule && !silencieux) {
           setEleves([]);
           setErreur("Impossible de charger les élèves de cette classe.");
         }
@@ -237,7 +245,14 @@ export default function FraisScolarite({ permissions = [], etablissement = null 
     return () => {
       annule = true;
     };
-  }, [classeId]);
+  }, [classeId, actualisation]);
+
+  // Fiche de l'eleve ouvert : ses frais et paiements suivent aussi (paiement saisi ailleurs).
+  useEffect(() => {
+    if (actualisation === 0 || !eleveSelectionne) return;
+    api.get(`/frais/eleves/${eleveSelectionne}`).then((res) => setSuivi(res.data)).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [actualisation]);
 
   // Declare apres le chargement des eleves : la liste part en premier vers le serveur, qui traite
   // les requetes une par une (php artisan serve).

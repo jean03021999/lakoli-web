@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import useActualisation from "../../hooks/useActualisation";
 import { useSearchParams } from "react-router-dom";
 import {
   Plus, Search, X, Loader2, Ban, AlertTriangle, Paperclip, FileText, Image as ImageIcon, Trash2, Pencil,
@@ -214,6 +215,7 @@ export default function Depenses({ etablissement = null, permissions = [] }) {
   const [motif, setMotif] = useState("");
   const [annulation, setAnnulation] = useState({ envoi: false, erreur: "" });
 
+  const actualisation = useActualisation();
   const idOuvert = Number(params.get("depense")) || null;
   const ouverte = depenses.find((d) => d.id === idOuvert) || null;
   const ouvrir = (id) => setParams((p) => { const n = new URLSearchParams(p); if (id) n.set("depense", id); else n.delete("depense"); return n; }, { replace: true });
@@ -233,7 +235,7 @@ export default function Depenses({ etablissement = null, permissions = [] }) {
       setChargement(false);
     });
     return () => { annule = true; };
-  }, [rechargement]);
+  }, [rechargement, actualisation]);
 
   const termes = normaliser(recherche).split(/\s+/).filter(Boolean);
   const affichees = useMemo(

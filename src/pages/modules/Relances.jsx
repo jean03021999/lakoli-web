@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import useActualisation from "../../hooks/useActualisation";
 import { Search, Printer, MessageCircle, Phone, CheckCheck, X, AlertTriangle, Clock, BellRing, Users, Loader2, History } from "lucide-react";
 import api from "../../services/api";
 import { STYLE_CARTE, formaterGNF, formaterDateCourte, normaliser, telechargerCsv } from "../../components/frais/configFrais";
@@ -80,9 +81,14 @@ export default function Relances({ etablissement = null, permissions = [] }) {
     api.get("/classes").then((res) => setToutesClasses(res.data)).catch(() => setToutesClasses([]));
   }, []);
 
+  const actualisation = useActualisation();
+  const derniereActualisation = useRef(actualisation);
   useEffect(() => {
     let annule = false;
-    setChargement(true);
+    // Actualisation automatique : en silence.
+    const silencieux = derniereActualisation.current !== actualisation;
+    derniereActualisation.current = actualisation;
+    if (!silencieux) setChargement(true);
     api.get("/frais/relances", { params: { horizon } })
       .then((res) => {
         if (annule) return;
@@ -91,10 +97,10 @@ export default function Relances({ etablissement = null, permissions = [] }) {
         // Premier affichage : l'onglet qui a du contenu.
         setOnglet((o) => (o === "retard" && !res.data.lignes.some((l) => l.motif === "retard") && res.data.lignes.some((l) => l.motif === "rappel") ? "rappel" : o));
       })
-      .catch((err) => { if (!annule) setErreur(messageErreurApi(err, "Impossible de charger les relances.")); })
+      .catch((err) => { if (!annule && !silencieux) setErreur(messageErreurApi(err, "Impossible de charger les relances.")); })
       .finally(() => { if (!annule) setChargement(false); });
     return () => { annule = true; };
-  }, [horizon, rechargement]);
+  }, [horizon, rechargement, actualisation]);
 
   const lignes = donnees.lignes;
   const enRetard = lignes.filter((l) => l.motif === "retard");

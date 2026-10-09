@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import useActualisation from "../../hooks/useActualisation";
 import api from "../../services/api";
 import { FileSpreadsheet, FileText, Search, Printer, ChevronLeft, ChevronRight, X, Ban, AlertTriangle, Loader2 } from "lucide-react";
 import { regrouperVersements } from "../../utils/versements";
@@ -59,6 +60,7 @@ export default function PaiementsCaisse({ etablissement = null, permissions = []
   const [annulation, setAnnulation] = useState({ envoi: false, erreur: "" });
   const [succes, setSucces] = useState("");
   const [rechargement, setRechargement] = useState(0);
+  const actualisation = useActualisation();
   const [onglet, setOnglet] = useState(() => new URLSearchParams(window.location.search).get("onglet") || "encaissements");
   const [synthese, setSynthese] = useState(null);
   const [sortiesCaisse, setSortiesCaisse] = useState(null);
@@ -70,14 +72,14 @@ export default function PaiementsCaisse({ etablissement = null, permissions = []
       .then((res) => setVersements(regrouperVersements(res.data)))
       .catch(() => setErreur("Impossible de charger le journal de caisse."))
       .finally(() => setChargement(false));
-  }, [rechargement]);
+  }, [rechargement, actualisation]);
 
   // Solde de caisse : encaissements - salaires verses - depenses (rafraichi apres chaque changement).
   useEffect(() => {
     api.get("/caisse/synthese").then((res) => setSynthese(res.data)).catch(() => setSynthese(null));
     // Sorties detaillees pour le journal imprime (depenses a justifier, dernieres sorties).
     api.get("/caisse/sorties").then((res) => setSortiesCaisse(res.data)).catch(() => setSortiesCaisse(null));
-  }, [rechargement]);
+  }, [rechargement, actualisation]);
 
   // Annulation d'un versement (tous ses paiements), motif obligatoire ; il reste visible, barre.
   const annuler = async () => {
