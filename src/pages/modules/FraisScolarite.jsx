@@ -1249,6 +1249,7 @@ export default function FraisScolarite({ permissions = [], etablissement = null 
       {onglet === "grilles" && (
         <GrillesTarifaires
           classes={classes}
+          etablissement={etablissement}
           typesFrais={typesFrais}
           grilles={grillesExistantes}
           peutCreer={peutInscrire}

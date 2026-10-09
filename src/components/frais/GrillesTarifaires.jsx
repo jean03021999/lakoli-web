@@ -4,6 +4,7 @@ import { Plus, RefreshCw, Layers, SlidersHorizontal, Trash2, Tag, Pencil, Settin
 import { STYLE_CARTE, configTypeFrais, formaterGNF, formaterDateCourte, normaliser } from "./configFrais";
 import ModaleGrille from "./ModaleGrille";
 import ModaleTypesFrais from "./ModaleTypesFrais";
+import { lireDecoupage, echeancesModele, libelleDecoupage } from "./decoupage";
 
 // Onglet "Grilles tarifaires" (design "Frais de scolarite & facturation") : creation a gauche,
 // grilles existantes regroupees par classe a droite. Donnees reelles de /frais/grilles.
@@ -23,30 +24,17 @@ function estParEleve(nomType) {
   return ["inscription", "reinscription"].includes(normaliser(nomType));
 }
 
-const ECHEANCES_DEFAUT = [
-  { libelle: "Trimestre 1", pourcentage: 40, date_limite: "" },
-  { libelle: "Trimestre 2", pourcentage: 35, date_limite: "" },
-  { libelle: "Trimestre 3", pourcentage: 25, date_limite: "" },
-];
-
-// Montant de chaque echeance d'apres son pourcentage ; la derniere prend l'arrondi pour que la
-// somme soit exactement le montant annuel.
-function repartir(montant, echeances) {
-  let cumul = 0;
-  return echeances.map((e, i) => {
-    const m = i === echeances.length - 1 ? montant - cumul : Math.round((montant * (Number(e.pourcentage) || 0)) / 100);
-    cumul += m;
-    return m;
-  });
-}
-
-export default function GrillesTarifaires({ classes, typesFrais, grilles, peutCreer, onGrillesModifiees, onTypesModifies, onMessage }) {
+export default function GrillesTarifaires({ classes, typesFrais, grilles, peutCreer, onGrillesModifiees, onTypesModifies, onMessage, etablissement }) {
+  // Echeances saisies en MONTANTS, pre-remplies selon le decoupage de l'etablissement (trimestres,
+  // mensualites avec les mois choisis, ou libre) tant qu'elles n'ont pas ete retouchees a la main.
+  const decoupage = lireDecoupage(etablissement);
   const [typeId, setTypeId] = useState("");
   const [classeId, setClasseId] = useState("");
   const [montant, setMontant] = useState("");
   const [publicVise, setPublicVise] = useState("tous");
   const [actif, setActif] = useState(true);
-  const [echeances, setEcheances] = useState(ECHEANCES_DEFAUT);
+  const [echeances, setEcheances] = useState(() => echeancesModele(decoupage, 0));
+  const [retouchees, setRetouchees] = useState(false);
   const [nouveauType, setNouveauType] = useState("");
   const [ajoutType, setAjoutType] = useState(false);
   const [envoi, setEnvoi] = useState(false);
@@ -59,17 +47,18 @@ export default function GrillesTarifaires({ classes, typesFrais, grilles, peutCr
   const type = typesFrais.find((t) => String(t.id) === String(typeId));
   const parEleve = type && estParEleve(type.nom);
   const montantNum = Number(montant) || 0;
-  const lignes = parEleve ? [{ libelle: type.nom, pourcentage: 100, date_limite: echeances[0]?.date_limite || "" }] : echeances;
-  // Arrondi : 33.4 + 33.3 + 33.3 vaut 99.99999999999999 en virgule flottante.
-  const totalPct = Math.round(lignes.reduce((s, e) => s + (Number(e.pourcentage) || 0), 0) * 100) / 100;
-  const montants = repartir(montantNum, lignes);
+  const lignes = parEleve ? [{ libelle: type.nom, montant: String(montantNum), date_limite: echeances[0]?.date_limite || "" }] : echeances;
+  const montants = lignes.map((e) => Math.round(Number(e.montant) || 0));
+  const totalLignes = montants.reduce((t, m) => t + m, 0);
+  const ecart = montantNum - totalLignes;
   const classeChoisie = classes.find((c) => String(c.id) === String(classeId));
   // Ce qui empeche la creation, affiche sous le bouton tant qu'il est grise.
   const manquants = [
     !type && "le type de frais",
     !classeId && "la classe",
     montantNum <= 0 && "le montant annuel",
-    totalPct !== 100 && "des pourcentages totalisant 100 %",
+    montantNum > 0 && ecart !== 0 && `des échéances totalisant le montant annuel (écart de ${formaterGNF(Math.abs(ecart))})`,
+    montants.some((m) => m <= 0) && "un montant pour chaque échéance",
     lignes.some((e) => !e.libelle) && "le libellé de chaque échéance",
     lignes.some((e) => !e.date_limite) && "la date limite de chaque échéance",
   ].filter(Boolean);
@@ -80,8 +69,21 @@ export default function GrillesTarifaires({ classes, typesFrais, grilles, peutCr
     if (estParEleve(t.nom)) setPublicVise("tous");
   };
 
-  const modifierEcheance = (i, champ, valeur) =>
+  const modifierEcheance = (i, champ, valeur) => {
     setEcheances(parEleve ? [{ ...lignes[0], [champ]: valeur }] : echeances.map((e, j) => (j === i ? { ...e, [champ]: valeur } : e)));
+    if (!parEleve) setRetouchees(true);
+  };
+
+  // Montant annuel : les echeances suivent tant qu'elles n'ont pas ete retouchees.
+  const changerMontant = (valeur) => {
+    setMontant(valeur);
+    if (!retouchees) setEcheances(echeancesModele(decoupage, valeur));
+  };
+
+  const repartirSelonDecoupage = () => {
+    setEcheances(echeancesModele(decoupage, montantNum));
+    setRetouchees(false);
+  };
 
   const ajouterType = async (e) => {
     e.preventDefault();
@@ -118,7 +120,8 @@ export default function GrillesTarifaires({ classes, typesFrais, grilles, peutCr
           : `Grille ${type.nom} créée pour ${classeChoisie?.nom}.`
       );
       setMontant("");
-      setEcheances(ECHEANCES_DEFAUT);
+      setEcheances(echeancesModele(decoupage, 0));
+      setRetouchees(false);
       await onGrillesModifiees();
     } catch (err) {
       onMessage("erreur", err.response?.data?.message || "Erreur lors de la création de la grille.");
@@ -248,8 +251,8 @@ export default function GrillesTarifaires({ classes, typesFrais, grilles, peutCr
                 type="number"
                 min="1"
                 value={montant}
-                onChange={(e) => setMontant(e.target.value)}
-                placeholder="ex : 3000000"
+                onChange={(e) => changerMontant(e.target.value)}
+                placeholder="ex : 3150000"
                 className={`${CHAMP} tabular-nums text-sm`}
                 required
               />
@@ -300,12 +303,22 @@ export default function GrillesTarifaires({ classes, typesFrais, grilles, peutCr
             </div>
 
             <div className="bg-slate-50/80 rounded-xl p-3.5 border border-slate-200 space-y-2.5">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-800">{parEleve ? "Échéance unique" : "Ventilation des échéances"}</span>
-                <span className={`text-[11px] tabular-nums font-bold px-2 py-0.5 rounded ${totalPct === 100 ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"}`}>
-                  Total : {totalPct}% {totalPct === 100 ? "✓" : "(doit faire 100 %)"}
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-bold text-slate-800">{parEleve ? "Échéance unique" : `Échéances (${lignes.length})`}</span>
+                <span className={`text-[11px] tabular-nums font-bold px-2 py-0.5 rounded ${montantNum > 0 && ecart === 0 ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"}`}>
+                  Total : {formaterGNF(totalLignes)} {montantNum > 0 && ecart === 0 ? "✓" : `(doit faire ${formaterGNF(montantNum)})`}
                 </span>
               </div>
+              {!parEleve && (
+                <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-500">
+                  <span>Modèle de l'établissement : {libelleDecoupage(decoupage)}</span>
+                  {retouchees && (
+                    <button type="button" onClick={repartirSelonDecoupage} className="font-semibold text-[#0C447C] hover:underline cursor-pointer">
+                      Répartir selon ce modèle
+                    </button>
+                  )}
+                </div>
+              )}
               {lignes.map((e, i) => (
                 <div key={i} className="grid grid-cols-12 gap-1.5 items-center text-xs">
                   <input
@@ -313,30 +326,29 @@ export default function GrillesTarifaires({ classes, typesFrais, grilles, peutCr
                     onChange={(ev) => modifierEcheance(i, "libelle", ev.target.value)}
                     disabled={parEleve}
                     placeholder="Libellé"
-                    className="col-span-4 bg-white border border-slate-300 rounded-lg px-2 py-1 font-semibold disabled:bg-slate-100"
+                    aria-label={`Libellé de l'échéance ${i + 1}`}
+                    className="col-span-3 bg-white border border-slate-300 rounded-lg px-2 py-1 font-semibold disabled:bg-slate-100"
                   />
-                  <div className="col-span-2 flex items-center gap-0.5">
-                    <input
-                      type="number"
-                      min="0"
-                      max="100"
-                      value={e.pourcentage}
-                      disabled={parEleve}
-                      onChange={(ev) => modifierEcheance(i, "pourcentage", ev.target.value)}
-                      className="w-full bg-white border border-slate-300 rounded-lg px-1 py-1 text-center font-bold disabled:bg-slate-100 tabular-nums"
-                    />
-                    <span className="text-slate-400">%</span>
-                  </div>
+                  <input
+                    type="number"
+                    min="0"
+                    value={e.montant}
+                    disabled={parEleve}
+                    onChange={(ev) => modifierEcheance(i, "montant", ev.target.value)}
+                    aria-label={`Montant de l'échéance ${i + 1}`}
+                    className="col-span-3 bg-white border border-slate-300 rounded-lg px-1.5 py-1 text-right font-bold disabled:bg-slate-100 tabular-nums"
+                  />
                   <input
                     type="date"
                     value={e.date_limite}
                     onChange={(ev) => modifierEcheance(i, "date_limite", ev.target.value)}
-                    className="col-span-3 bg-white border border-slate-300 rounded-lg px-1 py-1 text-[11px]"
+                    aria-label={`Date limite de l'échéance ${i + 1}`}
+                    className="col-span-4 bg-white border border-slate-300 rounded-lg px-1 py-1 text-[11px]"
                     required
                   />
-                  <span className="col-span-2 text-right font-semibold text-slate-800 text-[11px] tabular-nums">{montants[i].toLocaleString("fr-FR")}</span>
+                  <span className="col-span-1 text-right text-slate-400 text-[10px] tabular-nums">{montantNum > 0 ? `${Math.round((montants[i] / montantNum) * 100)}%` : ""}</span>
                   {!parEleve && echeances.length > 1 ? (
-                    <button type="button" onClick={() => setEcheances(echeances.filter((_, j) => j !== i))} className="col-span-1 text-slate-400 hover:text-rose-600 cursor-pointer justify-self-end" title="Retirer">
+                    <button type="button" onClick={() => { setEcheances(echeances.filter((_, j) => j !== i)); setRetouchees(true); }} className="col-span-1 text-slate-400 hover:text-rose-600 cursor-pointer justify-self-end" title="Retirer">
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   ) : (
@@ -347,7 +359,7 @@ export default function GrillesTarifaires({ classes, typesFrais, grilles, peutCr
               {!parEleve && (
                 <button
                   type="button"
-                  onClick={() => setEcheances([...echeances, { libelle: `Tranche ${echeances.length + 1}`, pourcentage: 0, date_limite: "" }])}
+                  onClick={() => { setEcheances([...echeances, { libelle: `Échéance ${echeances.length + 1}`, montant: "", date_limite: "" }]); setRetouchees(true); }}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-dashed border-slate-300 bg-white text-xs text-slate-500 hover:bg-slate-50 cursor-pointer"
                 >
                   <Plus className="h-3.5 w-3.5" /> Ajouter une échéance
