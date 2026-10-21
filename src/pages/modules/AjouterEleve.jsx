@@ -3,6 +3,12 @@ import { useNavigate } from "react-router-dom";
 import api from "../../services/api";
 import { ArrowLeft } from "lucide-react";
 import { Card, Button, Input, Select } from "../../components/ui/LakoliDesignSystem";
+import ChampAutocomplete from "../../components/ChampAutocomplete";
+import { LIEUX_NAISSANCE } from "../../constants/lieux";
+
+// Meme apparence que <Input> du design system.
+const CHAMP_LIEU =
+  "w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-[#2563EB] focus:ring-1 focus:ring-[#2563EB] transition-colors duration-150";
 
 export default function AjouterEleve() {
   const navigate = useNavigate();
@@ -77,7 +83,13 @@ export default function AjouterEleve() {
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-600 mb-1">Lieu de naissance</label>
-              <Input name="lieu_naissance" value={form.lieu_naissance} onChange={handleChange} />
+              <ChampAutocomplete
+                value={form.lieu_naissance}
+                onChange={(valeur) => setForm((f) => ({ ...f, lieu_naissance: valeur }))}
+                suggestions={LIEUX_NAISSANCE}
+                placeholder="Ex : Conakry"
+                className={CHAMP_LIEU}
+              />
             </div>
             <div className="md:col-span-2">
               <label className="block text-xs font-semibold text-slate-600 mb-1">Classe *</label>

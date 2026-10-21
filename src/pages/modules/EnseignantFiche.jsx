@@ -19,6 +19,8 @@ import {
   X,
 } from "lucide-react";
 import BadgeContrat from "../../components/enseignants/BadgeContrat";
+import ChampAutocomplete from "../../components/ChampAutocomplete";
+import { LIEUX_NAISSANCE } from "../../constants/lieux";
 import { degradeEnseignant, initialesEnseignant, libelleAnciennete, formaterGNF, formaterDate } from "../../components/enseignants/theme";
 import { MOIS, ouvrirFenetreVierge, genererEtImprimerFichePaie, imprimerDocument } from "../../utils/impression";
 import { genererFicheEnseignantHtml } from "../../utils/ficheEnseignant";
@@ -348,7 +350,15 @@ export default function EnseignantFiche({ permissions = [], etablissement = null
                   {champ("telephone", "Téléphone")}
                   {champ("email", "E-mail", "email")}
                   {champ("diplome", "Diplôme")}
-                  {champ("lieu_naissance", "Lieu de naissance")}
+                  <div>
+                    <label className="text-[11px] text-slate-500 font-semibold block mb-0.5">Lieu de naissance</label>
+                    <ChampAutocomplete
+                      value={edition.lieu_naissance ?? ""}
+                      onChange={(valeur) => setEdition({ ...edition, lieu_naissance: valeur })}
+                      suggestions={LIEUX_NAISSANCE}
+                      className="w-full px-2 py-1.5 bg-white border border-slate-300 rounded-lg text-xs focus:outline-none focus:border-[#0C447C]"
+                    />
+                  </div>
                   <button
                     onClick={enregistrer}
                     disabled={enregistrement}

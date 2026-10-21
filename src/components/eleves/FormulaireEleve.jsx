@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { User, Users, GraduationCap, AlertTriangle, Save, X, Loader2 } from "lucide-react";
 import api from "../../services/api";
+import ChampAutocomplete from "../ChampAutocomplete";
+import { LIEUX_NAISSANCE } from "../../constants/lieux";
 
 // Mode edition de la fiche eleve (design "Fiche et modification eleve") : identite, classe et
 // filiation, sur PUT /eleves/{id}. Un changement de classe demande de choisir entre une correction
@@ -136,7 +138,13 @@ export default function FormulaireEleve({ eleve, onAnnuler, onEnregistre }) {
           </div>
           <div>
             <Libelle>Lieu de naissance</Libelle>
-            <input name="lieu_naissance" value={form.lieu_naissance} onChange={maj} placeholder="Ex : Conakry" className={CHAMP} />
+            <ChampAutocomplete
+              value={form.lieu_naissance}
+              onChange={(valeur) => setForm((f) => ({ ...f, lieu_naissance: valeur }))}
+              suggestions={LIEUX_NAISSANCE}
+              placeholder="Ex : Conakry"
+              className={CHAMP}
+            />
           </div>
           <div className="sm:col-span-2">
             <Libelle>Classe</Libelle>

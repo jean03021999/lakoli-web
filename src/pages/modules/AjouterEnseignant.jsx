@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import api from "../../services/api";
 import { ArrowLeft, ArrowRight, CheckCircle2, ShieldCheck, User, FileText } from "lucide-react";
 import BadgeContrat from "../../components/enseignants/BadgeContrat";
+import ChampAutocomplete from "../../components/ChampAutocomplete";
+import { LIEUX_NAISSANCE } from "../../constants/lieux";
 import { degradeEnseignant, formaterGNF, formaterDate } from "../../components/enseignants/theme";
 
 // Nouveau dossier enseignant en 3 etapes (design "Gestion des enseignants") : identite, contrat,
@@ -166,7 +168,7 @@ export default function AjouterEnseignant() {
             <Champ libelle="Nom" requis><input name="nom" value={form.nom} onChange={maj} placeholder="ex : Diallo" className={CHAMP} /></Champ>
             <Champ libelle="Prénom(s)" requis><input name="prenom" value={form.prenom} onChange={maj} placeholder="ex : Mamadou" className={CHAMP} /></Champ>
             <Champ libelle="Date de naissance" requis><input type="date" name="date_naissance" value={form.date_naissance} onChange={maj} className={CHAMP} /></Champ>
-            <Champ libelle="Lieu de naissance"><input name="lieu_naissance" value={form.lieu_naissance} onChange={maj} placeholder="ex : Conakry, Kindia, Labé..." className={CHAMP} /></Champ>
+            <Champ libelle="Lieu de naissance"><ChampAutocomplete value={form.lieu_naissance} onChange={(valeur) => setForm((f) => ({ ...f, lieu_naissance: valeur }))} suggestions={LIEUX_NAISSANCE} placeholder="ex : Conakry, Kindia, Labé..." className={CHAMP} /></Champ>
             <Champ libelle="Téléphone"><input name="telephone" value={form.telephone} onChange={maj} placeholder="+224 62X XX XX XX" className={CHAMP} /></Champ>
             <Champ libelle="E-mail"><input type="email" name="email" value={form.email} onChange={maj} placeholder="nom@exemple.com" className={CHAMP} /></Champ>
             <div className="md:col-span-2">

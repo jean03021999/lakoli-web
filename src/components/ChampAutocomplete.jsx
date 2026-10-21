@@ -5,11 +5,15 @@ import { useState } from "react";
  * dans un dropdown React controle (evite <datalist>, peu fiable sur Safari).
  * L'utilisateur peut toujours valider une valeur absente des suggestions.
  */
+// Comparaison sans majuscules ni accents : « labe » trouve « Labé ».
+const normaliser = (texte) => texte.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+
 export default function ChampAutocomplete({ value, onChange, suggestions = [], placeholder, style, className = "", required }) {
   const [ouvert, setOuvert] = useState(false);
 
-  const suggestionsFiltrees = value.trim()
-    ? suggestions.filter((s) => s.toLowerCase().includes(value.trim().toLowerCase()))
+  const saisie = normaliser(value.trim());
+  const suggestionsFiltrees = saisie
+    ? suggestions.filter((s) => normaliser(s).includes(saisie) && normaliser(s) !== saisie)
     : [];
 
   return (
