@@ -140,11 +140,13 @@ export default function Eleves({ permissions = [] }) {
     setAfficherSuggestions(false);
   };
 
-  // Suit l'ordre pedagogique renvoye par /classes (Maternelle -> Primaire -> College -> Lycee)
-  // plutot qu'un tri alphabetique, qui melangeait les niveaux (ex: "CE1" avant "CP").
+  // Toutes les classes de l'ecole, meme sans eleve encore (ex: Creche dont la grille est deja
+  // creee), dans l'ordre pedagogique renvoye par /classes (Maternelle -> Primaire -> College ->
+  // Lycee) plutot qu'un tri alphabetique, qui melangeait les niveaux (ex: "CE1" avant "CP").
+  // Une classe d'eleve absente de /classes (droit classes.voir manquant) est ajoutee a la fin.
   const classesDisponibles = useMemo(() => {
-    const presentes = new Set(eleves.map((e) => e.classe).filter(Boolean));
-    return ordreClasses.filter((nom) => presentes.has(nom));
+    const presentes = eleves.map((e) => e.classe).filter(Boolean);
+    return [...new Set([...ordreClasses, ...presentes])];
   }, [eleves, ordreClasses]);
 
   const session = eleves.find((e) => e.inscription_active?.session_scolaire?.libelle)?.inscription_active.session_scolaire.libelle;
@@ -340,7 +342,7 @@ export default function Eleves({ permissions = [] }) {
         <button
           type="button"
           onClick={imprimerListe}
-          disabled={chargement || classesDisponibles.length === 0}
+          disabled={chargement || eleves.length === 0}
           title={`${classeFiltre === "all" ? "Imprime une page par classe" : `Imprime la liste de la classe ${classeFiltre}`}${
             statutFiltre === "all" ? "" : ` (élèves « ${LIBELLES_FILTRE_STATUT[statutFiltre]} » uniquement)`
           }`}
