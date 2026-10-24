@@ -67,7 +67,6 @@ export default function FormulaireEleve({ eleve, onAnnuler, onEnregistre }) {
     const manquants = {};
     if (!form.nom.trim()) manquants.nom = "Le nom est obligatoire.";
     if (!form.prenom.trim()) manquants.prenom = "Le prénom est obligatoire.";
-    if (!form.date_naissance) manquants.date_naissance = "La date de naissance est obligatoire.";
     if (classeChangee && modeClasse === "changement" && !motif.trim()) manquants.motif = "Indiquez le motif du changement de classe.";
     setErreurs(manquants);
     if (Object.keys(manquants).length) return;
@@ -132,7 +131,7 @@ export default function FormulaireEleve({ eleve, onAnnuler, onEnregistre }) {
             {erreurs.prenom && <p className="mt-1 text-xs text-rose-600">{erreurs.prenom}</p>}
           </div>
           <div>
-            <Libelle requis>Date de naissance</Libelle>
+            <Libelle>Date de naissance</Libelle>
             <input type="date" name="date_naissance" value={form.date_naissance} onChange={maj} className={champ("date_naissance")} />
             {erreurs.date_naissance && <p className="mt-1 text-xs text-rose-600">{erreurs.date_naissance}</p>}
           </div>

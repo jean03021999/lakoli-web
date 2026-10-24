@@ -78,8 +78,8 @@ export default function AjouterEleve() {
               <Input name="prenom" value={form.prenom} onChange={handleChange} required />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1">Date de naissance *</label>
-              <Input type="date" name="date_naissance" value={form.date_naissance} onChange={handleChange} required />
+              <label className="block text-xs font-semibold text-slate-600 mb-1">Date de naissance</label>
+              <Input type="date" name="date_naissance" value={form.date_naissance} onChange={handleChange} />
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-600 mb-1">Lieu de naissance</label>
