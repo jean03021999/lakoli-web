@@ -34,9 +34,12 @@ export function regrouperVersements(paiements) {
     v.reference = v.reference || p.reference;
     v.caissier = v.caissier || p.caissier;
     v.annule = v.annule && Boolean(p.annule);
+    // Versement qui en corrige un autre : « Correction du reçu ... par ... : motif ».
+    v.observation = v.observation || p.observation || null;
     v.details.push({
       id: p.id,
       echeance_eleve_id: p.echeance_eleve_id,
+      frais_eleve_id: p.frais_eleve_id,
       type_frais: p.type_frais,
       libelle: p.libelle,
       montant: parseFloat(p.montant) || 0,

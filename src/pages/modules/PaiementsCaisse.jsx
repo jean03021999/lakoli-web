@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import useActualisation from "../../hooks/useActualisation";
 import api from "../../services/api";
-import { FileSpreadsheet, FileText, Search, Printer, ChevronLeft, ChevronRight, X, Ban, AlertTriangle, Loader2 } from "lucide-react";
+import { FileSpreadsheet, FileText, Search, Printer, ChevronLeft, ChevronRight, X, Ban, AlertTriangle, Loader2, Pencil } from "lucide-react";
 import { regrouperVersements } from "../../utils/versements";
 import CarteSoldeCaisse from "../../components/caisse/CarteSoldeCaisse";
 import SortiesCaisse from "../../components/caisse/SortiesCaisse";
@@ -58,6 +58,7 @@ export default function PaiementsCaisse({ etablissement = null, permissions = []
   const [aAnnuler, setAAnnuler] = useState(null); // versement a annuler
   const [motif, setMotif] = useState("");
   const [annulation, setAnnulation] = useState({ envoi: false, erreur: "" });
+  const [aCorriger, setACorriger] = useState(null); // { versement, lignes, moyen, date, motif, envoi, erreur }
   const [succes, setSucces] = useState("");
   const [rechargement, setRechargement] = useState(0);
   const actualisation = useActualisation();
@@ -94,6 +95,45 @@ export default function PaiementsCaisse({ etablissement = null, permissions = []
     } catch (err) {
       const liste = err.response?.data?.errors;
       setAnnulation({ envoi: false, erreur: liste ? Object.values(liste).flat()[0] : err.response?.data?.message || "Annulation impossible." });
+    }
+  };
+
+  // Correction d'un versement (erreur de montant, de moyen ou de date) : l'ancien est annule et le
+  // bon reenregistre sous un nouveau recu, en une operation. Un montant par frais du versement.
+  const ouvrirCorrection = (v) => {
+    const parFrais = new Map();
+    v.details.forEach((d) => {
+      const cle = d.frais_eleve_id ?? `sans-${d.id}`;
+      if (!parFrais.has(cle)) parFrais.set(cle, { frais_eleve_id: d.frais_eleve_id, libelle: d.type_frais || d.libelle || "Paiement", initial: 0 });
+      parFrais.get(cle).initial += d.montant;
+    });
+    setACorriger({
+      versement: v,
+      lignes: [...parFrais.values()].map((l) => ({ ...l, montant: String(Math.round(l.initial)) })),
+      moyen: v.moyen_paiement,
+      date: String(v.date_paiement || "").slice(0, 10),
+      motif: "",
+      envoi: false,
+      erreur: "",
+    });
+  };
+  const changerCorrection = (champs) => setACorriger((c) => ({ ...c, ...champs }));
+  const corriger = async () => {
+    changerCorrection({ envoi: true, erreur: "" });
+    try {
+      const res = await api.post("/frais/paiements/corriger", {
+        paiement_ids: aCorriger.versement.details.map((d) => d.id),
+        lignes: aCorriger.lignes.map((l) => ({ frais_eleve_id: l.frais_eleve_id, montant: Number(l.montant) || 0 })),
+        moyen_paiement: aCorriger.moyen,
+        date_paiement: aCorriger.date,
+        motif: aCorriger.motif.trim(),
+      });
+      setACorriger(null);
+      setSucces(`${res.data.message} Réimprimez-le depuis le journal (icône imprimante).`);
+      setRechargement((n) => n + 1);
+    } catch (err) {
+      const liste = err.response?.data?.errors;
+      changerCorrection({ envoi: false, erreur: liste ? Object.values(liste).flat()[0] : err.response?.data?.message || "Correction impossible." });
     }
   };
 
@@ -468,6 +508,9 @@ export default function PaiementsCaisse({ etablissement = null, permissions = []
                             Annulé{v.annule_par ? ` par ${v.annule_par}` : ""} : {v.motif_annulation}
                           </div>
                         )}
+                        {!v.annule && v.observation && (
+                          <div className="text-[10px] text-amber-700 max-w-52 whitespace-normal mt-0.5">{v.observation}</div>
+                        )}
                       </td>
                       <td className="py-3 px-4 text-right whitespace-nowrap">
                         <button
@@ -479,6 +522,16 @@ export default function PaiementsCaisse({ etablissement = null, permissions = []
                         >
                           <Printer className="w-4 h-4" />
                         </button>
+                        {peutAnnuler && !v.annule && (
+                          <button
+                            type="button"
+                            onClick={() => ouvrirCorrection(v)}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-amber-600 hover:bg-amber-50 transition-colors cursor-pointer"
+                            title="Corriger ce versement (montant, moyen ou date)"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </button>
+                        )}
                         {peutAnnuler && !v.annule && (
                           <button
                             type="button"
@@ -632,6 +685,102 @@ export default function PaiementsCaisse({ etablissement = null, permissions = []
           </div>
         </div>
       )}
+
+      {aCorriger && (() => {
+        const v = aCorriger.versement;
+        const total = aCorriger.lignes.reduce((s, l) => s + (Number(l.montant) || 0), 0);
+        const sansFrais = aCorriger.lignes.some((l) => !l.frais_eleve_id);
+        const montantsValides = aCorriger.lignes.every((l) => l.montant !== "" && Number(l.montant) >= 0);
+        const pret = !sansFrais && montantsValides && total >= 1 && aCorriger.date && aCorriger.motif.trim().length >= 3;
+        const champ = "w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-200 focus:border-amber-400";
+        const etiquette = "block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1.5";
+        return (
+          <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-[2px] flex items-center justify-center p-4" onClick={() => !aCorriger.envoi && setACorriger(null)}>
+            <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-start gap-3">
+                <span className="w-11 h-11 rounded-2xl bg-amber-100 text-amber-600 flex items-center justify-center shrink-0"><Pencil className="w-5 h-5" /></span>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">Corriger ce versement</h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    {v.eleve?.nom_complet} · {formaterGNF(v.montant)} · {referenceVersement(v)}
+                  </p>
+                </div>
+              </div>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                L'ancien reçu reste dans le journal, barré, avec votre nom et le motif. Le versement corrigé est enregistré sous un
+                nouveau reçu, à remettre à la famille à la place de l'ancien.
+              </p>
+
+              {sansFrais ? (
+                <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-700">
+                  Les frais de ce versement n'existent plus : annulez-le, puis enregistrez le bon paiement.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {aCorriger.lignes.map((l, i) => (
+                    <div key={l.frais_eleve_id}>
+                      <label className={etiquette}>
+                        {l.libelle} (GNF) <span className="normal-case font-medium text-slate-400">· saisi : {formaterGNF(l.initial)}</span>
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="1"
+                        inputMode="numeric"
+                        autoFocus={i === 0}
+                        value={l.montant}
+                        onChange={(e) => changerCorrection({ lignes: aCorriger.lignes.map((x, j) => (j === i ? { ...x, montant: e.target.value } : x)) })}
+                        className={`${champ} tabular-nums`}
+                      />
+                    </div>
+                  ))}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className={etiquette}>Moyen</label>
+                      <select value={aCorriger.moyen} onChange={(e) => changerCorrection({ moyen: e.target.value })} className={champ}>
+                        {Object.entries(MOYENS).map(([cle, m]) => (
+                          <option key={cle} value={cle}>{m.libelle}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className={etiquette}>Date</label>
+                      <input type="date" max={dateLocale()} value={aCorriger.date} onChange={(e) => changerCorrection({ date: e.target.value })} className={champ} />
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs">
+                    <span className="font-semibold text-slate-600">Nouveau total</span>
+                    <span className="font-extrabold text-sm tabular-nums text-[#15803d]">{formaterGNF(total)}</span>
+                  </div>
+                  <div>
+                    <label className={etiquette}>Motif de la correction *</label>
+                    <input
+                      value={aCorriger.motif}
+                      onChange={(e) => changerCorrection({ motif: e.target.value })}
+                      placeholder="Ex : 500 000 saisi au lieu de 50 000, payé par Orange Money…"
+                      className={champ}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {aCorriger.erreur && <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-700">{aCorriger.erreur}</div>}
+              <div className="flex items-center justify-end gap-3 pt-1">
+                <button type="button" onClick={() => setACorriger(null)} disabled={aCorriger.envoi} className="px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 cursor-pointer">Retour</button>
+                <button
+                  type="button"
+                  onClick={corriger}
+                  disabled={aCorriger.envoi || !pret}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                >
+                  {aCorriger.envoi ? <Loader2 className="w-4 h-4 animate-spin" /> : <Pencil className="w-4 h-4" />}
+                  Enregistrer la correction
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
