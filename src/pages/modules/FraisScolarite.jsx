@@ -21,10 +21,12 @@ import {
   Search,
   Ban,
   Printer,
+  FileSpreadsheet,
 } from "lucide-react";
 import { calculerStatutEcheance } from "../../constants/statutEcheance";
 import { situationGlobaleDepuisSuivi } from "../../utils/situationFrais";
 import GrillesTarifaires from "../../components/frais/GrillesTarifaires";
+import FichesTarifaires from "../../components/frais/fiches/FichesTarifaires";
 import {
   STYLE_CARTE,
   MOYENS,
@@ -595,7 +597,7 @@ export default function FraisScolarite({ permissions = [], etablissement = null 
             </div>
             <div>
               <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight">Frais de Scolarité & Facturation</h1>
-              <p className="text-xs sm:text-sm text-white/70 font-medium mt-0.5">Suivi des paiements · Inscriptions · Grilles tarifaires</p>
+              <p className="text-xs sm:text-sm text-white/70 font-medium mt-0.5">Suivi des paiements · Inscriptions · Fiches tarifaires</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -627,7 +629,8 @@ export default function FraisScolarite({ permissions = [], etablissement = null 
       <div className="flex items-center gap-2 p-1.5 bg-slate-200/60 rounded-xl w-fit">
         {[
           { id: "suivi", libelle: "Suivi des paiements", icone: ClipboardList },
-          { id: "grilles", libelle: "Grilles tarifaires", icone: Layers },
+          { id: "fiches", libelle: "Fiches tarifaires", icone: FileSpreadsheet },
+          { id: "grilles", libelle: "Détail des grilles", icone: Layers },
         ].map((o) => (
           <button
             key={o.id}
@@ -1184,7 +1187,7 @@ export default function FraisScolarite({ permissions = [], etablissement = null 
                   {suivi && fraisAEcheances.length === 0 && (
                     <div className="bg-white p-8 text-center border border-slate-100/90" style={STYLE_CARTE}>
                       <p className="text-sm font-semibold text-slate-600">Aucun frais de scolarité appliqué à cet élève</p>
-                      <p className="text-xs text-slate-400 mt-1">Créez ou synchronisez la grille tarifaire de sa classe dans l'onglet Grilles tarifaires.</p>
+                      <p className="text-xs text-slate-400 mt-1">Créez la fiche tarifaire de sa classe (onglet Fiches tarifaires) ou synchronisez sa grille (Détail des grilles).</p>
                     </div>
                   )}
 
@@ -1261,12 +1264,24 @@ export default function FraisScolarite({ permissions = [], etablissement = null 
         </div>
       )}
 
+      {onglet === "fiches" && (
+        <FichesTarifaires
+          classes={classes}
+          peutCreer={peutInscrire}
+          onModifiees={() => Promise.all([chargerGrilles(), chargerTypes()])}
+          onMessage={(type, texte) => {
+            setErreur(type === "erreur" ? texte : "");
+            setSucces(type === "succes" ? texte : "");
+          }}
+        />
+      )}
       {onglet === "grilles" && (
         <GrillesTarifaires
           classes={classes}
           typesFrais={typesFrais}
           grilles={grillesExistantes}
           peutCreer={peutInscrire}
+          avecCreation={false}
           onGrillesModifiees={chargerGrilles}
           onTypesModifies={chargerTypes}
           onMessage={(type, texte) => {

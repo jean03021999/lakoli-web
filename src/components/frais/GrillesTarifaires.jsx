@@ -40,7 +40,7 @@ function repartir(montant, echeances) {
   });
 }
 
-export default function GrillesTarifaires({ classes, typesFrais, grilles, peutCreer, onGrillesModifiees, onTypesModifies, onMessage }) {
+export default function GrillesTarifaires({ classes, typesFrais, grilles, peutCreer, avecCreation = true, onGrillesModifiees, onTypesModifies, onMessage }) {
   const [typeId, setTypeId] = useState("");
   const [classeId, setClasseId] = useState("");
   const [montant, setMontant] = useState("");
@@ -164,8 +164,8 @@ export default function GrillesTarifaires({ classes, typesFrais, grilles, peutCr
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-      {/* Creation */}
-      {peutCreer && (
+      {/* Creation (remplacee par les fiches tarifaires : avecCreation=false) */}
+      {peutCreer && avecCreation && (
         <div className="lg:col-span-5 bg-white p-5 border border-slate-100/90" style={STYLE_CARTE}>
           <div className="flex items-center gap-3 pb-3 mb-4 border-b border-slate-100">
             <span className="w-9 h-9 rounded-xl bg-blue-50 text-[#0C447C] flex items-center justify-center"><Layers className="w-5 h-5" /></span>
@@ -369,7 +369,7 @@ export default function GrillesTarifaires({ classes, typesFrais, grilles, peutCr
       )}
 
       {/* Grilles existantes */}
-      <div className={`${peutCreer ? "lg:col-span-7" : "lg:col-span-12"} space-y-4`}>
+      <div className={`${peutCreer && avecCreation ? "lg:col-span-7" : "lg:col-span-12"} space-y-4`}>
         <div className="bg-white p-4 border border-slate-100/90 flex flex-wrap items-center justify-between gap-3" style={STYLE_CARTE}>
           <div className="flex items-center gap-2">
             <SlidersHorizontal className="w-4 h-4 text-[#0C447C]" />
@@ -394,7 +394,7 @@ export default function GrillesTarifaires({ classes, typesFrais, grilles, peutCr
         {groupes.length === 0 ? (
           <div className="bg-white p-12 text-center border border-slate-100/90" style={STYLE_CARTE}>
             <p className="text-sm font-bold text-slate-700">{grilles.length === 0 ? "Aucune grille tarifaire n'a encore été créée" : "Aucune grille correspondante"}</p>
-            {peutCreer && <p className="text-xs text-slate-400 mt-1">Créez une grille avec le formulaire.</p>}
+            {peutCreer && <p className="text-xs text-slate-400 mt-1">{avecCreation ? "Créez une grille avec le formulaire." : "Créez une fiche tarifaire pour vos classes."}</p>}
           </div>
         ) : (
           groupes.map(({ classe, grilles: gs }) => (
