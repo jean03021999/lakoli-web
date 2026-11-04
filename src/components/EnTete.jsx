@@ -65,8 +65,8 @@ export default function EnTete({ etablissement, session, utilisateur, libelleRol
     if (index) return;
     setIndex({ eleves: [], enseignants: [], classes: [] });
     Promise.allSettled([
-      permissions.includes("eleves.voir") ? api.get("/eleves") : Promise.reject(),
-      permissions.includes("enseignants.voir") ? api.get("/enseignants") : Promise.reject(),
+      modules.some((m) => m.chemin === "/eleves") ? api.get("/eleves") : Promise.reject(),
+      modules.some((m) => m.chemin === "/enseignants") ? api.get("/enseignants") : Promise.reject(),
       permissions.includes("classes.voir") ? api.get("/classes") : Promise.reject(),
     ]).then(([elv, ens, cls]) =>
       setIndex({

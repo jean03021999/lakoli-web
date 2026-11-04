@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import api, { CLE_STATS_ELEVES, EVENEMENT_STATS_ELEVES } from "../services/api";
 import EnTete from "./EnTete";
 import AvatarUtilisateur from "./AvatarUtilisateur";
+import { cheminMasque } from "../utils/modulesMasques";
 import { lireApparence, cssFond, chargerPolice, POLICES, EVENEMENT_APPARENCE, lireAlertes, EVENEMENT_ALERTES } from "./parametres/outils";
 import {
   GraduationCap,
@@ -70,6 +71,7 @@ const MODULES = [
 ];
 
 function moduleVisible(module, permissions, role) {
+  if (cheminMasque(role, module.chemin)) return false;
   if (module.roles) return module.roles.includes(role);
   return module.permission === null || permissions.includes(module.permission);
 }
@@ -288,7 +290,7 @@ export default function Layout({ children, role, permissions = [], etablissement
       couleur: "bg-rose-50 text-rose-600",
       titre: `${compteurs.nbRetard} élève${compteurs.nbRetard > 1 ? "s" : ""} en retard de paiement`,
       detail: "Échéance de scolarité dépassée, à relancer.",
-      chemin: "/eleves",
+      chemin: cheminMasque(role, "/eleves") ? "/relances" : "/eleves",
     },
     compteurs.nbSoumises > 0 && {
       id: "evaluations",

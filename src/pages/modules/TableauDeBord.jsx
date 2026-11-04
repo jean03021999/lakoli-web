@@ -29,6 +29,7 @@ import { imprimerDocument, genererRapportComptableHtml } from "../../utils/impre
 import { regrouperVersements } from "../../utils/versements";
 import CarteSoldeCaisse from "../../components/caisse/CarteSoldeCaisse";
 import GraphiquesComptables from "../../components/graphiques/GraphiquesComptables";
+import { cheminMasque } from "../../utils/modulesMasques";
 import { StatCard as StatCardSysteme, Card, Badge, Button, PageHeader } from "../../components/ui/LakoliDesignSystem";
 
 function formaterRole(role) {
@@ -1085,6 +1086,9 @@ function TableauDeBordComptable({ role }) {
 
 function TableauDeBordGenerique({ role }) {
   const navigate = useNavigate();
+  // Pas de lien vers un module masque au role (Fondateur : eleves, enseignants, bulletins).
+  const visible = (chemin) => !cheminMasque(role, chemin);
+  const lien = (chemin) => (visible(chemin) ? () => navigate(chemin) : undefined);
   const actualisation = useActualisation();
 
   const [stats, setStats] = useState({
@@ -1178,12 +1182,16 @@ function TableauDeBordGenerique({ role }) {
         badge={`Espace de Travail ${formaterRole(role)}`}
         actions={
           <div className="flex items-center gap-2">
-            <Button variant="secondary" icon={FileText} onClick={() => navigate("/bulletins")}>
-              Bulletins
-            </Button>
-            <Button variant="primary" icon={GraduationCap} onClick={() => navigate("/eleves")}>
-              Gestion des Élèves
-            </Button>
+            {visible("/bulletins") && (
+              <Button variant="secondary" icon={FileText} onClick={() => navigate("/bulletins")}>
+                Bulletins
+              </Button>
+            )}
+            {visible("/eleves") && (
+              <Button variant="primary" icon={GraduationCap} onClick={() => navigate("/eleves")}>
+                Gestion des Élèves
+              </Button>
+            )}
           </div>
         }
       />
@@ -1195,14 +1203,14 @@ function TableauDeBordGenerique({ role }) {
           value={stats.totalEleves}
           subtitle="Sessions scolaires actives : 2025-2026"
           icon={GraduationCap}
-          onClick={() => navigate("/eleves")}
+          onClick={lien("/eleves")}
         />
         <StatCardSysteme
           title="Corps Enseignant"
           value={stats.enseignantsActifs}
           subtitle="Contrats actifs vérifiés"
           icon={Users}
-          onClick={() => navigate("/enseignants")}
+          onClick={lien("/enseignants")}
         />
         <StatCardSysteme
           title="Évaluations"
@@ -1400,7 +1408,7 @@ function TableauDeBordGenerique({ role }) {
             { texte: "Enregistrer un Élève", chemin: "/eleves-ajouter" },
             { texte: "Calculer les Bulletins", chemin: "/bulletins" },
             { texte: "Consulter l'Emploi du Temps", chemin: "/emploi-du-temps" },
-          ].map((raccourci) => (
+          ].filter((r) => visible(r.chemin)).map((raccourci) => (
             <Button
               key={raccourci.chemin}
               variant="secondary"

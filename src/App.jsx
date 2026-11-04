@@ -28,6 +28,7 @@ import BulletinApercu from "./pages/modules/BulletinApercu";
 import FraisScolarite from "./pages/modules/FraisScolarite";
 import Parametres from "./pages/modules/Parametres";
 import { definirEtablissement } from "./utils/etablissementCourant";
+import { cheminMasque } from "./utils/modulesMasques";
 import Classes from "./pages/modules/Classes";
 import Periodes from "./pages/modules/Periodes";
 import PaiementsCaisse from "./pages/modules/PaiementsCaisse";
@@ -169,6 +170,10 @@ function AppContent() {
 
   if (!role) {
     return <Navigate to="/" />;
+  }
+
+  if (cheminMasque(role, location.pathname)) {
+    return <Navigate to="/tableau-de-bord" replace />;
   }
 
   return (
