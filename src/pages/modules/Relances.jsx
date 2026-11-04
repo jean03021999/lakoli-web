@@ -14,7 +14,7 @@ const CANAUX = { lettre: "Lettre", whatsapp: "WhatsApp", sms: "SMS", appel: "App
 const LIENS = { pere: "Père", mere: "Mère", tuteur: "Tuteur" };
 
 // Numero guineen au format international pour WhatsApp (620 00 00 00 -> 224620000000).
-function numeroInternational(telephone) {
+export function numeroInternational(telephone) {
   let n = String(telephone || "").replace(/\D/g, "");
   if (n.startsWith("00")) n = n.slice(2);
   if (n.length === 9 && n.startsWith("6")) n = `224${n}`;
@@ -22,7 +22,7 @@ function numeroInternational(telephone) {
 }
 
 // Message WhatsApp / SMS, courtois, adresse au parent contacte (Monsieur / Madame selon le lien).
-function messageRelance(ligne, contact, etablissement) {
+export function messageRelance(ligne, contact, etablissement) {
   const ecole = completerEtablissement(etablissement);
   const nomEcole = ecole.nom || "L'établissement";
   const civ = civiliteParent(contact);

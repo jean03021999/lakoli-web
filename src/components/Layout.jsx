@@ -31,6 +31,8 @@ import {
   Receipt,
   BellRing,
   TrendingUp,
+  ShieldAlert,
+  Settings,
 } from "lucide-react";
 
 const COULEURS = {
@@ -68,6 +70,16 @@ const MODULES = [
   // Pas de permission dediee cote backend pour les utilisateurs : on garde la liste de roles.
   { nom: "Utilisateurs", icone: UserCog, chemin: "/utilisateurs", roles: ["DIRECTEUR", "FONDATEUR", "PROVISEUR", "CENSEUR"] },
   { nom: "Abonnement", icone: Sparkles, chemin: "/abonnement", permission: "abonnement.voir" },
+];
+
+// Menu de l'Espace Fondateur (design AI Studio) : ses six pages, dans cet ordre.
+const MODULES_FONDATEUR = [
+  { nom: "Tableau de bord", icone: LayoutDashboard, chemin: "/tableau-de-bord" },
+  { nom: "Recouvrement & impayés", icone: BellRing, chemin: "/relances" },
+  { nom: "Journal de caisse", icone: CreditCard, chemin: "/paiements" },
+  { nom: "Contrôle des annulations", icone: ShieldAlert, chemin: "/controle" },
+  { nom: "Rapports financiers", icone: TrendingUp, chemin: "/rapport-financier" },
+  { nom: "Paramètres", icone: Settings, chemin: "/parametres" },
 ];
 
 function moduleVisible(module, permissions, role) {
@@ -226,7 +238,7 @@ export default function Layout({ children, role, permissions = [], etablissement
   const [alertes, setAlertes] = useState(lireAlertes);
   const [enLigne, setEnLigne] = useState(typeof navigator === "undefined" ? true : navigator.onLine);
 
-  const modulesVisibles = MODULES.filter((m) => moduleVisible(m, permissions, role));
+  const modulesVisibles = role === "FONDATEUR" ? MODULES_FONDATEUR : MODULES.filter((m) => moduleVisible(m, permissions, role));
   const peutVoirEleves = permissions.includes("eleves.voir");
   const peutVoirNotes = permissions.includes("notes.voir");
 

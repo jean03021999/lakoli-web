@@ -30,6 +30,7 @@ import { regrouperVersements } from "../../utils/versements";
 import CarteSoldeCaisse from "../../components/caisse/CarteSoldeCaisse";
 import GraphiquesComptables from "../../components/graphiques/GraphiquesComptables";
 import { cheminMasque } from "../../utils/modulesMasques";
+import TableauDeBordFondateur from "./fondateur/TableauDeBordFondateur";
 import { StatCard as StatCardSysteme, Card, Badge, Button, PageHeader } from "../../components/ui/LakoliDesignSystem";
 
 function formaterRole(role) {
@@ -311,7 +312,10 @@ function badgeStatut(statut) {
   }
 }
 
-export default function TableauDeBord({ role }) {
+export default function TableauDeBord({ role, utilisateur, session, etablissement }) {
+  if (role === "FONDATEUR") {
+    return <TableauDeBordFondateur utilisateur={utilisateur} session={session} etablissement={etablissement} />;
+  }
   if (role === "COMPTABLE") {
     return <TableauDeBordComptable role={role} />;
   }

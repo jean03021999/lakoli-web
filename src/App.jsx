@@ -29,6 +29,10 @@ import FraisScolarite from "./pages/modules/FraisScolarite";
 import Parametres from "./pages/modules/Parametres";
 import { definirEtablissement } from "./utils/etablissementCourant";
 import { cheminMasque } from "./utils/modulesMasques";
+import RecouvrementImpayes from "./pages/modules/fondateur/RecouvrementImpayes";
+import JournalCaisseFondateur from "./pages/modules/fondateur/JournalCaisseFondateur";
+import ControleAnnulations from "./pages/modules/fondateur/ControleAnnulations";
+import RapportsFinanciers from "./pages/modules/fondateur/RapportsFinanciers";
 import Classes from "./pages/modules/Classes";
 import Periodes from "./pages/modules/Periodes";
 import PaiementsCaisse from "./pages/modules/PaiementsCaisse";
@@ -179,7 +183,7 @@ function AppContent() {
   return (
     <Layout role={role} permissions={permissions} etablissement={etablissement} session={session} utilisateur={utilisateur} abonnement={abonnement}>
       <Routes>
-        <Route path="/tableau-de-bord" element={<TableauDeBord role={role} />} />
+        <Route path="/tableau-de-bord" element={<TableauDeBord role={role} utilisateur={utilisateur} session={session} etablissement={etablissement} />} />
         <Route path="/eleves" element={<Eleves permissions={permissions} />} />
         <Route path="/eleves/:id" element={<EleveFiche permissions={permissions} />} />
         <Route
@@ -209,10 +213,11 @@ function AppContent() {
         <Route path="/classes" element={<Classes permissions={permissions} />} />
         <Route path="/periodes" element={<Periodes permissions={permissions} />} />
         <Route path="/utilisateurs" element={<Navigate to="/parametres?section=utilisateurs" replace />} />
-        <Route path="/paiements" element={<RouteProtegee permissions={permissions} requiert="frais.voir"><PaiementsCaisse etablissement={etablissement} permissions={permissions} /></RouteProtegee>} />
+        <Route path="/paiements" element={<RouteProtegee permissions={permissions} requiert="frais.voir">{role === "FONDATEUR" ? <JournalCaisseFondateur etablissement={etablissement} /> : <PaiementsCaisse etablissement={etablissement} permissions={permissions} />}</RouteProtegee>} />
+        <Route path="/controle" element={role === "FONDATEUR" ? <RouteProtegee permissions={permissions} requiert="frais.voir"><ControleAnnulations etablissement={etablissement} permissions={permissions} /></RouteProtegee> : <Navigate to="/tableau-de-bord" replace />} />
         <Route path="/depenses" element={<RouteProtegee permissions={permissions} requiert="frais.voir"><Depenses etablissement={etablissement} permissions={permissions} /></RouteProtegee>} />
-        <Route path="/relances" element={<RouteProtegee permissions={permissions} requiert="frais.voir"><Relances etablissement={etablissement} permissions={permissions} /></RouteProtegee>} />
-        <Route path="/rapport-financier" element={<RouteProtegee permissions={permissions} requiert="frais.voir"><RapportFinancier etablissement={etablissement} /></RouteProtegee>} />
+        <Route path="/relances" element={<RouteProtegee permissions={permissions} requiert="frais.voir">{role === "FONDATEUR" ? <RecouvrementImpayes etablissement={etablissement} permissions={permissions} /> : <Relances etablissement={etablissement} permissions={permissions} />}</RouteProtegee>} />
+        <Route path="/rapport-financier" element={<RouteProtegee permissions={permissions} requiert="frais.voir">{role === "FONDATEUR" ? <RapportsFinanciers etablissement={etablissement} utilisateur={utilisateur} session={session} /> : <RapportFinancier etablissement={etablissement} />}</RouteProtegee>} />
         <Route
           path="/salaires"
           element={<RouteProtegee permissions={permissions} requiert="enseignants.salaires.voir"><Salaires permissions={permissions} /></RouteProtegee>}

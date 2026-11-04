@@ -27,6 +27,8 @@ export function regrouperVersements(paiements) {
         annule_le: p.annule_le || null,
         annule_par: p.annule_par || null,
         motif_annulation: p.motif_annulation || null,
+        cree_le: p.cree_le || null,
+        annulation_justifiee_le: p.annulation_justifiee_le || null,
       });
     }
     const v = parId.get(cle);

@@ -10,6 +10,7 @@ import SectionSessions from "../../components/parametres/SectionSessions";
 import SectionAbonnement from "../../components/parametres/SectionAbonnement";
 import SectionAlertes from "../../components/parametres/SectionAlertes";
 import SectionApparence from "../../components/parametres/SectionApparence";
+import SectionSeuilsControle from "../../components/parametres/SectionSeuilsControle";
 
 // Parametres (design "Parametres LAKOLI") sur GET /parametres : etablissement, profil, securite,
 // utilisateurs et roles, sessions scolaires, abonnement, alertes et apparence. La section ouverte
@@ -34,7 +35,10 @@ const STYLES_TOAST = {
 
 export default function Parametres({ permissions = [], onUtilisateurMaj, onEtablissementMaj, onSessionMaj }) {
   const [parametres, setParametres] = useSearchParams();
-  const section = SECTIONS.some((s) => s.id === parametres.get("section")) ? parametres.get("section") : "etablissement";
+  // Seuils d'alerte des annulations : uniquement pour qui controle la caisse (Fondateur).
+  const peutControler = permissions.includes("frais.controle.gerer");
+  const sections = peutControler ? [...SECTIONS, { id: "controle", libelle: "Seuils d'alerte", icone: "🛡️" }] : SECTIONS;
+  const section = sections.some((s) => s.id === parametres.get("section")) ? parametres.get("section") : "etablissement";
   const [donnees, setDonnees] = useState(null);
   const [erreur, setErreur] = useState("");
   const [toasts, setToasts] = useState([]);
@@ -129,7 +133,7 @@ export default function Parametres({ permissions = [], onUtilisateurMaj, onEtabl
               <p className="text-xs font-bold text-slate-400 uppercase tracking-wider px-2">Navigation des paramètres</p>
             </div>
             <nav className="p-2 space-y-1 flex lg:block overflow-x-auto gap-1">
-              {SECTIONS.map((s) => {
+              {sections.map((s) => {
                 const actif = section === s.id;
                 const badge = s.id === "abonnement" && etablissement.statut !== "actif" ? { texte: etablissement.statut === "essai" ? "Essai" : "Suspendu", danger: etablissement.statut === "suspendu" } : null;
                 return (
@@ -213,6 +217,16 @@ export default function Parametres({ permissions = [], onUtilisateurMaj, onEtabl
           {section === "abonnement" && <SectionAbonnement etablissement={etablissement} consommation={donnees.consommation} />}
           {section === "notifications" && <SectionAlertes permissions={permissions} onToast={toast} />}
           {section === "apparence" && <SectionApparence onToast={toast} />}
+          {section === "controle" && (
+            <SectionSeuilsControle
+              etablissement={etablissement}
+              onToast={toast}
+              onMaj={(e) => {
+                maj("etablissement", e);
+                onEtablissementMaj?.(e);
+              }}
+            />
+          )}
         </div>
       </div>
 
