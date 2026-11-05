@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { X, Save, Loader2, Copy, Check, KeyRound } from "lucide-react";
 import api from "../../services/api";
+import { copierTexte } from "../../utils/pressePapiers";
 import { CHAMP, LIBELLES_ROLES, messageErreur } from "./outils";
 
 // Fenetres de gestion des comptes (direction) : creation / modification, et affichage du mot de
@@ -80,13 +81,9 @@ export function ModaleUtilisateur({ utilisateur, roles, onFermer, onEnregistre }
 export function ModaleMotDePasse({ nom, email, motDePasse, onFermer }) {
   const [copie, setCopie] = useState(false);
   const copier = async () => {
-    try {
-      await navigator.clipboard.writeText(motDePasse);
-      setCopie(true);
-      setTimeout(() => setCopie(false), 2000);
-    } catch {
-      setCopie(false);
-    }
+    if (!(await copierTexte(motDePasse))) return;
+    setCopie(true);
+    setTimeout(() => setCopie(false), 2000);
   };
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-[2px] flex items-center justify-center p-4">

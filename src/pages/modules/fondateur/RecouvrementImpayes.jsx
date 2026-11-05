@@ -5,6 +5,7 @@ import api from "../../../services/api";
 import useActualisation from "../../../hooks/useActualisation";
 import { messageErreurApi } from "../../../utils/erreurs";
 import { imprimerDocument } from "../../../utils/impression";
+import { copierTexte } from "../../../utils/pressePapiers";
 import { telechargerCsv } from "../../../components/frais/configFrais";
 import TableauTriable from "../../../components/fondateur/TableauTriable";
 import BoutonExport from "../../../components/fondateur/BoutonExport";
@@ -26,7 +27,7 @@ function ModaleRelance({ eleves, etablissement, onClose, onEnregistrer }) {
   const message = messageRelance(eleve, eleve.contact, etablissement?.nom);
 
   const copier = async () => {
-    await navigator.clipboard.writeText(message);
+    if (!(await copierTexte(message))) return;
     setCopie(true);
     setTimeout(() => setCopie(false), 2500);
   };

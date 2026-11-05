@@ -1,8 +1,9 @@
 ﻿import axios from "axios";
 
 const api = axios.create({
-  // Adresse de l'API : VITE_API_URL (.env), par defaut le serveur « php artisan serve ».
-  baseURL: import.meta.env.VITE_API_URL || "http://127.0.0.1:8000/api",
+  // Adresse de l'API : VITE_API_URL (.env), par defaut /api sur l'adresse utilisee pour ouvrir
+  // LAKOLI (127.0.0.1 sur le PC de l'ecole, adresse Tailscale a distance).
+  baseURL: import.meta.env.VITE_API_URL || "/api",
   headers: {
     "Content-Type": "application/json",
   },
